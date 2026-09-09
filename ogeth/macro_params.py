@@ -662,9 +662,10 @@ R_GOV_CONVERGENCE_PERIODS = 4
 # targets the floor through the program years, the closest admissible value.
 R_GOV_FLOOR = 0.0
 # Steady-state return on capital the r_gov_shift path is evaluated at: the
-# capital-output ratio target (households.md) puts it at gamma / (K/Y) less
-# depreciation.
-R_SS_FOR_R_GOV = 0.087
+# solved baseline steady state (examples/run_og_eth.py) with beta = 0.92;
+# foreign capital entering at the world rate keeps it below the closed-economy
+# gamma / (K/Y) - delta arithmetic in households.md.
+R_SS_FOR_R_GOV = 0.058
 
 # Allocation of the program's revenue gains across the model's tax
 # instruments: two thirds to consumption taxes (VAT reform, excise, customs),
