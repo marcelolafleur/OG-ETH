@@ -2,6 +2,7 @@ import os
 import json
 from importlib.resources import files
 from ogeth.calibrate import Calibration
+from ogeth.remittances import derived_remittance_params
 from ogcore.parameters import Specifications
 from ogcore.utils import params_to_json
 
@@ -27,6 +28,9 @@ def main():
     d = c.get_dict()
     # update parameters
     p.update_specifications(d)
+    # remittance growth path and allocation are derived from the demographics
+    # just regenerated, so they are rebuilt here rather than left stale
+    p.update_specifications(derived_remittance_params(p))
     # save to json file
     params_to_json(p, os.path.join(CUR_DIR, "ogeth_default_parameters.json"))
 
