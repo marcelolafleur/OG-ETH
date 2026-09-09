@@ -107,6 +107,26 @@ def remittance_eta(omega_SS, lambdas, quintile_value_shares=None):
     return within * group_share.reshape(1, -1)
 
 
+def derive_remittance_params(g_y, g_n, omega_SS, lambdas):
+    """
+    The remittance parameters that depend on a given set of demographics.
+
+    Args:
+        g_y (scalar): model-period productivity growth rate
+        g_n (array_like): population growth path, length T + S
+        omega_SS (array_like): steady-state population distribution, (S, J)
+        lambdas (array_like): population shares of the J groups
+
+    Returns:
+        dict: ``{"g_RM": list, "eta_RM": nested list}`` ready for
+            ``Specifications.update_specifications``
+    """
+    return {
+        "g_RM": flat_share_g_RM(g_y, g_n).tolist(),
+        "eta_RM": remittance_eta(omega_SS, lambdas).tolist(),
+    }
+
+
 def derived_remittance_params(p):
     """
     The remittance parameters that depend on the demographics in ``p``.
@@ -116,14 +136,10 @@ def derived_remittance_params(p):
             ``omega_SS`` and ``lambdas``
 
     Returns:
-        dict: ``{"g_RM": list, "eta_RM": nested list}`` ready for
-            ``Specifications.update_specifications``
+        dict: see ``derive_remittance_params``
     """
     g_n = np.asarray(p.g_n, dtype=float)[: p.T + p.S]
-    return {
-        "g_RM": flat_share_g_RM(p.g_y, g_n).tolist(),
-        "eta_RM": remittance_eta(p.omega_SS, p.lambdas).tolist(),
-    }
+    return derive_remittance_params(p.g_y, g_n, p.omega_SS, p.lambdas)
 
 
 def main():

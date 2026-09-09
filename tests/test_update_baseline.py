@@ -68,3 +68,40 @@ def test_main_json_updates_specifications(monkeypatch, tmp_path):
     assert np.asarray(p.income_tax_filer)[-1].tolist() == pytest.approx(
         [1.0] * 7
     )
+
+
+def test_main_rebuilds_remittance_objects_from_regenerated_demographics(
+    monkeypatch, tmp_path
+):
+    """
+    g_RM and eta_RM are derived from the demographics, so a baseline
+    regeneration must rewrite them from the demographics it saves.
+    """
+    from ogeth import remittances
+
+    output_dir = tmp_path / "baseline_output"
+    output_dir.mkdir()
+    monkeypatch.setattr(update_baseline, "Calibration", MockCalibration)
+    monkeypatch.setattr(
+        update_baseline.os.path,
+        "realpath",
+        lambda _: str(output_dir / "update_baseline.py"),
+    )
+
+    update_baseline.main()
+
+    saved = json.loads(
+        (output_dir / "ogeth_default_parameters.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    p = Specifications(baseline=True)
+    p.update_specifications(saved)
+    expected = remittances.derive_remittance_params(
+        p.g_y,
+        np.asarray(saved["g_n"])[: p.T + p.S],
+        saved["omega_SS"],
+        saved["lambdas"],
+    )
+    assert np.allclose(saved["g_RM"], expected["g_RM"], atol=1e-12)
+    assert np.allclose(saved["eta_RM"], expected["eta_RM"], atol=1e-12)
