@@ -9,9 +9,12 @@ rebuilt whenever the demographics are:
 
 * ``g_RM`` -- ``aggregates.get_RM`` advances detrended remittances by the
   factor ``(1 + g_RM[t]) / (exp(g_y) * (1 + g_n[t-1]))`` between the first
-  period and ``tG1``, so ``RM/Y`` only stays at the calibrated share when
-  that factor is one. ``g_n`` moves along the transition, so the growth rate
-  that holds the share flat is a path, not a scalar (see ``flat_share_g_RM``).
+  period and ``tG1``, independently of that period's output, so remittances
+  keep pace with trend GDP (a constant share on the balanced growth path)
+  only when that factor is one. ``g_n`` moves along the transition, so the
+  growth rate that does this is a path, not a scalar (see
+  ``flat_share_g_RM``). Along the transition ``RM/Y`` then moves inversely
+  with output's deviation from trend.
 * ``eta_RM`` -- the share of aggregate remittances each household receives,
   shaped (S, J). OG-Core's default hands every lifetime-income group exactly
   its population share. ``remittance_eta`` instead maps a data distribution
@@ -50,8 +53,8 @@ RM_QUINTILE_VALUE_SHARES = [
 
 def flat_share_g_RM(g_y, g_n):
     """
-    Remittance growth path that holds aggregate remittances at a constant
-    share of GDP.
+    Remittance growth path that keeps aggregate remittances growing with
+    trend GDP, so their share is constant on the balanced growth path.
 
     Args:
         g_y (scalar): model-period productivity growth rate

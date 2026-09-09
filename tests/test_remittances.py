@@ -1,12 +1,14 @@
 """
 Tests of the remittance calibration in the packaged single-industry JSON.
 
-Remittances are calibrated as a constant share of GDP. Holding that share
-takes two things: ``alpha_RM_1 == alpha_RM_T`` for the level, and a ``g_RM``
-path that tracks ``g_n`` so ``aggregates.get_RM`` neither inflates nor
-deflates remittances along the transition. These tests pin the level against
-its source and assert the share actually stays flat -- the second is the one
-that catches a stale ``g_RM`` after a demographics regeneration.
+Remittances are calibrated as a constant share of GDP on the balanced growth
+path. That takes two things: ``alpha_RM_1 == alpha_RM_T`` for the level, and
+a ``g_RM`` path that tracks ``g_n`` so ``aggregates.get_RM`` keeps detrended
+remittances on trend instead of eroding them along the transition (along the
+actual path RM/Y then moves only with output's deviation from trend). These
+tests pin the level against its source and assert remittances stay exactly on
+trend -- the second is the one that catches a stale ``g_RM`` after a
+demographics regeneration.
 
 No model solve is involved.
 """
@@ -58,13 +60,15 @@ def test_no_remittance_transition_path(packaged):
     assert packaged["alpha_RM_1"] == packaged["alpha_RM_T"]
 
 
-def test_g_rm_holds_remittances_at_a_constant_share_of_gdp(params):
+def test_g_rm_keeps_remittances_on_trend(params):
     """The property the whole calibration rests on.
 
-    ``get_RM`` compounds ``(1 + g_RM[t]) / (exp(g_y) * (1 + g_n[t-1]))``, so a
-    ``g_RM`` that does not track ``g_n`` makes RM/Y drift for the first tG1
-    periods. With Ethiopia's growth rates a scalar ``g_RM = 0`` shrank the
-    share by about 7 percent a year.
+    ``get_RM`` compounds ``(1 + g_RM[t]) / (exp(g_y) * (1 + g_n[t-1]))``
+    independently of output, so with trend output (Y = 1 in detrended
+    units) the share must come out exactly at alpha_RM in every period; a
+    ``g_RM`` that does not track ``g_n`` makes it drift for the first tG1
+    periods. With Ethiopia's growth rates a scalar ``g_RM = 0`` eroded
+    remittances relative to trend by about 7 percent a year.
     """
     Y = np.ones(params.T + params.S)
     ratio = aggr.get_RM(Y, params, "TPI")[: params.T] / Y[: params.T]
