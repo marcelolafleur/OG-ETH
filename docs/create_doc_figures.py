@@ -214,9 +214,9 @@ def calibration_vs_data(output_dir=None, save_path=None, program=None):
     panels = [
         ("Public debt (% of GDP)", 100 * ratio("D"), program.IMF_PUBLIC_DEBT),
         (
-            "Revenue excl. grants (% of GDP)",
+            "Tax revenue (% of GDP)",
             100 * ratio("total_tax_revenue"),
-            program.IMF_REVENUE,
+            program.IMF_TAX_REVENUE,
         ),
         (
             "Primary expenditure (% of GDP)",
@@ -238,8 +238,21 @@ def calibration_vs_data(output_dir=None, save_path=None, program=None):
             program.IMF_TRADE_BALANCE,
         ),
         ("Real GDP growth (%)", 100 * growth, program.IMF_REAL_GDP_GROWTH),
+        (
+            "Gross investment incl. public (% of GDP)",
+            100 * (ratio("I_total") + ratio("I_g")),
+            program.IMF_GROSS_INVESTMENT,
+        ),
+        (
+            "Public debt held abroad (% of GDP)",
+            100 * ratio("D_f"),
+            list(
+                np.array(program.IMF_PUBLIC_DEBT)
+                - np.array(program.IMF_DOMESTIC_DEBT)
+            ),
+        ),
     ]
-    fig, axes = plt.subplots(3, 2, figsize=(11, 10))
+    fig, axes = plt.subplots(4, 2, figsize=(11, 13))
     for ax, (title, model, data) in zip(axes.flat, panels):
         ax.plot(years[: len(model)], model, label="OG-ETH baseline")
         ax.plot(

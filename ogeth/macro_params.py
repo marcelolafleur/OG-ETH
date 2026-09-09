@@ -602,6 +602,15 @@ PROGRAM_YEARS = [
 ]
 IMF_PUBLIC_DEBT = [50.5, 45.3, 40.8, 37.2, 34.0, 31.2, 28.6]
 IMF_REVENUE = [9.2, 10.8, 11.4, 11.8, 12.1, 12.2, 12.3]  # excl. grants
+IMF_TAX_REVENUE = [
+    7.8,
+    9.5,
+    10.1,
+    10.5,
+    10.8,
+    10.9,
+    11.0,
+]  # model has no nontax
 IMF_GRANTS = [1.7, 1.3, 0.9, 0.3, 0.3, 0.3, 0.1]
 IMF_EXPENDITURE = [12.0, 14.1, 13.5, 13.5, 14.0, 14.0, 14.0]
 IMF_RECURRENT = [7.1, 8.2, 8.0, 8.5, 8.6, 8.8, 8.9]
@@ -620,6 +629,7 @@ IMF_TRADE_BALANCE = [
 IMF_PRIVATE_TRANSFERS = [5.6, 6.0, 5.9, 5.3, 4.8, 4.6, 4.1]
 IMF_CURRENT_ACCOUNT = [-1.1, -2.5, -1.3, -1.5, -2.0, -2.0, -2.7]
 IMF_GROSS_INVESTMENT = [20.1, 28.7, 27.5, 27.2, 27.2, 27.4, 26.5]
+IMF_DOMESTIC_DEBT = [18.7, 15.4, 13.7, 12.6, 12.6, 12.5, 11.9]
 
 # Cash transfers to households as a share of GDP. The IMF recurrent line
 # bundles the wage bill, goods and services, interest, and transfers; the
@@ -647,6 +657,14 @@ LONG_RUN_R_GOV = 0.02
 # Periods after the program horizon over which r_gov converges to the
 # long-run rate above
 R_GOV_CONVERGENCE_PERIODS = 4
+# OG-Core floors the sovereign rate at zero (fiscal.get_r_gov), so the
+# program-implied negative real rates are not representable; the shipped path
+# targets the floor through the program years, the closest admissible value.
+R_GOV_FLOOR = 0.0
+# Steady-state return on capital the r_gov_shift path is evaluated at: the
+# capital-output ratio target (households.md) puts it at gamma / (K/Y) less
+# depreciation.
+R_SS_FOR_R_GOV = 0.087
 
 # Allocation of the program's revenue gains across the model's tax
 # instruments: two thirds to consumption taxes (VAT reform, excise, customs),
@@ -757,7 +775,8 @@ def r_gov_shift_path(g_y, g_n, r_gov_scale, r_gov_DY2, debt_ratio_ss, r_ss):
     """
     Level-shift path for the sovereign rate, r_gov = r_gov_scale r - shift +
     premium, that puts the real effective rate on debt on the program-implied
-    path, converges it linearly to LONG_RUN_R_GOV over
+    path (clipped at OG-Core's zero floor), converges it linearly to
+    LONG_RUN_R_GOV over
     R_GOV_CONVERGENCE_PERIODS, and keeps the debt-elastic premium centered on
     debt_ratio_ss (see macro.md). The market return r is approximated by its
     steady-state value; along the transition r moves by at most a percentage
@@ -767,7 +786,7 @@ def r_gov_shift_path(g_y, g_n, r_gov_scale, r_gov_DY2, debt_ratio_ss, r_ss):
         list: r_gov_shift path, length 7 + R_GOV_CONVERGENCE_PERIODS + 1
     """
     d = np.array(IMF_PUBLIC_DEBT) / 100
-    r_prog = implied_real_rate_on_debt(g_y, g_n)
+    r_prog = np.maximum(implied_real_rate_on_debt(g_y, g_n), R_GOV_FLOOR)
     targets = np.concatenate(
         [
             [r_prog[0]],  # period 0: no program-implied value; use period 1
@@ -780,12 +799,15 @@ def r_gov_shift_path(g_y, g_n, r_gov_scale, r_gov_DY2, debt_ratio_ss, r_ss):
     debt = np.concatenate(
         [d, np.full(R_GOV_CONVERGENCE_PERIODS + 1, debt_ratio_ss)]
     )
+    # OG-Core adds r_gov_DY d + r_gov_DY2 d^2 with r_gov_DY = -2 r_gov_DY2 D,
+    # which equals r_gov_DY2 (d - D)^2 - r_gov_DY2 D^2; the shift absorbs the
+    # constant so the premium is exactly zero at the target.
     centering = r_gov_DY2 * debt_ratio_ss**2
     shift = (
         r_gov_scale * r_ss
         + r_gov_DY2 * (debt - debt_ratio_ss) ** 2
+        - centering
         - targets
-        + centering
     )
     return [float(x) for x in shift]
 
@@ -799,13 +821,13 @@ def fiscal_program_params(p, r_ss=None):
         p (Specifications): parameters carrying g_y, g_n, r_gov_scale,
             r_gov_DY2, debt_ratio_ss, tau_c, adjustment_factor_for_cit_receipts
         r_ss (scalar): steady-state market return used in r_gov_shift_path;
-            defaults to p.initial_guess_r_SS
+            defaults to R_SS_FOR_R_GOV
 
     Returns:
         dict: ready for Specifications.update_specifications
     """
     if r_ss is None:
-        r_ss = float(p.initial_guess_r_SS)
+        r_ss = R_SS_FOR_R_GOV
     out = {}
     out.update(program_spending_paths())
     out.update(

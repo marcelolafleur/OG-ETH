@@ -88,21 +88,42 @@ def test_implied_real_rate_on_debt_is_negative_through_the_program(params):
     assert (r < 0).all() and (r > -0.06).all()
 
 
+def test_r_gov_path_sits_on_the_floor_through_the_program(params):
+    """OG-Core floors r_gov at zero, so the shipped shift path targets the
+    floor (not the negative program-implied rate) in every program year."""
+    shift = np.asarray(params.r_gov_shift)[:N]
+    scale = float(np.asarray(params.r_gov_scale).flatten()[0])
+    d = np.array(mp.IMF_PUBLIC_DEBT) / 100
+    # ogcore: r_gov = scale r - shift + r_gov_DY d + r_gov_DY2 d^2
+    r_gov = (
+        scale * mp.R_SS_FOR_R_GOV
+        - shift
+        + params.r_gov_DY * d
+        + params.r_gov_DY2 * d**2
+    )
+    assert np.allclose(r_gov, mp.R_GOV_FLOOR, atol=1e-9)
+
+
 def test_r_gov_shift_path_converges_to_the_long_run_rate(params):
     """After the program and the convergence window, r_gov_scale r - shift
     (premium zero at the debt target) equals LONG_RUN_R_GOV."""
     shift = np.asarray(params.r_gov_shift)
     scale = float(np.asarray(params.r_gov_scale).flatten()[0])
-    r_ss = 0.0438
-    centering = params.r_gov_DY2 * params.debt_ratio_ss**2
-    long_run = scale * r_ss - shift[-1] + centering
+    r_ss = mp.R_SS_FOR_R_GOV
+    D = params.debt_ratio_ss
+    long_run = (
+        scale * r_ss
+        - shift[-1]
+        + params.r_gov_DY * D
+        + params.r_gov_DY2 * D**2
+    )
     assert long_run == pytest.approx(mp.LONG_RUN_R_GOV, abs=1e-9)
     assert shift[-1] == pytest.approx(shift[N + mp.R_GOV_CONVERGENCE_PERIODS])
 
 
 def test_packaged_fiscal_paths_match_the_derivation(packaged, params):
     """A regeneration must rewrite the fiscal paths from the same tables."""
-    expected = mp.fiscal_program_params(params, r_ss=0.0438)
+    expected = mp.fiscal_program_params(params)
     for key in ("alpha_G", "alpha_T", "alpha_I", "alpha_FA"):
         assert np.allclose(
             np.array(packaged[key])[: len(expected[key])], expected[key]
