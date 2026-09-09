@@ -77,7 +77,7 @@ def test_main_rebuilds_remittance_objects_from_regenerated_demographics(
     g_RM and eta_RM are derived from the demographics, so a baseline
     regeneration must rewrite them from the demographics it saves.
     """
-    from ogeth import remittances
+    from ogeth import macro_params as remittances
 
     output_dir = tmp_path / "baseline_output"
     output_dir.mkdir()

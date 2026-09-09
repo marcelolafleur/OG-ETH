@@ -21,7 +21,7 @@ import pytest
 from ogcore import aggregates as aggr
 from ogcore.parameters import Specifications
 
-from ogeth import remittances
+from ogeth import macro_params as remittances
 
 # IMF Country Report 26/174 (fifth ECF review, June 2026), Table 4a,
 # FY2024/25 actual: private transfers (net) US$7,037 million, 5.6 percent of

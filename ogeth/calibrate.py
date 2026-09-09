@@ -1,4 +1,4 @@
-from ogeth import macro_params, income, remittances
+from ogeth import macro_params, income
 from ogeth import input_output as io
 import os
 import numpy as np
@@ -121,7 +121,7 @@ class Calibration:
             # the remittance growth path and allocation matrix are derived
             # from these demographics, so they travel with them
             self.demographic_params.update(
-                remittances.derive_remittance_params(
+                macro_params.derive_remittance_params(
                     p.g_y,
                     self.demographic_params["g_n"],
                     self.demographic_params["omega_SS"],

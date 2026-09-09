@@ -2,7 +2,7 @@ import os
 import json
 from importlib.resources import files
 from ogeth.calibrate import Calibration
-from ogeth.remittances import derived_remittance_params
+from ogeth.macro_params import derived_remittance_params
 from ogcore.parameters import Specifications
 from ogcore.utils import params_to_json
 
