@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ogeth"
-version = "0.1.0"
+version = "0.3.0"
 authors = [
     {name = "Marcelo LaFleur, Richard W. Evans, and Jason DeBacker"},
 ]
@@ -47,7 +47,7 @@ dependencies = [
     "statsmodels",
     "linearmodels",
     "linecheck",
-    "ogcore>=0.14.11",
+    "ogcore>=0.20.0",
 ]
 
 [project.urls]
@@ -103,4 +103,17 @@ minversion = "6.0"
 testpaths = ["tests"]
 markers = [
     "local: marks tests that are run locally only and not on GH Actions",
+]
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+ogeth = { workspace = true, editable = true }
+
+[dependency-groups]
+dev = [
+    "ogeth",
 ]
