@@ -583,3 +583,269 @@ def derived_remittance_params(p):
     """
     g_n = np.asarray(p.g_n, dtype=float)[: p.T + p.S]
     return derive_remittance_params(p.g_y, g_n, p.omega_SS, p.lambdas)
+
+
+# ---------------------------------------------------------------------------
+# Fiscal program path (IMF Country Report 26/174, fifth ECF review, Tables 1,
+# 2b and 4b). Ethiopian fiscal years FY2024/25 (model period 0, start year
+# 2025) through FY2030/31 (period 6); the last value of each series is held
+# for the long run. All figures are percent of GDP, general government.
+# ---------------------------------------------------------------------------
+PROGRAM_YEARS = [
+    "FY2024/25",
+    "FY2025/26",
+    "FY2026/27",
+    "FY2027/28",
+    "FY2028/29",
+    "FY2029/30",
+    "FY2030/31",
+]
+IMF_PUBLIC_DEBT = [50.5, 45.3, 40.8, 37.2, 34.0, 31.2, 28.6]
+IMF_REVENUE = [9.2, 10.8, 11.4, 11.8, 12.1, 12.2, 12.3]  # excl. grants
+IMF_GRANTS = [1.7, 1.3, 0.9, 0.3, 0.3, 0.3, 0.1]
+IMF_EXPENDITURE = [12.0, 14.1, 13.5, 13.5, 14.0, 14.0, 14.0]
+IMF_RECURRENT = [7.1, 8.2, 8.0, 8.5, 8.6, 8.8, 8.9]
+IMF_INTEREST = [0.8, 1.3, 1.3, 1.3, 1.3, 1.4, 1.5]
+IMF_CAPITAL = [5.0, 5.8, 5.5, 5.0, 5.4, 5.2, 5.1]
+IMF_REAL_GDP_GROWTH = [9.2, 9.2, 7.8, 8.2, 8.2, 8.0, 7.7]
+IMF_TRADE_BALANCE = [
+    -8.3,
+    -9.9,
+    -8.6,
+    -8.4,
+    -8.5,
+    -8.3,
+    -8.3,
+]  # goods+services
+IMF_PRIVATE_TRANSFERS = [5.6, 6.0, 5.9, 5.3, 4.8, 4.6, 4.1]
+IMF_CURRENT_ACCOUNT = [-1.1, -2.5, -1.3, -1.5, -2.0, -2.0, -2.7]
+IMF_GROSS_INVESTMENT = [20.1, 28.7, 27.5, 27.2, 27.2, 27.4, 26.5]
+
+# Cash transfers to households as a share of GDP. The IMF recurrent line
+# bundles the wage bill, goods and services, interest, and transfers; the
+# household-transfer part is the fuel and fertilizer subsidies (about 1
+# percent of GDP in FY2024/25, fuel subsidies eliminated by March 2026 and a
+# capped envelope in FY2026/27, fertilizer about 1 percent of GDP), the
+# Productive Safety Net Program (budget contribution about 0.4 percent of
+# GDP), and public pension payouts (about 0.5 percent of GDP). IMF CR
+# 26/174 paragraphs 9, 20-22 and Box on social safety nets.
+CASH_TRANSFERS = [2.0, 1.8, 1.5, 1.5, 1.5, 1.5, 1.5]
+
+# Long-run grants (percent of GDP) once the program's donor surge fades.
+LONG_RUN_GRANTS = 0.3
+
+# Long-run real effective interest rate on public debt. Ethiopia's public
+# debt is mostly concessional external debt (average interest on new
+# FY2024/25 commitments 0.77 percent, MoF Bulletin 56) and domestic paper
+# whose real return has been deeply negative; the program's FY2030/31
+# interest bill (1.5 percent of GDP on 28.6 percent debt, a 5.2 percent
+# nominal effective rate) against a GDP deflator of 8.6 percent still implies
+# a negative real rate. We take 2 percent as the long-run real effective
+# rate once inflation settles at the authorities' single-digit objective and
+# domestic financing moves to market terms.
+LONG_RUN_R_GOV = 0.02
+# Periods after the program horizon over which r_gov converges to the
+# long-run rate above
+R_GOV_CONVERGENCE_PERIODS = 4
+
+# Allocation of the program's revenue gains across the model's tax
+# instruments: two thirds to consumption taxes (VAT reform, excise, customs),
+# one third to corporate income tax collections (tax administration). FY2024/25
+# model collections these are scaled against: consumption taxes 3.85 and CIT
+# 1.71 percent of GDP (steady-state solve of the packaged calibration).
+INDIRECT_SHARE_OF_REVENUE_GAIN = 2 / 3
+BASE_CONS_TAX_REVENUE = 0.0385
+BASE_CIT_REVENUE = 0.0171
+
+
+def program_spending_paths():
+    """
+    Government spending ratios along the IMF program, mapped onto the model's
+    three spending instruments.
+
+    Government consumption is recurrent spending net of interest (which the
+    model pays through r_gov) and of cash transfers; transfers are the cash
+    items in CASH_TRANSFERS; public investment is capital expenditure. The
+    sum reproduces the IMF's primary expenditure to within a tenth of a
+    percent of GDP in every program year.
+
+    Returns:
+        dict: alpha_G, alpha_T, alpha_I, alpha_FA as lists (length 7 plus
+            the long-run value; OG-Core holds the last value thereafter)
+    """
+    rec = np.array(IMF_RECURRENT) / 100
+    interest = np.array(IMF_INTEREST) / 100
+    tr = np.array(CASH_TRANSFERS) / 100
+    g = rec - interest - tr
+    ig = np.array(IMF_CAPITAL) / 100
+    fa = np.array(IMF_GRANTS) / 100
+    return {
+        "alpha_G": (list(g) + [g[-1]]),
+        "alpha_T": (list(tr) + [tr[-1]]),
+        "alpha_I": (list(ig) + [ig[-1]]),
+        "alpha_FA": (list(fa) + [LONG_RUN_GRANTS / 100]),
+    }
+
+
+def program_revenue_paths(tau_c_0, cit_factor_0):
+    """
+    Consumption-tax and CIT-collection paths that raise the model's tax
+    revenue by the same percentage points of GDP as the IMF revenue path,
+    with the gain allocated per INDIRECT_SHARE_OF_REVENUE_GAIN.
+
+    Args:
+        tau_c_0 (scalar): FY2024/25 effective consumption-tax rate
+        cit_factor_0 (scalar): FY2024/25 CIT collections adjustment factor
+
+    Returns:
+        dict: tau_c (list of [rate] per period, I = 1) and
+            adjustment_factor_for_cit_receipts (list), each length 7 plus
+            the long-run value
+    """
+    gain = (np.array(IMF_REVENUE) - IMF_REVENUE[0]) / 100
+    tau_c = tau_c_0 * (
+        1 + INDIRECT_SHARE_OF_REVENUE_GAIN * gain / BASE_CONS_TAX_REVENUE
+    )
+    cit = cit_factor_0 * (
+        1 + (1 - INDIRECT_SHARE_OF_REVENUE_GAIN) * gain / BASE_CIT_REVENUE
+    )
+    return {
+        "tau_c": [[float(x)] for x in list(tau_c) + [tau_c[-1]]],
+        "adjustment_factor_for_cit_receipts": [
+            float(x) for x in list(cit) + [cit[-1]]
+        ],
+    }
+
+
+def implied_real_rate_on_debt(g_y, g_n):
+    """
+    Real effective interest rate on public debt that reproduces the IMF
+    debt path given the program's primary balances and the model's growth.
+
+    In the model's detrended units debt evolves as
+    d_t = ((1 + r_t) d_{t-1} - pb_{t-1}) / (exp(g_y) (1 + g_n[t])), so the
+    rate that carries the ratio from one program year to the next is
+    r_t = (d_t growth_t + pb_{t-1}) / d_{t-1} - 1. The program's debt
+    decline works through inflation and nominal growth eroding a stock that
+    carries concessional and administered rates; in a real model that is a
+    negative real effective rate on the legacy debt.
+
+    Args:
+        g_y (scalar): model-period productivity growth rate
+        g_n (array_like): population growth path
+
+    Returns:
+        Numpy array: r_gov for periods 1..6 (period 0 has no predecessor)
+    """
+    d = np.array(IMF_PUBLIC_DEBT) / 100
+    rev = np.array(IMF_REVENUE) / 100
+    sp = program_spending_paths()
+    pb = (
+        rev
+        + np.array(sp["alpha_FA"][:7])
+        - np.array(sp["alpha_G"][:7])
+        - np.array(sp["alpha_T"][:7])
+        - np.array(sp["alpha_I"][:7])
+    )
+    growth = np.exp(g_y) * (1 + np.asarray(g_n, dtype=float)[:7])
+    return np.array(
+        [(d[t] * growth[t] + pb[t - 1]) / d[t - 1] - 1 for t in range(1, 7)]
+    )
+
+
+def r_gov_shift_path(g_y, g_n, r_gov_scale, r_gov_DY2, debt_ratio_ss, r_ss):
+    """
+    Level-shift path for the sovereign rate, r_gov = r_gov_scale r - shift +
+    premium, that puts the real effective rate on debt on the program-implied
+    path, converges it linearly to LONG_RUN_R_GOV over
+    R_GOV_CONVERGENCE_PERIODS, and keeps the debt-elastic premium centered on
+    debt_ratio_ss (see macro.md). The market return r is approximated by its
+    steady-state value; along the transition r moves by at most a percentage
+    point, which the 0.24 scale turns into a few basis points of r_gov.
+
+    Returns:
+        list: r_gov_shift path, length 7 + R_GOV_CONVERGENCE_PERIODS + 1
+    """
+    d = np.array(IMF_PUBLIC_DEBT) / 100
+    r_prog = implied_real_rate_on_debt(g_y, g_n)
+    targets = np.concatenate(
+        [
+            [r_prog[0]],  # period 0: no program-implied value; use period 1
+            r_prog,
+            np.linspace(
+                r_prog[-1], LONG_RUN_R_GOV, R_GOV_CONVERGENCE_PERIODS + 2
+            )[1:],
+        ]
+    )
+    debt = np.concatenate(
+        [d, np.full(R_GOV_CONVERGENCE_PERIODS + 1, debt_ratio_ss)]
+    )
+    centering = r_gov_DY2 * debt_ratio_ss**2
+    shift = (
+        r_gov_scale * r_ss
+        + r_gov_DY2 * (debt - debt_ratio_ss) ** 2
+        - targets
+        + centering
+    )
+    return [float(x) for x in shift]
+
+
+def fiscal_program_params(p, r_ss=None):
+    """
+    All fiscal parameters that follow the IMF program path, derived from the
+    Specifications object's growth and premium settings.
+
+    Args:
+        p (Specifications): parameters carrying g_y, g_n, r_gov_scale,
+            r_gov_DY2, debt_ratio_ss, tau_c, adjustment_factor_for_cit_receipts
+        r_ss (scalar): steady-state market return used in r_gov_shift_path;
+            defaults to p.initial_guess_r_SS
+
+    Returns:
+        dict: ready for Specifications.update_specifications
+    """
+    if r_ss is None:
+        r_ss = float(p.initial_guess_r_SS)
+    out = {}
+    out.update(program_spending_paths())
+    out.update(
+        program_revenue_paths(
+            float(np.asarray(p.tau_c).flatten()[0]),
+            float(
+                np.asarray(p.adjustment_factor_for_cit_receipts).flatten()[0]
+            ),
+        )
+    )
+    out["r_gov_shift"] = r_gov_shift_path(
+        p.g_y,
+        p.g_n,
+        float(np.asarray(p.r_gov_scale).flatten()[0]),
+        float(p.r_gov_DY2),
+        float(p.debt_ratio_ss),
+        r_ss,
+    )
+    out["initial_debt_ratio"] = IMF_PUBLIC_DEBT[0] / 100
+    out["tG1"] = len(PROGRAM_YEARS)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Initial household wealth
+#
+# OG-Core (from PSLmodels/OG-Core#1189) can anchor aggregate household wealth
+# in the first period of the transition to a multiple of steady-state GDP,
+# B(0) = initial_wealth_ratio x Y_ss. Household wealth in the model is
+# domestically owned capital plus domestically held government debt, so the
+# data counterpart is K/Y less the foreign-owned capital stock plus the
+# domestically held debt: the Penn World Table capital-output ratio of about
+# 2.2, less inward FDI stock of about 0.24 of GDP (UNCTAD), plus domestic
+# public debt of 18.7 percent of GDP (IMF CR 26/174, Table 2: 50.5 total less
+# 31.8 external). Until the ogcore release that carries #1189, the example
+# script applies the value only when the installed ogcore supports it.
+# ---------------------------------------------------------------------------
+PWT_CAPITAL_OUTPUT_RATIO = 2.2
+FDI_STOCK_TO_GDP = 0.24
+DOMESTIC_DEBT_TO_GDP = 0.187
+INITIAL_WEALTH_RATIO = round(
+    PWT_CAPITAL_OUTPUT_RATIO - FDI_STOCK_TO_GDP + DOMESTIC_DEBT_TO_GDP, 3
+)

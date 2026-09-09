@@ -79,9 +79,12 @@ def test_informality_noncompliance_by_group(p):
 
 
 def test_cit_collections_factor(p):
-    """CIT collections factor re-anchored to hit corporate-tax revenue."""
-    factor = float(np.asarray(p.adjustment_factor_for_cit_receipts)[-1])
-    assert factor == pytest.approx(0.327)
+    """CIT collections factor re-anchored to hit FY2024/25 corporate-tax
+    revenue in period 0, then rising along the IMF program's revenue path
+    (see tests/test_fiscal_program.py for the path itself)."""
+    factor = np.asarray(p.adjustment_factor_for_cit_receipts)
+    assert float(factor[0]) == pytest.approx(0.327)
+    assert float(factor[-1]) > float(factor[0])
 
 
 def test_all_households_are_filers(p):

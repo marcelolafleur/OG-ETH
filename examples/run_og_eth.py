@@ -8,6 +8,7 @@ import copy
 from importlib.resources import files
 import matplotlib.pyplot as plt
 from ogeth.calibrate import Calibration
+from ogeth import macro_params
 from ogcore.parameters import Specifications
 from ogcore import output_tables as ot
 from ogcore import output_plots as op
@@ -54,6 +55,18 @@ def main():
     ):
         defaults = json.load(file)
     p.update_specifications(defaults)
+    # Anchor initial household wealth to the data (see macro.md) where the
+    # installed OG-Core supports it (PSLmodels/OG-Core#1189); older releases
+    # start the transition from steady-state wealth.
+    if hasattr(p, "initial_wealth_ratio"):
+        p.update_specifications(
+            {"initial_wealth_ratio": macro_params.INITIAL_WEALTH_RATIO}
+        )
+    else:
+        print(
+            "Installed ogcore has no initial_wealth_ratio; the transition "
+            "starts from steady-state household wealth."
+        )
     # Update parameters from calibrate.py Calibration class
     if is_connected():  # only update if connected to internet
         c = Calibration(
