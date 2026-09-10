@@ -88,20 +88,23 @@ def test_implied_real_rate_on_debt_is_negative_through_the_program(params):
     assert (r < 0).all() and (r > -0.06).all()
 
 
-def test_r_gov_path_sits_on_the_floor_through_the_program(params):
-    """OG-Core floors r_gov at zero, so the shipped shift path targets the
-    floor (not the negative program-implied rate) in every program year."""
-    shift = np.asarray(params.r_gov_shift)[:N]
+def test_r_gov_path_targets_the_program_implied_rates(params):
+    """Through the program years the shift path puts r_gov (before OG-Core's
+    floor) on the negative real rates that reproduce the IMF debt path; the
+    example lowers r_gov_floor so they bind where the installed ogcore has
+    the parameter (PSLmodels/OG-Core#1203)."""
+    shift = np.asarray(params.r_gov_shift)[1:N]
     scale = float(np.asarray(params.r_gov_scale).flatten()[0])
-    d = np.array(mp.IMF_PUBLIC_DEBT) / 100
-    # ogcore: r_gov = scale r - shift + r_gov_DY d + r_gov_DY2 d^2
+    d = np.array(mp.IMF_PUBLIC_DEBT[1:]) / 100
     r_gov = (
         scale * mp.R_SS_FOR_R_GOV
         - shift
         + params.r_gov_DY * d
         + params.r_gov_DY2 * d**2
     )
-    assert np.allclose(r_gov, mp.R_GOV_FLOOR, atol=1e-9)
+    implied = mp.implied_real_rate_on_debt(params.g_y, params.g_n)
+    assert np.allclose(r_gov, implied, atol=1e-9)
+    assert (implied > mp.R_GOV_FLOOR).all()
 
 
 def test_r_gov_shift_path_converges_to_the_long_run_rate(params):

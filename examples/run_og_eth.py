@@ -67,6 +67,16 @@ def main():
             "Installed ogcore has no initial_wealth_ratio; the transition "
             "starts from steady-state household wealth."
         )
+    # Let the sovereign rate follow the program-implied negative real rates
+    # where the installed OG-Core exposes the floor (PSLmodels/OG-Core#1203);
+    # older releases clip it at zero.
+    if hasattr(p, "r_gov_floor"):
+        p.update_specifications({"r_gov_floor": macro_params.R_GOV_FLOOR})
+    else:
+        print(
+            "Installed ogcore has no r_gov_floor; the interest rate on "
+            "government debt is clipped at zero through the program years."
+        )
     # Update parameters from calibrate.py Calibration class
     if is_connected():  # only update if connected to internet
         c = Calibration(

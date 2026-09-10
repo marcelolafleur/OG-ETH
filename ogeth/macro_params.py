@@ -644,6 +644,15 @@ CASH_TRANSFERS = [2.0, 1.8, 1.5, 1.5, 1.5, 1.5, 1.5]
 # Long-run grants (percent of GDP) once the program's donor surge fades.
 LONG_RUN_GRANTS = 0.3
 
+# Required real return of foreign investors in Ethiopian capital (OG-Core's
+# world_int_rate_annual). The 4 percent risk-free benchmark understates it for
+# a frontier market: UNCTAD's World Investment Report 2018 puts the rate of
+# return on inward FDI in Africa at 6.3 percent (2017), down from 12.3 percent
+# in 2012. With OG-Core's capital split K_f = zeta_K (K_open - K_d), where
+# K_open is capital demand at the world rate, this is the lever that sets the
+# foreign-owned capital stock against the ~0.24 of GDP FDI stock (UNCTAD).
+WORLD_INT_RATE_ANNUAL = 0.063
+
 # Long-run real effective interest rate on public debt. Ethiopia's public
 # debt is mostly concessional external debt (average interest on new
 # FY2024/25 commitments 0.77 percent, MoF Bulletin 56) and domestic paper
@@ -657,15 +666,16 @@ LONG_RUN_R_GOV = 0.02
 # Periods after the program horizon over which r_gov converges to the
 # long-run rate above
 R_GOV_CONVERGENCE_PERIODS = 4
-# OG-Core floors the sovereign rate at zero (fiscal.get_r_gov), so the
-# program-implied negative real rates are not representable; the shipped path
-# targets the floor through the program years, the closest admissible value.
-R_GOV_FLOOR = 0.0
+# OG-Core clips the sovereign rate at ``r_gov_floor`` (a parameter since
+# PSLmodels/OG-Core#1203; the hard-coded 0.0 before that). The shipped shift
+# path targets the program-implied negative real rates, and the example
+# lowers the floor to R_GOV_FLOOR where the installed ogcore has the
+# parameter so they can bind; on an older ogcore the rate sits at zero
+# through the program years instead (documented in macro.md).
+R_GOV_FLOOR = -0.10
 # Steady-state return on capital the r_gov_shift path is evaluated at: the
-# solved baseline steady state (examples/run_og_eth.py) with beta = 0.92;
-# foreign capital entering at the world rate keeps it below the closed-economy
-# gamma / (K/Y) - delta arithmetic in households.md.
-R_SS_FOR_R_GOV = 0.058
+# solved baseline steady state of examples/run_og_eth.py.
+R_SS_FOR_R_GOV = 0.07
 
 # Allocation of the program's revenue gains across the model's tax
 # instruments: two thirds to consumption taxes (VAT reform, excise, customs),
@@ -776,8 +786,7 @@ def r_gov_shift_path(g_y, g_n, r_gov_scale, r_gov_DY2, debt_ratio_ss, r_ss):
     """
     Level-shift path for the sovereign rate, r_gov = r_gov_scale r - shift +
     premium, that puts the real effective rate on debt on the program-implied
-    path (clipped at OG-Core's zero floor), converges it linearly to
-    LONG_RUN_R_GOV over
+    path, converges it linearly to LONG_RUN_R_GOV over
     R_GOV_CONVERGENCE_PERIODS, and keeps the debt-elastic premium centered on
     debt_ratio_ss (see macro.md). The market return r is approximated by its
     steady-state value; along the transition r moves by at most a percentage
@@ -787,7 +796,7 @@ def r_gov_shift_path(g_y, g_n, r_gov_scale, r_gov_DY2, debt_ratio_ss, r_ss):
         list: r_gov_shift path, length 7 + R_GOV_CONVERGENCE_PERIODS + 1
     """
     d = np.array(IMF_PUBLIC_DEBT) / 100
-    r_prog = np.maximum(implied_real_rate_on_debt(g_y, g_n), R_GOV_FLOOR)
+    r_prog = implied_real_rate_on_debt(g_y, g_n)
     targets = np.concatenate(
         [
             [r_prog[0]],  # period 0: no program-implied value; use period 1
