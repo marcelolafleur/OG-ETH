@@ -150,29 +150,30 @@ Most of the parameters on this page are only weakly identified from the data on 
 
 | Steady-state moment | OG-ETH baseline | Ethiopia data | Data source |
 |:---|:---:|:---:|:---|
-| Government debt $D/Y$ | 0.30 | 0.30 (long-run target); 0.505 (FY2024/25); 0.286 (FY2030/31) | IMF CR 26/174, Table 1 |
-| Foreign-held debt share $D_f/D$ | 0.15 | 0.63 (FY2024/25), falling to 0.58 by FY2030/31 | IMF CR 26/174, Table 1 |
-| Real effective rate on public debt $r_{gov}$ | 0.020 | negative through FY2030/31 (5.2% nominal on the stock vs 8.6% deflator); ~0.8% on new external commitments | IMF CR 26/174; MoF Bulletin 56 |
-| Tax revenue $T/Y$ | 0.118 | 0.110 (FY2030/31 program); 0.078 (FY2024/25) | IMF CR 26/174, Table 2b |
+| Government debt $D/Y$ | 0.30; path 50.5 → 30.3% by FY2030/31 | 0.30 (long-run target); 50.5 → 28.6% (FY2024/25 → FY2030/31) | IMF CR 26/174, Table 1 |
+| Foreign-held debt share $D_f/D$ | 0.15; external debt 31.8 → 19.9% of GDP by FY2030/31 | 0.63 (FY2024/25); external debt 31.8 → 16.7% | IMF CR 26/174, Table 1 |
+| Real effective rate on public debt $r_{gov}$ | −3.2 to −1.2% through FY2030/31; 2.0% long run | negative through FY2030/31 (5.2% nominal on the stock vs 8.6% deflator); ~0.8% on new external commitments | IMF CR 26/174; MoF Bulletin 56 |
+| Tax revenue $T/Y$ | 0.121; path 8.9 → 12.0% | 0.110 (FY2030/31 program); 7.8 → 11.0% | IMF CR 26/174, Table 2b |
 | Personal income tax / $Y$ | 0.014 | 0.014 (FY2024/25) | IMF SIP 2025/108 |
-| Corporate income tax / $Y$ | 0.029 | 0.017 (FY2024/25); program allocates a third of revenue gains here | IMF SIP 2025/108; assumption |
-| Consumption taxes / $Y$ | 0.058 | 0.039 (FY2024/25) plus two thirds of the program's revenue gains | IMF CR 26/174; assumption |
-| Government consumption $G/Y$ | 0.070 (closure) | 0.059 (FY2030/31, recurrent net of interest and cash transfers) | IMF CR 26/174, Table 2b |
+| Corporate income tax / $Y$ | 0.029 | 0.017 (FY2024/25); a third of the program's revenue gains allocated here | IMF SIP 2025/108; assumption |
+| Consumption taxes / $Y$ | 0.060 | 0.039 (FY2024/25) plus two thirds of the program's revenue gains | IMF CR 26/174; assumption |
+| Government consumption $G/Y$ | 0.073 (closure) | 0.059 (FY2030/31, recurrent net of interest and cash transfers) | IMF CR 26/174, Table 2b |
 | Cash transfers $TR/Y$ | 0.015 | 0.015 (FY2026/27 onward) | IMF CR 26/174 |
 | Public investment $I_g/Y$ | 0.051 | 0.051 (FY2030/31) | IMF CR 26/174, Table 2b |
 | Remittances $RM/Y$ | 0.056 | 0.056 (FY2024/25); program projects 0.041 by FY2030/31 | IMF CR 26/174, Table 4b |
-| Foreign-owned capital $K_f/Y$ | 0.37 | ~0.24 (FDI stock) | UNCTAD / WB |
-| Foreign-owned capital share $K_f/K$ | 0.14 | low (near-closed account) | Chinn-Ito; BoP IIP |
-| Capital-output $K/Y$ | 2.6 | ~2.2 | Penn World Table |
-| Household wealth $B/Y$ | 2.5 (steady state); 2.08 (initial) | 2.15 (K/Y less FDI stock plus domestic debt) | PWT, UNCTAD, IMF |
-| Total investment $(I+I_g)/Y$ | 0.36 | 0.20 (FY2024/25); 0.27 (program, FY2030/31) | IMF CR 26/174, Table 1 |
-| Private consumption $C/Y$ | 0.63 | 0.81 (FY2024/25; BGP ~0.65–0.70) | WDI `NE.CON.PRVT.ZS` |
-| Trade balance $NX/Y$ | −0.058 | −0.083 (goods and services, FY2024/25 and FY2030/31) | IMF CR 26/174, Table 4b |
-| Real return on capital $r$ | 0.058 | high (capital-scarce) | model-implied MPK |
+| Foreign-owned capital $K_f/Y$ | 0.20 (0.22 initially) | ~0.24 (FDI stock) | UNCTAD / WB |
+| Foreign-owned capital share $K_f/K$ | 0.08 | low (near-closed account) | Chinn-Ito; BoP IIP |
+| Capital-output $K/Y$ | 2.4 (2.1 initially) | ~2.2 | Penn World Table |
+| Household wealth $B/Y$ | 2.4 (steady state); 2.08 (initial) | 2.15 (K/Y less FDI stock plus domestic debt) | PWT, UNCTAD, IMF |
+| Total investment $(I+I_g)/Y$ | 0.33 | 0.20 (FY2024/25); 0.27 (program, FY2030/31) | IMF CR 26/174, Table 1 |
+| Private consumption $C/Y$ | 0.65 | 0.81 (FY2024/25; BGP ~0.65–0.70) | WDI `NE.CON.PRVT.ZS` |
+| Trade balance $NX/Y$ | −0.059 (−0.03 to −0.035 along the program) | −0.083 (goods and services, FY2024/25 and FY2030/31) | IMF CR 26/174, Table 4b |
+| Real return on capital $r$ | 0.068 | high (capital-scarce); FDI return in Africa 6.3% | model-implied MPK; UNCTAD |
+| Real GDP growth | 7.9 → 7.6% over the program | 9.2 → 7.7% | IMF CR 26/174, Table 1 |
 
-**What matches.**  The fiscal block is now internally consistent and on the data: revenue by instrument, the spending ratios, transfers, public investment, remittances and the debt target all sit on their sources, and the transition ({numref}`CalibVsProgram`) reproduces the program's primary expenditure exactly, its tax revenue to within a point of GDP (the model's FY2024/25 base is 0.9 points above the IMF's tax line, and follows the same increments), its external debt ratio to within a few points, and real growth of 7.6–7.8 percent against the program's 7.7–9.2.  The remittance share holds at 5.6–5.7 percent along the path.
+**What matches.**  The fiscal block is internally consistent and on the data.  The transition ({numref}`CalibVsProgram`) reproduces the program's primary expenditure exactly, its tax revenue to within a point of GDP (the model's FY2024/25 base is a point above the IMF's tax line and follows the same increments), its external debt ratio to within three points, and — with the sovereign rate on the program-implied negative real rates — **its debt ratio to within two points of GDP in every program year**, landing at 30.3 percent in FY2030/31 against 28.6, and at the 30 percent target thereafter without a jump.  Real growth runs 7.6–7.9 percent against the program's 7.7–9.2; the remittance share holds at 5.6–5.7 percent.  The capital block sits on its anchors: the capital-output ratio starts at 2.1 and settles at 2.4 against the Penn World Table's 2.2, the foreign-owned capital stock at 0.20–0.22 of GDP against the 0.24 FDI stock, and household wealth starts at the 2.15 the data imply.
 
-**What does not, and why.**  Three gaps remain, each understood.  *Debt* falls to 36.5 rather than 28.6 percent of GDP by FY2030/31 and reaches the 30 percent target only around 2055: OG-Core floors the sovereign rate at zero, so the negative real effective rate through which inflation and concessional terms erode Ethiopia's debt cannot be represented, and with a primary balance near zero the ratio can fall only as fast as real growth dilutes it.  *Capital* is still too abundant: with $\beta$ lowered to 0.92 the capital-output ratio falls from 2.9 to 2.6 and total investment from 41 to 36 percent of GDP, but the Penn World Table's 2.2 and the program's 27 percent are not reached because foreign capital enters at the world rate as domestic saving falls — the foreign-owned share of capital rises to 14 percent, above what Ethiopia's investment position supports.  The over-accumulation of capital is a known trait of the OG-Core saving block across the country models, and pushing patience further would trade one miss for another.  *The trade deficit* is 3–4 percent of GDP along the transition and 5.8 percent in the steady state against 8.3 percent in the data, the mirror image of the same fact: the data's deficit is financed by FDI inflows of about 3 percent of GDP a year on top of remittances and grants, while the model's foreign capital inflow is smaller, and part of the remittance and grant inflow is saved rather than spent on imports.  The remaining rows are where they were: the model's long-run consumption share sits between Ethiopia's crisis-depressed current value and a balanced-growth level, and the foreign-held debt share converges from the initial 0.63 toward $\zeta_D$.
+**What does not, and why.**  Two gaps remain.  *Investment* is 33–34 percent of GDP against the program's 27: in the steady state investment must replace depreciation and equip growth, $(g+\delta)K/Y \approx 0.13 \times 2.4 = 0.31$, so with the capital-output ratio already at the data the remaining difference is the model's 8 percent growth and 5 percent depreciation applied to that stock — the data's 27 percent at a similar capital-output ratio implies a lower effective depreciation or slower capital deepening than a balanced growth path allows.  *The trade deficit* is 3–3.5 percent of GDP along the program and 5.9 percent in the steady state against 8.3 percent in the data.  The model's deficit is what remittances, grants and foreign capital inflows finance net of factor payments abroad; the data's is also financed by about 3 percent of GDP a year of FDI and by official borrowing, and Ethiopia's foreign capital inflow in the model is smaller because the foreign-owned stock is already near its long-run level.  Neither gap is a parameter away: they follow from the single-capital-good, balanced-growth structure of the model, and are reported here as its limits rather than calibrated around.  The remaining rows are where they were: the long-run consumption share sits between Ethiopia's crisis-depressed current value and a balanced-growth level, and the foreign-held debt share converges from the initial 0.63 toward $\zeta_D$.
 
 (SecLWI_footnotes)=
 ## Footnotes
