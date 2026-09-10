@@ -691,10 +691,10 @@ R_SS_FOR_R_GOV = 0.07
 NONCOMPLIANCE_START = [1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0]
 NONCOMPLIANCE_END = [1.0, 1.0, 1.0, 1.0, 0.8, 0.0, 0.0]
 # Personal-income-tax revenue the formalization adds by the end of the
-# program, percent of GDP, estimated from the steady-state incidence of the
-# packaged calibration (group 6 contributes about 0.6 and group 5 about 0.1
-# points of GDP at full and one-fifth compliance respectively).
-PIT_FORMALIZATION_GAIN = 0.007
+# program, percent of GDP, read off the solved transition of the packaged
+# calibration (personal income tax 1.4 -> 2.6 percent of GDP by FY2030/31;
+# a first estimate from steady-state incidence, 0.7, undershot it).
+PIT_FORMALIZATION_GAIN = 0.012
 
 # Pension coverage by lifetime-income group. Ethiopia's two schemes (PSSSA for
 # public servants, POESSA for private formal employees) cover only formal
