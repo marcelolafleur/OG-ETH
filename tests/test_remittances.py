@@ -1,18 +1,21 @@
 """
 Tests of the remittance calibration in the packaged single-industry JSON.
 
-Remittances are calibrated as a constant share of GDP on the balanced growth
-path. That takes two things: ``alpha_RM_1 == alpha_RM_T`` for the level, and
-a ``g_RM`` path that tracks ``g_n`` so ``aggregates.get_RM`` keeps detrended
-remittances on trend instead of eroding them along the transition (along the
-actual path RM/Y then moves only with output's deviation from trend). These
-tests pin the level against its source and assert remittances stay exactly on
-trend -- the second is the one that catches a stale ``g_RM`` after a
-demographics regeneration.
+Remittances are calibrated as a share of GDP that follows the IMF program's
+private-transfers projection over the program years (5.6 to 4.1 percent of
+GDP) and then stays where the program leaves it. That takes two things:
+``alpha_RM_1`` at the measured level and ``alpha_RM_T`` at the program
+endpoint, and a ``g_RM`` path built on ``g_n`` so ``aggregates.get_RM`` moves
+detrended remittances along the program instead of eroding them (along the
+actual path RM/Y then also moves with output's deviation from trend). These
+tests pin the level against its source and assert the share follows the
+program exactly -- the second is the one that catches a stale ``g_RM`` after
+a demographics regeneration.
 
 No model solve is involved.
 """
 
+import copy
 import json
 from importlib.resources import files
 
@@ -54,31 +57,65 @@ def test_alpha_rm_matches_imf_private_transfers(packaged):
     assert packaged["alpha_RM_1"] == IMF_PRIVATE_TRANSFERS_SHARE_OF_GDP
 
 
-def test_no_remittance_transition_path(packaged):
-    """A level shift between the first period and the steady state would be a
-    modeling choice; the calibration deliberately makes none."""
-    assert packaged["alpha_RM_1"] == packaged["alpha_RM_T"]
+def test_long_run_share_is_the_program_endpoint(packaged):
+    """The long-run share is the last program-year projection, held like the
+    other program series (4.1 percent of GDP in FY2030/31)."""
+    expected = remittances.remittance_level_params()
+    assert packaged["alpha_RM_1"] == expected["alpha_RM_1"]
+    assert packaged["alpha_RM_T"] == expected["alpha_RM_T"]
+    assert packaged["alpha_RM_T"] == pytest.approx(
+        remittances.IMF_PRIVATE_TRANSFERS[-1] / 100
+    )
 
 
-def test_g_rm_keeps_remittances_on_trend(params):
+def test_g_rm_moves_remittances_along_the_program_then_holds(params):
     """The property the whole calibration rests on.
 
     ``get_RM`` compounds ``(1 + g_RM[t]) / (exp(g_y) * (1 + g_n[t-1]))``
     independently of output, so with trend output (Y = 1 in detrended
-    units) the share must come out exactly at alpha_RM in every period; a
-    ``g_RM`` that does not track ``g_n`` makes it drift for the first tG1
-    periods. With Ethiopia's growth rates a scalar ``g_RM = 0`` eroded
-    remittances relative to trend by about 7 percent a year.
+    units) the share must come out exactly at the program's private
+    transfers in each program year and stay at the endpoint afterwards; a
+    ``g_RM`` that does not track ``g_n`` makes it drift instead. With
+    Ethiopia's growth rates a scalar ``g_RM = 0`` eroded remittances
+    relative to trend by about 7 percent a year.
     """
     Y = np.ones(params.T + params.S)
     ratio = aggr.get_RM(Y, params, "TPI")[: params.T] / Y[: params.T]
-    assert np.allclose(ratio, params.alpha_RM_T, atol=1e-12)
+    program = remittances.program_remittance_shares() / 100
+    assert np.allclose(ratio[: program.size], program, atol=1e-12)
+    assert np.allclose(ratio[program.size :], params.alpha_RM_T, atol=1e-12)
+
+
+def test_program_shares_glide_between_the_anchors():
+    """The model follows the program's start and end values with an even
+    decline in between: the year-by-year projection has jumps that OG-Core's
+    bounds on g_RM do not admit."""
+    shares = remittances.program_remittance_shares()
+    imf = np.array(remittances.IMF_PRIVATE_TRANSFERS)
+    assert shares[0] == imf[0] and shares[-1] == pytest.approx(imf[-1])
+    assert np.all(np.diff(shares) < 0)
+    assert np.allclose(np.diff(np.log(shares)), np.diff(np.log(shares))[0])
+    p = Specifications()
+    lo, hi = -0.02, 0.15
+    g_RM = remittances.program_share_g_RM(p.g_y, np.full(p.T + p.S, 0.03))
+    assert g_RM.min() > lo and g_RM.max() < hi
+
+
+def test_flat_share_g_rm_keeps_the_share_constant(params):
+    """The building block: with the flat-share path and trend output the
+    share never moves from its starting value."""
+    p = copy.deepcopy(params)
+    p.g_RM = remittances.flat_share_g_RM(params.g_y, params.g_n)
+    p.alpha_RM_T = p.alpha_RM_1
+    Y = np.ones(params.T + params.S)
+    ratio = aggr.get_RM(Y, p, "TPI")[: params.T] / Y[: params.T]
+    assert np.allclose(ratio, params.alpha_RM_1, atol=1e-12)
 
 
 def test_packaged_g_rm_is_consistent_with_packaged_g_n(params, packaged):
     """g_RM is derived from g_n, so a demographics regeneration that forgets
     to rewrite it leaves the two inconsistent."""
-    expected = remittances.flat_share_g_RM(params.g_y, params.g_n)
+    expected = remittances.program_share_g_RM(params.g_y, params.g_n)
     assert np.allclose(np.array(packaged["g_RM"]), expected, atol=1e-12)
 
 

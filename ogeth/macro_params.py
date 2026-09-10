@@ -475,8 +475,12 @@ def estimate_r_gov(debt_ratio_ss=0.30, r_gov_DY2=0.04):
 #   tG1, independently of that period's output, so remittances keep pace with
 #   trend GDP (a constant share on the balanced growth path) only when that
 #   factor is one. g_n moves along the transition, so the growth rate that
-#   does this is a path, not a scalar (flat_share_g_RM). Along the
-#   transition RM/Y then moves inversely with output's deviation from trend.
+#   does this is a path, not a scalar (flat_share_g_RM). The shipped path
+#   (program_share_g_RM) scales that factor by the ratio of consecutive
+#   program-year shares, so RM/Y follows the IMF projection from 5.6 to 4.1
+#   percent of GDP over the program and then holds; alpha_RM_T is the
+#   program endpoint (remittance_level_params). Along the transition RM/Y
+#   then moves inversely with output's deviation from trend.
 # * eta_RM -- the share of aggregate remittances each household receives,
 #   shaped (S, J). OG-Core's default hands every lifetime-income group
 #   exactly its population share; remittance_eta instead maps a data
@@ -521,6 +525,84 @@ def flat_share_g_RM(g_y, g_n):
     # get_RM never reads g_RM[0]; keep it consistent with period 0 anyway
     g_RM[0] = np.exp(g_y) * (1.0 + g_n[0]) - 1.0
     return g_RM
+
+
+def program_remittance_shares(shares=None):
+    """
+    Remittance share of GDP in each program year as the model follows it: a
+    geometric glide from the measured first-year share to the program's
+    last-year share.
+
+    The IMF's year-by-year projection (5.6, 6.0, 5.9, 5.3, 4.8, 4.6, 4.1
+    percent of GDP) peaks in FY2025/26 and then falls by up to 0.6 points
+    a year; following it exactly would need remittance growth rates of
+    +16 and -4 percent in consecutive periods, outside the [-2%, 15%]
+    bounds OG-Core places on ``g_RM``. The glide keeps the two values the
+    calibration anchors on -- the measured level and the program endpoint
+    -- and spreads the decline evenly between them.
+
+    Args:
+        shares (array_like): program projection of the remittance share of
+            GDP, percent; defaults to ``IMF_PRIVATE_TRANSFERS``
+
+    Returns:
+        Numpy array: smoothed shares, percent, same length as ``shares``
+    """
+    if shares is None:
+        shares = IMF_PRIVATE_TRANSFERS
+    s = np.asarray(shares, dtype=float)
+    return np.geomspace(s[0], s[-1], s.size)
+
+
+def program_share_g_RM(g_y, g_n, shares=None):
+    """
+    Remittance growth path that moves the remittance share of trend GDP
+    from the measured level to the IMF program's endpoint over the program
+    years and holds it flat afterwards.
+
+    Multiplying the flat-share factor by the ratio of consecutive shares
+    along ``program_remittance_shares`` makes ``get_RM`` carry RM/Y (with
+    output on trend) from ``shares[0]`` in the first period to
+    ``shares[-1]`` in the last program year; from then on the path is
+    ``flat_share_g_RM``, so the share stays where the program leaves it.
+    Pair it with ``alpha_RM_T = shares[-1]`` so that OG-Core's blend
+    toward the long-run share after ``tG1`` is a no-op.
+
+    Args:
+        g_y (scalar): model-period productivity growth rate
+        g_n (array_like): population growth path, length T + S
+        shares (array_like): program projection of the remittance share of
+            GDP, percent; defaults to ``IMF_PRIVATE_TRANSFERS``
+
+    Returns:
+        g_RM (Numpy array): growth rate of remittances, length T + S
+    """
+    s = program_remittance_shares(shares)
+    g_RM = flat_share_g_RM(g_y, g_n)
+    ratio = s[1:] / s[:-1]
+    g_RM[1 : s.size] = (1.0 + g_RM[1 : s.size]) * ratio - 1.0
+    return g_RM
+
+
+def remittance_level_params(shares=None):
+    """
+    The remittance share of GDP in the first period and in the long run.
+
+    Args:
+        shares (array_like): remittance share of GDP in each program year,
+            percent; defaults to ``IMF_PRIVATE_TRANSFERS``
+
+    Returns:
+        dict: ``{"alpha_RM_1", "alpha_RM_T"}`` -- the measured FY2024/25
+            share and the last program-year share, held for the long run
+            like the other program series
+    """
+    if shares is None:
+        shares = IMF_PRIVATE_TRANSFERS
+    return {
+        "alpha_RM_1": round(float(shares[0]) / 100, 6),
+        "alpha_RM_T": round(float(shares[-1]) / 100, 6),
+    }
 
 
 def remittance_eta(omega_SS, lambdas, quintile_value_shares=None):
@@ -576,7 +658,7 @@ def derive_remittance_params(g_y, g_n, omega_SS, lambdas):
             ``Specifications.update_specifications``
     """
     return {
-        "g_RM": flat_share_g_RM(g_y, g_n).tolist(),
+        "g_RM": program_share_g_RM(g_y, g_n).tolist(),
         "eta_RM": remittance_eta(omega_SS, lambdas).tolist(),
     }
 
@@ -1272,6 +1354,7 @@ def fiscal_program_params(p, r_ss=None):
     )
     out["initial_debt_ratio"] = IMF_PUBLIC_DEBT[0] / 100
     out["tG1"] = len(PROGRAM_YEARS)
+    out.update(remittance_level_params())
     out.update(statutory_tax_params())
     if PENSIONS_ON:
         out.update(defined_benefit_params())

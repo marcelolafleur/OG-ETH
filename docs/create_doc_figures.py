@@ -212,6 +212,15 @@ def calibration_vs_data(output_dir=None, save_path=None, program=None):
     growth = (Y[1:] / Y[:-1]) * np.exp(params.g_y) * (
         1 + np.asarray(params.g_n)[1 : horizon + 1]
     ) - 1
+    # the model's current account: the goods-market residual (net exports)
+    # less the returns paid on foreign-owned capital and foreign-held debt
+    # (OG-Core prices both at the household portfolio return r_p) plus
+    # remittances and grants
+    net_exports = 1 - ratio("C") - ratio("I_total") - ratio("I_g") - ratio("G")
+    r_p = np.asarray(tpi["r_p"])[:horizon]
+    factor_payments = r_p * (ratio("K_f") + ratio("D_f"))
+    grants = np.asarray(params.alpha_FA).flatten()[:horizon]
+    current_account = net_exports - factor_payments + ratio("RM") + grants
     panels = [
         ("Public debt (% of GDP)", 100 * ratio("D"), program.IMF_PUBLIC_DEBT),
         (
@@ -243,10 +252,9 @@ def calibration_vs_data(output_dir=None, save_path=None, program=None):
             program.IMF_PRIVATE_TRANSFERS,
         ),
         (
-            "Trade balance, model resource-constraint residual (% of GDP)",
-            100
-            * (1 - ratio("C") - ratio("I_total") - ratio("I_g") - ratio("G")),
-            program.IMF_TRADE_BALANCE,
+            "Current account (% of GDP)",
+            100 * current_account,
+            program.IMF_CURRENT_ACCOUNT,
         ),
         ("Real GDP growth (%)", 100 * growth, program.IMF_REAL_GDP_GROWTH),
         (
