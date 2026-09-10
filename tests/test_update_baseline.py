@@ -57,10 +57,10 @@ def test_main_json_updates_specifications(monkeypatch, tmp_path):
     assert np.asarray(p.etr_params)[-1, 0].tolist() == pytest.approx([0.1313])
     assert np.asarray(p.mtrx_params)[-1, 0].tolist() == pytest.approx([0.35])
     assert np.asarray(p.labor_income_tax_noncompliance_rate)[
-        -1
+        0
     ].tolist() == pytest.approx([1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0])
     assert np.asarray(p.capital_income_tax_noncompliance_rate)[
-        -1
+        0
     ].tolist() == pytest.approx([1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0])
     # the CIT collections factor is a path along the IMF program; its
     # FY2024/25 anchor must survive a regeneration

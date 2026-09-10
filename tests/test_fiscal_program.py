@@ -75,8 +75,36 @@ def test_revenue_paths_add_the_imf_revenue_gain(params):
     gain_cons = (tau_c / tau_c[0] - 1) * mp.BASE_CONS_TAX_REVENUE
     gain_cit = (cit / cit[0] - 1) * mp.BASE_CIT_REVENUE
     imf_gain = (np.array(mp.IMF_REVENUE) - mp.IMF_REVENUE[0]) / 100
-    assert np.allclose(gain_cons + gain_cit, imf_gain, atol=1e-12)
-    assert np.allclose(gain_cons, mp.INDIRECT_SHARE_OF_REVENUE_GAIN * imf_gain)
+    # the formalization path phases in PIT_FORMALIZATION_GAIN over the program
+    formal = mp.PIT_FORMALIZATION_GAIN * np.arange(N) / (N - 1)
+    assert np.allclose(gain_cons + gain_cit + formal, imf_gain, atol=1e-12)
+    assert np.allclose(
+        gain_cons, mp.INDIRECT_SHARE_OF_REVENUE_GAIN * (imf_gain - formal)
+    )
+
+
+def test_formalization_path_broadens_the_base_over_the_program(packaged):
+    """Group 6 goes from half to full compliance and group 5 from none to a
+    fifth, linearly over the seven program years, then holds; labor and
+    capital rates move together (the SS diagnostic tiles one from the
+    other)."""
+    lab = np.array(packaged["labor_income_tax_noncompliance_rate"])
+    cap = np.array(packaged["capital_income_tax_noncompliance_rate"])
+    assert lab.shape[0] == N + 1 and np.allclose(lab, cap)
+    assert lab[0].tolist() == pytest.approx(mp.NONCOMPLIANCE_START)
+    assert lab[N - 1].tolist() == pytest.approx(mp.NONCOMPLIANCE_END)
+    assert lab[N].tolist() == pytest.approx(mp.NONCOMPLIANCE_END)
+    assert (np.diff(lab, axis=0) <= 1e-12).all()  # compliance only improves
+
+
+def test_pensions_go_to_the_formal_groups_only(packaged):
+    """replacement_rate_adjust mirrors the compliance structure: no public
+    pension for the five informal groups, half for group 6, full for group
+    7."""
+    adj = np.array(packaged["replacement_rate_adjust"])
+    assert adj.shape[-1] == 7
+    assert adj[-1].tolist() == pytest.approx(mp.PENSION_COVERAGE)
+    assert adj[-1].tolist() == pytest.approx([0, 0, 0, 0, 0, 0.5, 1.0])
 
 
 def test_implied_real_rate_on_debt_is_negative_through_the_program(params):

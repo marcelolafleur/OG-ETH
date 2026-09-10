@@ -95,7 +95,7 @@ Ethiopia is one of the world's largest aid recipients, and on-budget grants to t
 (Sec_ProgramPath)=
 ### The program path and the transition
 
-The fiscal block above follows the IMF fifth-review program for its seven fiscal years (FY2024/25 is model period 0, the 2025 start year) and holds the last value thereafter; OG-Core's closure rule, which adjusts government consumption to bring debt to `debt_ratio_ss`, starts at `tG1 = 7` (FY2031/32).  Revenue follows the program too: the model's tax revenue rises by the same percentage points of GDP as the IMF revenue line (9.2 to 12.3 percent), with two thirds of the gain on consumption taxes (`tau_c` 0.060 → 0.092, the VAT reform, excise and customs measures) and one third on corporate-tax collections (`adjustment_factor_for_cit_receipts` 0.327 → 0.525, tax administration).  The payroll and personal income tax settings are unchanged.  The table gives the program values and the parameters they map to; all paths are derived from the IMF tables by `ogeth.macro_params` and rebuilt by `update_baseline.py`.
+The fiscal block above follows the IMF fifth-review program for its seven fiscal years (FY2024/25 is model period 0, the 2025 start year) and holds the last value thereafter; OG-Core's closure rule, which adjusts government consumption to bring debt to `debt_ratio_ss`, starts at `tG1 = 7` (FY2031/32).  Revenue follows the program too: the model's tax revenue rises by the same percentage points of GDP as the IMF revenue line (9.2 to 12.3 percent).  About 0.7 points come from the formalization path in {ref}`Chap_Tax` — income-tax compliance improving in the fifth and sixth lifetime-income groups — and the remainder is split 60/40 between consumption taxes (`tau_c` 0.060 → 0.082, the VAT reform, excise and customs measures) and corporate-tax collections (`adjustment_factor_for_cit_receipts` 0.327 → 0.511, tax administration), following the direct-tax-heavy composition of the FY2025/26 outturn.  The payroll tax is unchanged.  The table gives the program values and the parameters they map to; all paths are derived from the IMF tables by `ogeth.macro_params` and rebuilt by `update_baseline.py`.
 
 | Fiscal year (model period) | 24/25 (0) | 25/26 (1) | 26/27 (2) | 27/28 (3) | 28/29 (4) | 29/30 (5) | 30/31 (6) | long run |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -106,8 +106,9 @@ The fiscal block above follows the IMF fifth-review program for its seven fiscal
 | `alpha_T` (% GDP) | 2.0 | 1.8 | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 |
 | `alpha_I` (% GDP) | 5.0 | 5.8 | 5.5 | 5.0 | 5.4 | 5.2 | 5.1 | 5.1 |
 | `alpha_FA` (% GDP) | 1.7 | 1.3 | 0.9 | 0.3 | 0.3 | 0.3 | 0.1 | 0.3 |
-| `tau_c` | 0.060 | 0.077 | 0.083 | 0.087 | 0.090 | 0.091 | 0.092 | 0.092 |
-| CIT collections factor | 0.327 | 0.429 | 0.467 | 0.493 | 0.512 | 0.518 | 0.525 | 0.525 |
+| Non-compliance, groups 5 / 6 | 1 / 0.5 | 0.97 / 0.42 | 0.93 / 0.33 | 0.9 / 0.25 | 0.87 / 0.17 | 0.83 / 0.08 | 0.8 / 0 | 0.8 / 0 |
+| `tau_c` | 0.060 | 0.074 | 0.078 | 0.081 | 0.083 | 0.083 | 0.082 | 0.082 |
+| CIT collections factor | 0.327 | 0.441 | 0.477 | 0.499 | 0.513 | 0.512 | 0.511 | 0.511 |
 | Implied real rate on debt (%) | — | −3.5 | −3.7 | −1.1 | −1.5 | −1.8 | −1.4 | 2.0 |
 
 The figure compares the baseline transition produced by `examples/run_og_eth.py` with the program path for the moments the calibration targets and for the external and growth moments it does not target directly.  Model periods 0–6 sit on the program values by construction where a parameter is imposed (spending); revenue, debt, remittances, the trade balance and growth are model outcomes.

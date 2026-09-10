@@ -72,10 +72,13 @@ def test_informality_tax_rates(p):
 
 def test_informality_noncompliance_by_group(p):
     """Bottom 5 groups fully non-compliant, group 6 half, top compliant."""
-    labor = np.asarray(p.labor_income_tax_noncompliance_rate)[-1]
-    capital = np.asarray(p.capital_income_tax_noncompliance_rate)[-1]
-    assert labor.tolist() == pytest.approx(NONCOMPLIANCE_BY_GROUP)
-    assert capital.tolist() == pytest.approx(NONCOMPLIANCE_BY_GROUP)
+    # period 0 (FY2024/25) carries the informality calibration; the path then
+    # broadens the base along the IMF program (tests/test_fiscal_program.py)
+    labor = np.asarray(p.labor_income_tax_noncompliance_rate)
+    capital = np.asarray(p.capital_income_tax_noncompliance_rate)
+    assert labor[0].tolist() == pytest.approx(NONCOMPLIANCE_BY_GROUP)
+    assert capital[0].tolist() == pytest.approx(NONCOMPLIANCE_BY_GROUP)
+    assert np.allclose(labor, capital)
 
 
 def test_cit_collections_factor(p):

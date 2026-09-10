@@ -677,12 +677,38 @@ R_GOV_FLOOR = -0.10
 # solved baseline steady state of examples/run_og_eth.py.
 R_SS_FOR_R_GOV = 0.07
 
-# Allocation of the program's revenue gains across the model's tax
-# instruments: two thirds to consumption taxes (VAT reform, excise, customs),
-# one third to corporate income tax collections (tax administration). FY2024/25
-# model collections these are scaled against: consumption taxes 3.85 and CIT
-# 1.71 percent of GDP (steady-state solve of the packaged calibration).
-INDIRECT_SHARE_OF_REVENUE_GAIN = 2 / 3
+# Formalization along the program. The informality calibration (taxes.md)
+# grades income-tax compliance by lifetime-income group: the bottom five
+# groups pay none of the tax owed, group 6 half, the top group all. The
+# program's revenue gains are direct-tax heavy -- in the first nine months of
+# FY2025/26 federal direct taxes grew 78 percent against 41 percent for
+# domestic VAT and 5 percent for import taxes (IMF CR 26/174, p. 15) -- so
+# part of the gain is modelled as the tax base broadening: group 6 moves
+# from half to full compliance and group 5 from none to a fifth over the
+# seven program years, linearly, and stays there. Lifetime income proxies
+# formality, so this is the margin of the formal sector moving down the
+# income distribution.
+NONCOMPLIANCE_START = [1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0]
+NONCOMPLIANCE_END = [1.0, 1.0, 1.0, 1.0, 0.8, 0.0, 0.0]
+# Personal-income-tax revenue the formalization adds by the end of the
+# program, percent of GDP, estimated from the steady-state incidence of the
+# packaged calibration (group 6 contributes about 0.6 and group 5 about 0.1
+# points of GDP at full and one-fifth compliance respectively).
+PIT_FORMALIZATION_GAIN = 0.007
+
+# Pension coverage by lifetime-income group. Ethiopia's two schemes (PSSSA for
+# public servants, POESSA for private formal employees) cover only formal
+# employment, a small share of the labour force; the same formality proxy is
+# used, so the informal groups draw no public pension.
+PENSION_COVERAGE = [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0]
+
+# Allocation of the program's revenue gains net of formalization across the
+# other instruments: 60 percent to consumption taxes (VAT reform, excises,
+# customs) and 40 percent to corporate income tax collections (tax
+# administration), following the outturn composition above. FY2024/25 model
+# collections these are scaled against: consumption taxes 3.85 and CIT 1.71
+# percent of GDP.
+INDIRECT_SHARE_OF_REVENUE_GAIN = 0.6
 BASE_CONS_TAX_REVENUE = 0.0385
 BASE_CIT_REVENUE = 0.0171
 
@@ -719,8 +745,9 @@ def program_spending_paths():
 def program_revenue_paths(tau_c_0, cit_factor_0):
     """
     Consumption-tax and CIT-collection paths that raise the model's tax
-    revenue by the same percentage points of GDP as the IMF revenue path,
-    with the gain allocated per INDIRECT_SHARE_OF_REVENUE_GAIN.
+    revenue by the same percentage points of GDP as the IMF revenue path net
+    of what the formalization path delivers, with the remainder allocated per
+    INDIRECT_SHARE_OF_REVENUE_GAIN.
 
     Args:
         tau_c_0 (scalar): FY2024/25 effective consumption-tax rate
@@ -732,6 +759,9 @@ def program_revenue_paths(tau_c_0, cit_factor_0):
             the long-run value
     """
     gain = (np.array(IMF_REVENUE) - IMF_REVENUE[0]) / 100
+    # the part of the gain the formalization path delivers, phased in with it
+    n = len(PROGRAM_YEARS)
+    gain = gain - PIT_FORMALIZATION_GAIN * np.arange(n) / (n - 1)
     tau_c = tau_c_0 * (
         1 + INDIRECT_SHARE_OF_REVENUE_GAIN * gain / BASE_CONS_TAX_REVENUE
     )
@@ -743,6 +773,31 @@ def program_revenue_paths(tau_c_0, cit_factor_0):
         "adjustment_factor_for_cit_receipts": [
             float(x) for x in list(cit) + [cit[-1]]
         ],
+    }
+
+
+def program_compliance_paths():
+    """
+    Income-tax non-compliance paths (labor and capital, identical) that move
+    linearly from NONCOMPLIANCE_START to NONCOMPLIANCE_END over the program
+    years and stay there, and the pension-coverage matrix.
+
+    Returns:
+        dict: labor_income_tax_noncompliance_rate,
+            capital_income_tax_noncompliance_rate (lists of J-vectors, one
+            per program year plus the long run) and replacement_rate_adjust
+    """
+    n = len(PROGRAM_YEARS)
+    start = np.array(NONCOMPLIANCE_START)
+    end = np.array(NONCOMPLIANCE_END)
+    path = [
+        list(np.round(start + (end - start) * t / (n - 1), 6))
+        for t in range(n)
+    ] + [list(end)]
+    return {
+        "labor_income_tax_noncompliance_rate": path,
+        "capital_income_tax_noncompliance_rate": [list(r) for r in path],
+        "replacement_rate_adjust": [list(PENSION_COVERAGE)],
     }
 
 
@@ -840,6 +895,7 @@ def fiscal_program_params(p, r_ss=None):
         r_ss = R_SS_FOR_R_GOV
     out = {}
     out.update(program_spending_paths())
+    out.update(program_compliance_paths())
     out.update(
         program_revenue_paths(
             float(np.asarray(p.tau_c).flatten()[0]),
