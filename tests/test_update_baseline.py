@@ -20,9 +20,56 @@ class MockCalibration:
     def __init__(self, p, update_from_api):
         self.p = p
         self.update_from_api = update_from_api
+        self.demographic_params = {}
+        self.e = None
 
     def get_dict(self):
         return {"frisch": 0.5, "g_y_annual": 0.03}
+
+    def update_demographics(
+        self, p, demographic_data_path=None, output_path=None
+    ):
+        omega = np.asarray(p.omega_SS)
+        self.demographic_params = {
+            "omega_SS": omega,
+            "g_n": np.asarray(p.g_n),
+            "g_n_ss": np.float64(p.g_n_ss),
+        }
+        self.e = np.ones(omega.shape) / omega.sum()
+
+
+def test_demographics_only_writes_just_those_keys(monkeypatch, tmp_path):
+    """
+    The demographics-only route rewrites the regenerated keys and the fiscal
+    program paths in place and leaves every other entry untouched.
+    """
+    output_dir = tmp_path / "baseline_output"
+    output_dir.mkdir()
+    src = (
+        Path(update_baseline.__file__).parent / "ogeth_default_parameters.json"
+    )
+    before = json.loads(src.read_text(encoding="utf-8"))
+    (output_dir / "ogeth_default_parameters.json").write_text(
+        json.dumps(before), encoding="utf-8"
+    )
+    monkeypatch.setattr(update_baseline, "Calibration", MockCalibration)
+    monkeypatch.setattr(
+        update_baseline.os.path,
+        "realpath",
+        lambda _: str(output_dir / "update_baseline.py"),
+    )
+
+    update_baseline.main(demographics_only=True)
+
+    after = json.loads(
+        (output_dir / "ogeth_default_parameters.json").read_text("utf-8")
+    )
+    assert set(after) == set(before)
+    assert np.allclose(after["e"], np.ones((80, 7)))
+    assert after["gamma"] == before["gamma"]
+    assert after["chi_n"] == before["chi_n"]
+    assert after["etr_params"] == before["etr_params"]
+    assert "r_gov_shift" in after and "tG1" in after
 
 
 def test_main_json_updates_specifications(monkeypatch, tmp_path):
