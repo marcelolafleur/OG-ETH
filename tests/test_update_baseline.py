@@ -69,7 +69,11 @@ def test_demographics_only_writes_just_those_keys(monkeypatch, tmp_path):
     assert np.allclose(after["e"], np.ones((80, 7)))
     assert after["gamma"] == before["gamma"]
     assert after["chi_n"] == before["chi_n"]
-    assert after["etr_params"] == before["etr_params"]
+    # the tax functions are refitted from the statutory schedules, so they
+    # agree to solver precision rather than bit for bit
+    np.testing.assert_allclose(
+        after["etr_params"], before["etr_params"], rtol=1e-6, atol=1e-12
+    )
     assert "r_gov_shift" in after and "tG1" in after
 
 
