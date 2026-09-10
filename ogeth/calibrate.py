@@ -128,6 +128,14 @@ class Calibration:
                     p.lambdas,
                 )
             )
+            # so is the transfer allocation matrix (per capita within the
+            # targeted groups, pensions to the retired)
+            retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(
+                p.E
+            )
+            self.demographic_params["eta"] = macro_params.transfer_eta(
+                self.demographic_params["omega_SS"], p.lambdas, retire_idx
+            ).tolist()
         except Exception as exc:
             warnings.warn(
                 f"Demographics/income update failed: {exc}", stacklevel=2

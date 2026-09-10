@@ -675,7 +675,7 @@ R_GOV_CONVERGENCE_PERIODS = 4
 R_GOV_FLOOR = -0.10
 # Steady-state return on capital the r_gov_shift path is evaluated at: the
 # solved baseline steady state of examples/run_og_eth.py.
-R_SS_FOR_R_GOV = 0.07
+R_SS_FOR_R_GOV = 0.093
 
 # Formalization along the program. The informality calibration (taxes.md)
 # grades income-tax compliance by lifetime-income group: the bottom five
@@ -801,6 +801,75 @@ def program_compliance_paths():
     }
 
 
+# Foreign share of net new government borrowing along the program. With debt
+# falling, zeta_D is the share of the decline borne by external creditors; the
+# IMF path has external debt falling from 31.8 to 16.7 percent of GDP while
+# domestic debt falls from 18.7 to 11.9, i.e. amortization to external
+# creditors carries most of the adjustment (CR 26/174, Table 1). The long-run
+# value is the calibrated 0.15 (macro.md).
+LONG_RUN_ZETA_D = 0.15
+
+# Cash transfers by programme, percent of GDP, long run (see CASH_TRANSFERS):
+# the Productive Safety Net Program goes to the poorest households, public
+# pensions to retired formal-sector workers, the fertilizer subsidy to farming
+# households. OG-Core's eta matrix allocates aggregate transfers across ages
+# and lifetime-income groups; the default is population-proportional.
+PSNP_SHARE_OF_GDP = 0.4
+PENSIONS_SHARE_OF_GDP = 0.5
+FERTILIZER_SUBSIDY_SHARE_OF_GDP = 0.6
+PSNP_GROUPS = [0]  # poorest quarter of households
+FARM_GROUPS = [0, 1, 2]  # bottom 70 percent: smallholder agriculture
+PENSION_GROUPS = [5, 6]  # the formal groups, as in PENSION_COVERAGE
+
+
+def program_zeta_D_path():
+    """
+    zeta_D path: the external creditors' share of each program year's change
+    in the debt ratio, clipped to [0, 1], then LONG_RUN_ZETA_D.
+
+    Returns:
+        list: length 7 plus the long-run value (period 0 uses period 1's)
+    """
+    tot = np.array(IMF_PUBLIC_DEBT)
+    ext = tot - np.array(IMF_DOMESTIC_DEBT)
+    share = np.clip(np.diff(ext) / np.diff(tot), 0.0, 1.0)
+    return [float(share[0])] + [float(x) for x in share] + [LONG_RUN_ZETA_D]
+
+
+def transfer_eta(omega_SS, lambdas, retire_age_index):
+    """
+    Allocation matrix eta distributing aggregate transfers across households,
+    shaped (S, J): the safety net per capita within PSNP_GROUPS, the
+    fertilizer subsidy per capita within FARM_GROUPS, and pensions per
+    capita among the retired (age index >= retire_age_index) in
+    PENSION_GROUPS, each programme weighted by its share of GDP.
+
+    Returns:
+        Numpy array: (S, J), sums to one
+    """
+    omega_SS = np.asarray(omega_SS, dtype=float)
+    S, J = omega_SS.shape
+    eta = np.zeros((S, J))
+
+    def spread(groups, ages, weight):
+        mask = np.zeros((S, J))
+        mask[np.ix_(ages, groups)] = omega_SS[np.ix_(ages, groups)]
+        return weight * mask / mask.sum()
+
+    eta += spread(PSNP_GROUPS, range(S), PSNP_SHARE_OF_GDP)
+    eta += spread(FARM_GROUPS, range(S), FERTILIZER_SUBSIDY_SHARE_OF_GDP)
+    eta += spread(
+        PENSION_GROUPS, range(retire_age_index, S), PENSIONS_SHARE_OF_GDP
+    )
+    return eta / eta.sum()
+
+
+def derived_transfer_eta(p):
+    """The transfer allocation matrix for the demographics in ``p``."""
+    retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
+    return {"eta": transfer_eta(p.omega_SS, p.lambdas, retire_idx).tolist()}
+
+
 def implied_real_rate_on_debt(g_y, g_n):
     """
     Real effective interest rate on public debt that reproduces the IMF
@@ -896,6 +965,8 @@ def fiscal_program_params(p, r_ss=None):
     out = {}
     out.update(program_spending_paths())
     out.update(program_compliance_paths())
+    out["zeta_D"] = program_zeta_D_path()
+    out.update(derived_transfer_eta(p))
     out.update(
         program_revenue_paths(
             float(np.asarray(p.tau_c).flatten()[0]),

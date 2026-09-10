@@ -184,3 +184,41 @@ def test_initial_wealth_ratio_is_built_from_its_components():
         abs=1e-3,
     )
     assert 1.5 < mp.INITIAL_WEALTH_RATIO < 3.0
+
+
+def test_zeta_d_path_follows_the_external_share_of_the_debt_decline(packaged):
+    """During the program external creditors absorb the share of the debt
+    decline the IMF external/domestic split implies (0.37 -> 1.0 -> 0.77);
+    afterwards zeta_D returns to the calibrated 0.15."""
+    z = np.asarray(packaged["zeta_D"])
+    assert np.allclose(z[: N + 1], mp.program_zeta_D_path())
+    tot = np.array(mp.IMF_PUBLIC_DEBT)
+    ext = tot - np.array(mp.IMF_DOMESTIC_DEBT)
+    assert np.allclose(z[1:N], np.clip(np.diff(ext) / np.diff(tot), 0, 1))
+    assert z[N] == pytest.approx(mp.LONG_RUN_ZETA_D)
+    assert (z >= 0).all() and (z <= 1).all()
+
+
+def test_transfers_are_targeted_by_programme(packaged, params):
+    """eta gives the safety net to the poorest quarter, the fertilizer
+    subsidy to the bottom 70 percent, and pensions to the retired in the
+    formal groups; it is rebuilt from the packaged demographics."""
+    eta = np.array(packaged["eta"])
+    assert eta.shape == (80, 7) and eta.sum() == pytest.approx(1.0)
+    retire_idx = int(params.retirement_age[0]) - int(params.E)
+    expected = mp.transfer_eta(
+        packaged["omega_SS"], packaged["lambdas"], retire_idx
+    )
+    assert np.allclose(eta, expected, atol=1e-12)
+    total = (
+        mp.PSNP_SHARE_OF_GDP
+        + mp.FERTILIZER_SUBSIDY_SHARE_OF_GDP
+        + mp.PENSIONS_SHARE_OF_GDP
+    )
+    share = eta.sum(axis=0)
+    assert share[3:5].sum() == pytest.approx(0.0)  # groups 4-5 get nothing
+    assert share[5:].sum() == pytest.approx(mp.PENSIONS_SHARE_OF_GDP / total)
+    assert eta[:retire_idx, 5:].sum() == pytest.approx(
+        0.0
+    )  # pensions: retired
+    assert share[0] > share[1] > share[2]
