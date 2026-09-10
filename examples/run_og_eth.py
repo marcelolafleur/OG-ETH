@@ -77,6 +77,24 @@ def main():
             "Installed ogcore has no r_gov_floor; the interest rate on "
             "government debt is clipped at zero through the program years."
         )
+    # Solver settings: a damped outer loop (nu) with Anderson acceleration
+    # of the time path where the installed OG-Core offers it; the calibrated
+    # heterogeneity in discount factors makes the transition converge slowly
+    # under plain functional iteration.
+    p.update_specifications({"nu": macro_params.NU})
+    if hasattr(p, "TPI_outer_method"):
+        p.update_specifications(
+            {
+                "TPI_outer_method": "anderson",
+                "TPI_anderson_m": macro_params.TPI_ANDERSON_M,
+                "TPI_anderson_beta": macro_params.TPI_ANDERSON_BETA,
+            }
+        )
+    else:
+        print(
+            "Installed ogcore has no Anderson acceleration for the time "
+            "path; using damped functional iteration."
+        )
     # Update parameters from calibrate.py Calibration class
     if is_connected():  # only update if connected to internet
         c = Calibration(

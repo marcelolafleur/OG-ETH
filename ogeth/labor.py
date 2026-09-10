@@ -229,7 +229,8 @@ def estimate_chi_n(
     for iteration in range(max_iter):
         ss = SS.run_SS(p, client=client)
         n_model = average_labor_supply(ss["n"], p.omega_SS)
-        gap = np.abs(n_model / target - 1)[fit].max()
+        # ages where chi_n sits at OG-Core's cap cannot be fitted
+        gap = np.abs(n_model / target - 1)[fit & (chi_n < MAX_CHI_N)].max()
         history.append(
             {
                 "iteration": iteration,

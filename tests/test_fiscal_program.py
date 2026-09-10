@@ -46,6 +46,9 @@ def test_spending_paths_reproduce_imf_primary_expenditure():
         + np.array(sp["alpha_T"][:N])
         + np.array(sp["alpha_I"][:N])
     )
+    if mp.PENSIONS_ON:
+        # pension benefits are paid by the pension system, not as transfers
+        primary = primary + mp.PENSIONS_SHARE_OF_GDP / 100
     imf = (np.array(mp.IMF_EXPENDITURE) - np.array(mp.IMF_INTEREST)) / 100
     assert np.allclose(primary, imf, atol=1e-3)
 
@@ -57,7 +60,8 @@ def test_program_paths_start_at_fy2024_25_values(packaged):
     assert packaged["alpha_I"][0] == pytest.approx(0.050)
     assert packaged["alpha_FA"][0] == pytest.approx(0.017)
     assert packaged["alpha_G"][0] == pytest.approx(0.043)
-    assert packaged["alpha_T"][0] == pytest.approx(0.020)
+    cash = 0.020 - (mp.PENSIONS_SHARE_OF_GDP / 100 if mp.PENSIONS_ON else 0)
+    assert packaged["alpha_T"][0] == pytest.approx(cash)
 
 
 def test_closure_starts_after_the_program_horizon(packaged):
@@ -91,9 +95,14 @@ def test_formalization_path_broadens_the_base_over_the_program(packaged):
     lab = np.array(packaged["labor_income_tax_noncompliance_rate"])
     cap = np.array(packaged["capital_income_tax_noncompliance_rate"])
     assert lab.shape[0] == N + 1 and np.allclose(lab, cap)
-    assert lab[0].tolist() == pytest.approx(mp.NONCOMPLIANCE_START)
-    assert lab[N - 1].tolist() == pytest.approx(mp.NONCOMPLIANCE_END)
-    assert lab[N].tolist() == pytest.approx(mp.NONCOMPLIANCE_END)
+    # the shape vectors give compliance relative to the top group; the
+    # calibrated scale sets the level (see taxes.md)
+    start = 1 - mp.COMPLIANCE_SCALE * (1 - np.array(mp.NONCOMPLIANCE_START))
+    end = 1 - mp.COMPLIANCE_SCALE * (1 - np.array(mp.NONCOMPLIANCE_END))
+    assert lab[0].tolist() == pytest.approx(start.tolist())
+    assert lab[N - 1].tolist() == pytest.approx(end.tolist())
+    assert lab[N].tolist() == pytest.approx(end.tolist())
+    assert 0 < mp.COMPLIANCE_SCALE < 1
     assert (np.diff(lab, axis=0) <= 1e-12).all()  # compliance only improves
 
 
@@ -103,8 +112,11 @@ def test_pensions_go_to_the_formal_groups_only(packaged):
     7."""
     adj = np.array(packaged["replacement_rate_adjust"])
     assert adj.shape[-1] == 7
-    assert adj[-1].tolist() == pytest.approx(mp.PENSION_COVERAGE)
-    assert adj[-1].tolist() == pytest.approx([0, 0, 0, 0, 0, 0.5, 1.0])
+    expected = np.array(mp.PENSION_COVERAGE) * mp.PENSION_COVERAGE_SCALE
+    assert adj[-1].tolist() == pytest.approx(expected.tolist())
+    assert adj[-1][:5].tolist() == pytest.approx([0.0] * 5)
+    assert adj[-1][5] == pytest.approx(0.5 * adj[-1][6])
+    assert 0 < mp.PENSION_COVERAGE_SCALE < 1
 
 
 def test_implied_real_rate_on_debt_is_negative_through_the_program(params):
@@ -210,14 +222,15 @@ def test_transfers_are_targeted_by_programme(packaged, params):
         packaged["omega_SS"], packaged["lambdas"], retire_idx
     )
     assert np.allclose(eta, expected, atol=1e-12)
+    pensions = 0.0 if mp.PENSIONS_ON else mp.PENSIONS_SHARE_OF_GDP
     total = (
-        mp.PSNP_SHARE_OF_GDP
-        + mp.FERTILIZER_SUBSIDY_SHARE_OF_GDP
-        + mp.PENSIONS_SHARE_OF_GDP
+        mp.PSNP_SHARE_OF_GDP + mp.FERTILIZER_SUBSIDY_SHARE_OF_GDP + pensions
     )
     share = eta.sum(axis=0)
     assert share[3:5].sum() == pytest.approx(0.0)  # groups 4-5 get nothing
-    assert share[5:].sum() == pytest.approx(mp.PENSIONS_SHARE_OF_GDP / total)
+    # with the pension system on, the retired formal groups are paid
+    # benefits instead of transfers
+    assert share[5:].sum() == pytest.approx(pensions / total)
     assert eta[:retire_idx, 5:].sum() == pytest.approx(
         0.0
     )  # pensions: retired

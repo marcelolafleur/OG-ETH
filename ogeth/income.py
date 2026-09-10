@@ -37,6 +37,12 @@ OGUSA_S = 80
 WID_YEAR = 2021
 WID_SHARE_VARIABLE = "sptincj992"
 WID_GINI_VARIABLE = "gptincj992"
+# WID net personal wealth shares (equal-split adults), the target for the
+# distribution of wealth across the groups; the bottom quarter's share is
+# negative in the data, which the model's no-borrowing households cannot
+# reproduce, hence the floor
+WID_WEALTH_VARIABLE = "shwealj992"
+WEALTH_SHARE_FLOOR = 0.005
 # NTA labor income per capita: Ethiopia's only profile is 2005, and 2006
 # is the US profile closest to it
 NTA_YEAR = {"ETH": 2005, "US": 2006}
@@ -247,27 +253,28 @@ def earnings_age_factor(ages):
     return factor
 
 
-def wid_cumulative_shares(country):
+def wid_cumulative_shares(country, variable=WID_SHARE_VARIABLE):
     """
-    Cumulative pre-tax income shares at the percentile bounds WID reports.
+    Cumulative shares at the percentile bounds WID reports.
 
     Args:
         country (str): "ETH" or "US"
+        variable (str): WID series, pre-tax income shares by default or
+            WID_WEALTH_VARIABLE for net personal wealth
 
     Returns:
-        cumulative (dict): share of income received by the bottom fraction
-            of adults, keyed by that fraction (0.25, 0.5, 0.7, 0.8, 0.9,
-            0.99 and 1.0)
+        cumulative (dict): share received by the bottom fraction of adults,
+            keyed by that fraction (0.25, 0.5, 0.7, 0.8, 0.9, 0.99 and 1.0)
 
     """
     df = pd.read_csv(os.path.join(DATA_DIR, "wid_pretax_income_2021.csv"))
     df = df[
         (df.country == country)
         & (df.year == WID_YEAR)
-        & (df.variable == WID_SHARE_VARIABLE)
+        & (df.variable == variable)
     ]
     if df.empty:
-        raise ValueError(f"No WID income shares for {country}")
+        raise ValueError(f"No WID {variable} shares for {country}")
     s = df.set_index("percentile").value
     bottom_70 = s["p0p50"] + s["p50p90"] - s["p70p80"] - s["p80p90"]
     return {
@@ -281,19 +288,20 @@ def wid_cumulative_shares(country):
     }
 
 
-def wid_group_shares(country, lambdas):
+def wid_group_shares(country, lambdas, variable=WID_SHARE_VARIABLE):
     """
-    WID pre-tax income share of each lifetime-income group.
+    WID share of each lifetime-income group, of pre-tax income by default.
 
     Args:
         country (str): "ETH" or "US"
         lambdas (Numpy array): population share of each group, length J
+        variable (str): WID series (see wid_cumulative_shares)
 
     Returns:
-        shares (Numpy array): income share of each group, length J
+        shares (Numpy array): share of each group, length J
 
     """
-    cumulative = wid_cumulative_shares(country)
+    cumulative = wid_cumulative_shares(country, variable)
     bounds = np.round(np.cumsum(lambdas), 4)
     missing = [b for b in bounds if b not in cumulative]
     if missing:
@@ -323,6 +331,46 @@ def wid_gini(country):
         & (df.variable == WID_GINI_VARIABLE)
     ]
     return float(df.value.iloc[0])
+
+
+def wealth_share_targets(lambdas, country="ETH", floor=WEALTH_SHARE_FLOOR):
+    """
+    Target share of household wealth for each lifetime-income group, from
+    WID's net personal wealth shares. Households in the model cannot borrow,
+    so a group whose WID share is negative or below the floor is given the
+    floor and the rest is rescaled to sum to one.
+
+    Args:
+        lambdas (Numpy array): population share of each group, length J
+        country (str): "ETH" or "US"
+        floor (float): smallest share any group is asked to hold
+
+    Returns:
+        shares (Numpy array): target wealth share of each group, length J
+
+    """
+    shares = wid_group_shares(country, lambdas, WID_WEALTH_VARIABLE)
+    low = shares < floor
+    shares = shares.copy()
+    shares[low] = floor
+    shares[~low] *= (1.0 - floor * low.sum()) / shares[~low].sum()
+    return shares
+
+
+def implied_wealth_shares(b, age_wgts):
+    """
+    Share of aggregate household wealth held by each group.
+
+    Args:
+        b (Numpy array): savings by age and group, size (S, J)
+        age_wgts (Numpy array): joint population distribution, size (S, J)
+
+    Returns:
+        shares (Numpy array): wealth share of each group, length J
+
+    """
+    wealth = np.asarray(b) * np.asarray(age_wgts)
+    return wealth.sum(axis=0) / wealth.sum()
 
 
 def implied_group_shares(e, age_wgts):

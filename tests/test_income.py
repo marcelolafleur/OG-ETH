@@ -222,7 +222,7 @@ def test_packaged_e_is_the_reshaped_matrix(packaged):
     assert means[0] == pytest.approx(0.176, abs=0.005)
     assert means[-1] == pytest.approx(10.47, abs=0.05)
     gini = income.implied_gini(e, omega, lambdas)
-    assert gini == pytest.approx(0.520, abs=0.005)
+    assert gini == pytest.approx(0.511, abs=0.005)
     profile = (e * omega).sum(axis=1) / omega.sum(axis=1)
     thirties, fifties, sixties = (
         profile[10:20].mean(),

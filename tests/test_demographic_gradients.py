@@ -26,6 +26,29 @@ def test_gradients_are_the_library_tilts_per_percentile_point():
     assert np.all(mort[45:] == 0.0)  # older bands not used
 
 
+def test_mortality_gradient_steepens_with_income():
+    g = calibrate.demographic_gradients(
+        20, 80, T=320, start_year=2025, g_y_annual=0.047
+    )
+    path = g["mort_gradient"]
+    assert path.shape == (400, 100)
+    base = calibrate.demographic_gradients(20, 80)["mort_gradient"]
+    # the rule's change since the 2007 census: -0.2443 ln(1100/210) at
+    # the 2024 income, plus one year of growth by the 2025 start
+    shift_2025 = -0.2443 * np.log(1100 * 1.047 / 210) / 100
+    assert path[0, 20] == pytest.approx(base[20] + shift_2025, abs=1e-6)
+    assert path[0, 50] == pytest.approx(shift_2025, abs=1e-6)  # 0 measured
+    assert path[0, 3] == pytest.approx(base[3])  # children untouched
+    assert path[0, 70] == pytest.approx(0.0)  # rule not applied past 60
+    # steeper over time, and flat once income passes the rule's range
+    assert path[40, 30] < path[0, 30]
+    years_to_cap = np.log(10000 / (1100 * 1.047)) / np.log(1.047)
+    assert path[int(years_to_cap) + 5, 30] == pytest.approx(path[-1, 30])
+    assert path[-1, 30] == pytest.approx(
+        base[30] - 0.2443 * np.log(10000 / 210) / 100, abs=1e-6
+    )
+
+
 def test_gradients_missing_indicator_raises(tmp_path):
     path = tmp_path / "g.csv"
     path.write_text(
@@ -59,5 +82,5 @@ def test_calibration_passes_gradients_to_demographics():
     np.testing.assert_array_equal(kwargs["income_percentiles"], p.lambdas)
     assert kwargs["fert_gradient"] == pytest.approx(-0.00736, abs=1e-5)
     assert kwargs["infmort_gradient"] == pytest.approx(-0.00657, abs=1e-5)
-    assert kwargs["mort_gradient"].shape == (100,)
+    assert kwargs["mort_gradient"].shape == (400, 100)
     assert "e" in c.get_dict()

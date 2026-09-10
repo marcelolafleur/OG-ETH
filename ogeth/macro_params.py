@@ -12,6 +12,17 @@ import datetime
 from io import StringIO
 from pathlib import Path
 
+# Solver settings used by the example scripts: the damping of OG-Core's
+# outer loops (nu, the weight on the new iterate) and Anderson acceleration
+# of the time-path outer loop (PSLmodels/OG-Core master; the example applies
+# it only where the installed OG-Core has the parameters). With discount
+# factors that differ by lifetime-income group the plain damped iteration
+# converges slowly, and a smaller step with acceleration is both faster and
+# more robust.
+NU = 0.2
+TPI_ANDERSON_M = 5
+TPI_ANDERSON_BETA = 1.0
+
 # Public capital elasticity; see firms.md.
 GAMMA_G_LIC = 0.1
 
@@ -695,12 +706,97 @@ NONCOMPLIANCE_END = [1.0, 1.0, 1.0, 1.0, 0.8, 0.0, 0.0]
 # calibration (personal income tax 1.4 -> 2.6 percent of GDP by FY2030/31;
 # a first estimate from steady-state incidence, 0.7, undershot it).
 PIT_FORMALIZATION_GAIN = 0.012
+# With the statutory schedule as the tax function, the compliance vectors
+# above give the *shape* of the formal tax boundary and this scale its
+# level: even the top percent remits only part of the tax the schedule
+# implies, because much of its income is business and self-employment income
+# outside Schedule A. The scale is calibrated so that personal income tax
+# collects PIT_REVENUE_TARGET of GDP in FY2024/25
+# (ogeth.calibrate.match_steady_state).
+COMPLIANCE_SCALE = 0.204
+PIT_REVENUE_TARGET = 0.014
+# The matching sees only the steady state; the first-period collections it
+# infers from the steady-state incidence came out 5 percent above the solved
+# transition's FY2024/25 value, so the steady-state target is raised by this
+# factor (measured on the solved transition of the packaged calibration).
+PIT_START_CORRECTION = 1.053
 
 # Pension coverage by lifetime-income group. Ethiopia's two schemes (PSSSA for
 # public servants, POESSA for private formal employees) cover only formal
 # employment, a small share of the labour force; the same formality proxy is
 # used, so the informal groups draw no public pension.
 PENSION_COVERAGE = [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0]
+# The public pension is a defined-benefit scheme (Proclamations 1267/2022 for
+# public servants and 1268/2022 for private employees): retirement at 60
+# after at least ten years of service, a benefit of 30 percent of the average
+# salary of the last three years plus 1.25 percent for every year of service
+# beyond ten, capped at 70 percent. A full career from 20 to 60 gives 67.5
+# percent. OG-Core's defined-benefit formula is yr_contrib * alpha_db times
+# average earnings over avg_earn_num_years, so alpha_db is the replacement
+# rate per year of contribution.
+PENSIONS_ON = True
+PENSION_RETIREMENT_AGE = 60
+PENSION_MIN_YEARS = 10
+PENSION_BASE_REPLACEMENT = 0.30
+PENSION_REPLACEMENT_PER_YEAR = 0.0125
+PENSION_MAX_REPLACEMENT = 0.70
+PENSION_AVERAGING_YEARS = 3
+PENSION_CAREER_YEARS = 40
+# The coverage vector above says which groups draw a pension; the scale
+# multiplies it so that pension outlays match PENSIONS_SHARE_OF_GDP. The
+# formal groups hold 10 percent of households but 40 percent of labor income,
+# far more than the scheme's 800,000 pensioners and two percent of the
+# working-age population, so the scale is well below one. Calibrated by
+# ogeth.calibrate.match_steady_state.
+PENSION_COVERAGE_SCALE = 0.8689
+# Pension outlays relative to GDP rise along the transition as the population
+# ages: in the solved transition they are 1.6 times higher in the steady state
+# than in FY2024/25. The data anchor is today's 0.5 percent of GDP, so the
+# steady-state target the matching uses is that much higher.
+PENSION_OUTLAYS_SS_TO_START = 1.6
+
+# Personal income tax: the statutory employment-income schedule (Schedule A)
+# in birr per month, as (upper bound, marginal rate) with an open last
+# bracket. Proclamation 979/2016 applies in FY2024/25 (model period 0) and
+# Proclamation 1395/2025, in force from July 2025, from FY2025/26 on.
+PIT_SCHEDULE_2016 = [
+    (600, 0.0),
+    (1650, 0.10),
+    (3200, 0.15),
+    (5250, 0.20),
+    (7800, 0.25),
+    (10900, 0.30),
+    (None, 0.35),
+]
+PIT_SCHEDULE_2025 = [
+    (2000, 0.0),
+    (4000, 0.15),
+    (7000, 0.20),
+    (10000, 0.25),
+    (14000, 0.30),
+    (None, 0.35),
+]
+# Capital income is taxed under Schedule D at flat rates, 10 percent on
+# dividends and 5 percent on interest; the model uses the dividend rate.
+CAPITAL_INCOME_TAX_RATE = 0.10
+# The model's birr are FY2025/26 birr: mean_income_data is GDP per adult of
+# that year (IMF CR 26/174, Table 1, nominal GDP in billions of birr; World
+# Bank population and age structure, 2024, grown one year), and the FY2024/25
+# schedule's thresholds are scaled up by nominal income growth per head
+# between the two years so that they bite at the same real incomes.
+NOMINAL_GDP_BIRR_BN = {"FY2024/25": 19268.0, "FY2025/26": 23851.0}
+POPULATION_2024 = 132.06e6
+ADULT_SHARE_2024 = (
+    0.4986  # aged 20 and over: 1 - 0.3906 (0-14) - 0.1108 (15-19)
+)
+POPULATION_GROWTH = 0.026
+# income grid, birr per year, on which the Gouveia-Strauss form is fitted to
+# the schedule: from the old exemption threshold to well past the top decile
+# of wage earners (55,000 birr a month)
+TAX_FIT_INCOME_RANGE = (12_000.0, 5_000_000.0)
+# OG-Core caps the third Gouveia-Strauss parameter; a flat rate is the limit
+# of a very large one
+GS_FLAT_PHI2 = 2.0e4
 
 # Allocation of the program's revenue gains net of formalization across the
 # other instruments: 60 percent to consumption taxes (VAT reform, excises,
@@ -732,6 +828,9 @@ def program_spending_paths():
     interest = np.array(IMF_INTEREST) / 100
     tr = np.array(CASH_TRANSFERS) / 100
     g = rec - interest - tr
+    if PENSIONS_ON:
+        # pension payouts are paid by the pension system, not as transfers
+        tr = tr - PENSIONS_SHARE_OF_GDP / 100
     ig = np.array(IMF_CAPITAL) / 100
     fa = np.array(IMF_GRANTS) / 100
     return {
@@ -776,28 +875,210 @@ def program_revenue_paths(tau_c_0, cit_factor_0):
     }
 
 
-def program_compliance_paths():
+def program_compliance_paths(
+    compliance_scale=None, pension_coverage_scale=None
+):
     """
     Income-tax non-compliance paths (labor and capital, identical) that move
     linearly from NONCOMPLIANCE_START to NONCOMPLIANCE_END over the program
     years and stay there, and the pension-coverage matrix.
+
+    Args:
+        compliance_scale (scalar): multiplies the compliance (one minus
+            non-compliance) of every group at every date; defaults to
+            COMPLIANCE_SCALE
+        pension_coverage_scale (scalar): multiplies PENSION_COVERAGE;
+            defaults to PENSION_COVERAGE_SCALE
 
     Returns:
         dict: labor_income_tax_noncompliance_rate,
             capital_income_tax_noncompliance_rate (lists of J-vectors, one
             per program year plus the long run) and replacement_rate_adjust
     """
+    if compliance_scale is None:
+        compliance_scale = COMPLIANCE_SCALE
+    if pension_coverage_scale is None:
+        pension_coverage_scale = PENSION_COVERAGE_SCALE
     n = len(PROGRAM_YEARS)
-    start = np.array(NONCOMPLIANCE_START)
-    end = np.array(NONCOMPLIANCE_END)
+    start = 1 - compliance_scale * (1 - np.array(NONCOMPLIANCE_START))
+    end = 1 - compliance_scale * (1 - np.array(NONCOMPLIANCE_END))
     path = [
         list(np.round(start + (end - start) * t / (n - 1), 6))
         for t in range(n)
     ] + [list(end)]
+    coverage = [float(c * pension_coverage_scale) for c in PENSION_COVERAGE]
     return {
         "labor_income_tax_noncompliance_rate": path,
         "capital_income_tax_noncompliance_rate": [list(r) for r in path],
-        "replacement_rate_adjust": [list(PENSION_COVERAGE)],
+        "replacement_rate_adjust": [coverage],
+    }
+
+
+def schedule_tax_rates(annual_income, schedule, scale=1.0):
+    """
+    Effective and marginal rates of a monthly bracket schedule at given
+    annual incomes.
+
+    Args:
+        annual_income (array_like): income in birr per year
+        schedule (list): (monthly upper bound or None, marginal rate) pairs
+        scale (scalar): multiplies the bracket thresholds
+
+    Returns:
+        etr (Numpy array): tax paid over income
+        mtr (Numpy array): marginal rate of the bracket the income falls in
+    """
+    annual_income = np.asarray(annual_income, dtype=float)
+    monthly = annual_income / 12.0
+    tax = np.zeros_like(monthly)
+    mtr = np.zeros_like(monthly)
+    lower = 0.0
+    for upper, rate in schedule:
+        hi = np.inf if upper is None else upper * scale
+        tax += rate * np.clip(monthly - lower, 0.0, hi - lower)
+        mtr = np.where((monthly > lower) & (monthly <= hi), rate, mtr)
+        lower = hi
+    with np.errstate(divide="ignore", invalid="ignore"):
+        etr = np.where(annual_income > 0, 12.0 * tax / annual_income, 0.0)
+    return etr, mtr
+
+
+def gs_rates(income, phi, rate_type):
+    """
+    OG-Core's Gouveia-Strauss tax function.
+
+    Args:
+        income (array_like): income in birr per year
+        phi (array_like): the three parameters
+        rate_type (str): "etr" or "mtr"
+
+    Returns:
+        rates (Numpy array): effective or marginal rates
+    """
+    x = np.asarray(income, dtype=float)
+    phi0, phi1, phi2 = phi
+    if rate_type == "etr":
+        return phi0 * (x - (x**-phi1 + phi2) ** (-1 / phi1)) / x
+    return phi0 * (
+        1 - x ** (-phi1 - 1) * (x**-phi1 + phi2) ** ((-1 - phi1) / phi1)
+    )
+
+
+def fit_gs_parameters(schedule, scale=1.0):
+    """
+    Fit OG-Core's Gouveia-Strauss form to a statutory bracket schedule by
+    least squares on the effective and marginal rates over a log-spaced
+    income grid.
+
+    Args:
+        schedule (list): (monthly upper bound or None, marginal rate) pairs
+        scale (scalar): multiplies the bracket thresholds
+
+    Returns:
+        phi (list): the three parameters, floats
+    """
+    from scipy import optimize
+
+    incomes = np.logspace(
+        np.log10(TAX_FIT_INCOME_RANGE[0]),
+        np.log10(TAX_FIT_INCOME_RANGE[1]),
+        400,
+    )
+    etr, mtr = schedule_tax_rates(incomes, schedule, scale)
+    top_rate = schedule[-1][1]
+
+    def loss(theta):
+        if np.any(np.asarray(theta) <= 0):
+            return 1e6
+        return np.mean((gs_rates(incomes, theta, "etr") - etr) ** 2) + np.mean(
+            (gs_rates(incomes, theta, "mtr") - mtr) ** 2
+        )
+
+    best = None
+    for phi1 in (0.5, 1.0, 2.0, 4.0):
+        for phi2 in (1e-3, 1e-4, 1e-5, 1e-6, 1e-8):
+            res = optimize.minimize(
+                loss,
+                [top_rate, phi1, phi2],
+                method="Nelder-Mead",
+                options={"xatol": 1e-10, "fatol": 1e-14, "maxiter": 20000},
+            )
+            if best is None or res.fun < best.fun:
+                best = res
+    return [float(v) for v in best.x]
+
+
+def flat_gs_parameters(rate):
+    """
+    Gouveia-Strauss parameters that reproduce a flat rate.
+
+    Args:
+        rate (scalar): the flat tax rate
+
+    Returns:
+        phi (list): the three parameters
+    """
+    return [float(rate), 1.0, GS_FLAT_PHI2]
+
+
+def mean_income_per_adult():
+    """
+    GDP per adult in FY2025/26 birr, the mean_income_data that converts the
+    model's income units into the birr the tax schedule is written in.
+
+    Returns:
+        float: birr per year
+    """
+    adults = POPULATION_2024 * (1 + POPULATION_GROWTH) * ADULT_SHARE_2024
+    return NOMINAL_GDP_BIRR_BN["FY2025/26"] * 1e9 / adults
+
+
+def statutory_tax_params():
+    """
+    Income-tax function parameters from the statutory schedules: the
+    FY2024/25 schedule (in FY2025/26 birr) in the first period and the
+    2025 schedule thereafter for effective and labor marginal rates, a flat
+    dividend rate on capital income, and the birr-per-model-unit anchor.
+
+    Returns:
+        dict: tax_func_type, etr_params, mtrx_params, mtry_params,
+            mean_income_data
+    """
+    nominal_growth_per_head = (
+        NOMINAL_GDP_BIRR_BN["FY2025/26"] / NOMINAL_GDP_BIRR_BN["FY2024/25"]
+    ) / (1 + POPULATION_GROWTH)
+    phi_2016 = fit_gs_parameters(PIT_SCHEDULE_2016, nominal_growth_per_head)
+    phi_2025 = fit_gs_parameters(PIT_SCHEDULE_2025)
+    labor = [[phi_2016], [phi_2025]]
+    return {
+        "tax_func_type": "GS",
+        "etr_params": labor,
+        "mtrx_params": [[list(p) for p in row] for row in labor],
+        "mtry_params": [[flat_gs_parameters(CAPITAL_INCOME_TAX_RATE)]],
+        "mean_income_data": float(mean_income_per_adult()),
+    }
+
+
+def defined_benefit_params():
+    """
+    OG-Core defined-benefit pension parameters for Ethiopia's schemes.
+
+    Returns:
+        dict: pension_system, retirement_age, yr_contrib,
+            avg_earn_num_years, alpha_db
+    """
+    replacement = min(
+        PENSION_BASE_REPLACEMENT
+        + PENSION_REPLACEMENT_PER_YEAR
+        * (PENSION_CAREER_YEARS - PENSION_MIN_YEARS),
+        PENSION_MAX_REPLACEMENT,
+    )
+    return {
+        "pension_system": "Defined Benefits",
+        "retirement_age": [PENSION_RETIREMENT_AGE],
+        "yr_contrib": PENSION_CAREER_YEARS,
+        "avg_earn_num_years": PENSION_AVERAGING_YEARS,
+        "alpha_db": replacement / PENSION_CAREER_YEARS,
     }
 
 
@@ -858,9 +1139,12 @@ def transfer_eta(omega_SS, lambdas, retire_age_index):
 
     eta += spread(PSNP_GROUPS, range(S), PSNP_SHARE_OF_GDP)
     eta += spread(FARM_GROUPS, range(S), FERTILIZER_SUBSIDY_SHARE_OF_GDP)
-    eta += spread(
-        PENSION_GROUPS, range(retire_age_index, S), PENSIONS_SHARE_OF_GDP
-    )
+    if not PENSIONS_ON:
+        # pensions inside the cash-transfer ratio, to the retired formal
+        # groups; with the pension system on they are paid as benefits
+        eta += spread(
+            PENSION_GROUPS, range(retire_age_index, S), PENSIONS_SHARE_OF_GDP
+        )
     return eta / eta.sum()
 
 
@@ -900,6 +1184,9 @@ def implied_real_rate_on_debt(g_y, g_n):
         - np.array(sp["alpha_T"][:7])
         - np.array(sp["alpha_I"][:7])
     )
+    if PENSIONS_ON:
+        # pension benefits are primary spending too, paid by the scheme
+        pb = pb - PENSIONS_SHARE_OF_GDP / 100
     growth = np.exp(g_y) * (1 + np.asarray(g_n, dtype=float)[:7])
     return np.array(
         [(d[t] * growth[t] + pb[t - 1]) / d[t - 1] - 1 for t in range(1, 7)]
@@ -985,6 +1272,9 @@ def fiscal_program_params(p, r_ss=None):
     )
     out["initial_debt_ratio"] = IMF_PUBLIC_DEBT[0] / 100
     out["tG1"] = len(PROGRAM_YEARS)
+    out.update(statutory_tax_params())
+    if PENSIONS_ON:
+        out.update(defined_benefit_params())
     return out
 
 

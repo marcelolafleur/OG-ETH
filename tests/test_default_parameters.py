@@ -29,9 +29,16 @@ import numpy as np
 import pytest
 from ogcore.parameters import Specifications
 
+from ogeth import macro_params as mp
+
 # Expected income-tax non-compliance by lifetime-income group (low -> high),
 # shared by the labor and capital rows.
-NONCOMPLIANCE_BY_GROUP = [1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0]
+# the shape of compliance across groups; the level is the calibrated
+# COMPLIANCE_SCALE in macro_params (see taxes.md)
+NONCOMPLIANCE_BY_GROUP = (
+    1
+    - mp.COMPLIANCE_SCALE * (1 - np.array([1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0]))
+).tolist()
 
 
 @pytest.fixture(scope="module")
@@ -62,13 +69,32 @@ def test_packaged_defaults_validate(p):
     assert not p.errors
 
 
-def test_informality_tax_rates(p):
-    """Compliant-group effective and marginal tax rates carry the anchors."""
-    # linear tax funcs => one param per (t, age); index SS row, first age.
-    assert p.tax_func_type == "linear"
-    assert np.asarray(p.etr_params)[-1, 0].tolist() == pytest.approx([0.0871])
-    assert np.asarray(p.mtrx_params)[-1, 0].tolist() == pytest.approx([0.35])
-    assert np.asarray(p.mtry_params)[-1, 0].tolist() == pytest.approx([0.2])
+def test_statutory_tax_functions(p):
+    """The income-tax functions are the statutory schedules: Proclamation
+    979/2016 in FY2024/25, 1395/2025 from FY2025/26, in Gouveia-Strauss
+    form, with a flat dividend rate on capital income and the birr anchor
+    at GDP per adult."""
+    from ogeth import macro_params as mp
+
+    assert p.tax_func_type == "GS"
+    etr = np.asarray(p.etr_params)
+    assert etr.shape[-1] == 3
+    fitted = mp.statutory_tax_params()
+    assert etr[0, 0].tolist() == pytest.approx(fitted["etr_params"][0][0])
+    assert etr[1, 0].tolist() == pytest.approx(fitted["etr_params"][1][0])
+    assert etr[-1, 0].tolist() == pytest.approx(fitted["etr_params"][1][0])
+    assert np.asarray(p.mtrx_params)[-1, 0].tolist() == pytest.approx(
+        fitted["etr_params"][1][0]
+    )
+    assert np.asarray(p.mtry_params)[-1, 0, 0] == pytest.approx(
+        mp.CAPITAL_INCOME_TAX_RATE
+    )
+    assert p.mean_income_data == pytest.approx(mp.mean_income_per_adult())
+    # the 2025 schedule at the top decile's 55,000 birr a month is close to
+    # its 35 percent top rate; at the exemption threshold it is near zero
+    top = mp.gs_rates(55_000 * 12, etr[-1, 0], "etr")
+    assert 0.30 < top < 0.35
+    assert mp.gs_rates(24_000, etr[-1, 0], "etr") < 0.04
 
 
 def test_informality_noncompliance_by_group(p):

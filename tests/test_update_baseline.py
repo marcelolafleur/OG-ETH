@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from ogcore.parameters import Specifications
 
+from ogeth import macro_params as mp
 from ogeth import update_baseline
 
 
@@ -101,14 +102,15 @@ def test_main_json_updates_specifications(monkeypatch, tmp_path):
     # A baseline regeneration only overrides the calibrated macro params, so
     # the hand-set informality tax parameters must round-trip through main()
     # unchanged. Guards against an accidental regen wiping the calibration.
-    assert np.asarray(p.etr_params)[-1, 0].tolist() == pytest.approx([0.0871])
-    assert np.asarray(p.mtrx_params)[-1, 0].tolist() == pytest.approx([0.35])
+    assert p.tax_func_type == "GS"
+    assert np.asarray(p.etr_params).shape[-1] == 3
+    start = 1 - mp.COMPLIANCE_SCALE * (1 - np.array(mp.NONCOMPLIANCE_START))
     assert np.asarray(p.labor_income_tax_noncompliance_rate)[
         0
-    ].tolist() == pytest.approx([1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0])
+    ].tolist() == pytest.approx(start.tolist())
     assert np.asarray(p.capital_income_tax_noncompliance_rate)[
         0
-    ].tolist() == pytest.approx([1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0])
+    ].tolist() == pytest.approx(start.tolist())
     # the CIT collections factor is a path along the IMF program; its
     # FY2024/25 anchor must survive a regeneration
     assert float(

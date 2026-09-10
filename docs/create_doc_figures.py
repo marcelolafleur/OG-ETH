@@ -221,7 +221,17 @@ def calibration_vs_data(output_dir=None, save_path=None, program=None):
         ),
         (
             "Primary expenditure (% of GDP)",
-            100 * (ratio("G") + ratio("TR") + ratio("I_g")),
+            100
+            * (
+                ratio("G")
+                + ratio("TR")
+                + ratio("I_g")
+                + (
+                    ratio("agg_pension_outlays")
+                    if "agg_pension_outlays" in tpi
+                    else 0.0
+                )
+            ),
             list(
                 np.array(program.IMF_EXPENDITURE)
                 - np.array(program.IMF_INTEREST)
@@ -440,8 +450,10 @@ def demographics_by_income_group(save_path=None):
             [1, 2, 3],
             values / values[0],
             "o-" if used else "s--",
-            label=f"ages {int(row.age_lo)}-{int(row.age_hi)}, tilt {row.slope:+.2f}"
-            + ("" if used else " (not applied)"),
+            label=(
+                f"ages {int(row.age_lo)}-{int(row.age_hi)}, "
+                f"tilt {row.slope:+.2f}" + ("" if used else " (not applied)")
+            ),
         )
     ax.axhline(1.0, color="grey", lw=0.8)
     ax.set_xticks([1, 2, 3])
@@ -504,6 +516,152 @@ def demographics_by_income_group(save_path=None):
         va="bottom",
     )
     ax.legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=300)
+    return fig
+
+
+def statutory_tax_functions(save_path=None):
+    """
+    Plot the statutory income-tax schedules against the Gouveia-Strauss
+    functions fitted to them, in effective and marginal rates.
+
+    Args:
+        save_path (str): where to save the figure; defaults to the docs
+            images folder
+
+    Returns:
+        matplotlib Figure
+    """
+    from ogeth import macro_params as mp
+
+    if save_path is None:
+        save_path = os.path.join(plot_path, "statutory_tax_functions.png")
+    params = mp.statutory_tax_params()
+    growth = (
+        mp.NOMINAL_GDP_BIRR_BN["FY2025/26"]
+        / mp.NOMINAL_GDP_BIRR_BN["FY2024/25"]
+    ) / (1 + mp.POPULATION_GROWTH)
+    incomes = np.logspace(np.log10(12_000), np.log10(5_000_000), 400)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    for ax, rate_type, title in [
+        (axes[0], "etr", "Effective rate"),
+        (axes[1], "mtr", "Marginal rate"),
+    ]:
+        for label, schedule, scale, phi, color in [
+            (
+                "Proclamation 979/2016 (FY2024/25), in FY2025/26 birr",
+                mp.PIT_SCHEDULE_2016,
+                growth,
+                params["etr_params"][0][0],
+                "C0",
+            ),
+            (
+                "Proclamation 1395/2025 (from FY2025/26)",
+                mp.PIT_SCHEDULE_2025,
+                1.0,
+                params["etr_params"][1][0],
+                "C3",
+            ),
+        ]:
+            etr, mtr = mp.schedule_tax_rates(incomes, schedule, scale)
+            ax.plot(
+                incomes / 12000,
+                etr if rate_type == "etr" else mtr,
+                color=color,
+                lw=1,
+                label=f"statutory, {label}",
+            )
+            ax.plot(
+                incomes / 12000,
+                mp.gs_rates(incomes, phi, rate_type),
+                "--",
+                color=color,
+                lw=2,
+                label="Gouveia-Strauss fit",
+            )
+        for j, m in enumerate(
+            [0.176, 0.518, 0.80, 1.10, 1.52, 3.33, 10.47], start=1
+        ):
+            x = m * params["mean_income_data"] / 12000
+            ax.axvline(x, color="grey", lw=0.5, alpha=0.6)
+            if rate_type == "etr":
+                ax.text(
+                    x, 0.36, f"g{j}", fontsize=7, ha="center", color="grey"
+                )
+        ax.set_xscale("log")
+        ax.set_xlabel("Monthly income, thousand birr (log scale)")
+        ax.set_ylabel(title)
+        ax.set_title(f"{title}: statutory schedule vs. fitted function")
+        ax.set_ylim(0, 0.38)
+        ax.legend(loc="lower right", fontsize=7)
+    fig.suptitle(
+        "Vertical lines: mean income of the seven lifetime-income groups "
+        "(GDP per adult times the group means of e)"
+    )
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=300)
+    return fig
+
+
+def wealth_distribution_vs_data(output_dir=None, save_path=None):
+    """
+    Plot the steady-state share of wealth held by each lifetime-income
+    group against the WID net wealth shares, and the calibrated discount
+    factors.
+
+    Args:
+        output_dir (str): OUTPUT_BASELINE directory of an example run;
+            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE
+        save_path (str): where to save the figure; defaults to the docs
+            images folder
+
+    Returns:
+        matplotlib Figure
+    """
+    from ogcore.utils import safe_read_pickle
+    from ogeth import income
+
+    if output_dir is None:
+        output_dir = os.path.join(
+            CUR_DIR, "..", "examples", "OG-ETH-Example", "OUTPUT_BASELINE"
+        )
+    if save_path is None:
+        save_path = os.path.join(plot_path, "wealth_vs_data.png")
+    ss = safe_read_pickle(os.path.join(output_dir, "SS", "SS_vars.pkl"))
+    params = safe_read_pickle(os.path.join(output_dir, "model_params.pkl"))
+    lambdas = np.asarray(params.lambdas).flatten()
+    model = income.implied_wealth_shares(
+        np.asarray(ss["b_s"]), params.omega_SS
+    )
+    wid = income.wid_group_shares("ETH", lambdas, income.WID_WEALTH_VARIABLE)
+    target = income.wealth_share_targets(lambdas)
+    labels = ["0-25", "25-50", "50-70", "70-80", "80-90", "90-99", "Top 1"]
+    x = np.arange(len(lambdas))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    ax = axes[0]
+    width = 0.27
+    ax.bar(x - width, 100 * model, width, label="OG-ETH steady state")
+    ax.bar(x, 100 * target, width, color="C3", label="target (WID, floored)")
+    ax.bar(x + width, 100 * wid, width, color="C7", label="WID Ethiopia 2021")
+    ax.axhline(0, color="grey", lw=0.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_xlabel("Lifetime-income group (percentiles)")
+    ax.set_ylabel("Share of household wealth (%)")
+    ax.set_title("Wealth shares by group: model vs. WID")
+    ax.legend(loc="upper left", fontsize=8)
+    ax = axes[1]
+    beta = np.asarray(params.beta_annual, dtype=float).flatten()
+    ax.bar(x, beta, color="C0")
+    ax.axhline(0.88, color="C7", ls="--", label="single value used before")
+    ax.set_ylim(min(beta.min(), 0.88) - 0.05, 1.0)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_xlabel("Lifetime-income group (percentiles)")
+    ax.set_ylabel(r"annual $\beta_j$")
+    ax.set_title("Calibrated discount factors by group")
+    ax.legend(loc="upper left", fontsize=8)
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
     return fig
