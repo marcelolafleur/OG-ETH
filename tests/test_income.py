@@ -68,13 +68,39 @@ def test_wid_gini_values():
     assert income.wid_gini("US") == pytest.approx(0.5831)
 
 
-def test_group_factor_fatter_bottom_thinner_top():
-    """Relative to the US, Ethiopia's bottom half earns more of the total
-    and its top percent much less."""
-    factor = income.earnings_group_factor(LAMBDAS)
-    assert factor.shape == (7,)
-    assert factor[0] > 1.2 and factor[1] > 1.2
-    assert factor[-1] < 0.6
+def test_scale_groups_to_shares_hits_the_target():
+    rng = np.random.default_rng(1)
+    e = rng.uniform(0.5, 2.0, size=(80, 7)) * np.arange(1, 8)
+    omega = rng.uniform(0.5, 1.5, size=(80, 7)) * LAMBDAS.reshape(1, 7)
+    omega /= omega.sum()
+    target = income.wid_group_shares("ETH", LAMBDAS)
+    scaled = income.scale_groups_to_shares(e, omega, target)
+    np.testing.assert_allclose(
+        income.implied_group_shares(scaled, omega), target / target.sum()
+    )
+    # only the level of each group's profile moves, not its shape
+    np.testing.assert_allclose(
+        scaled / e, np.broadcast_to((scaled / e)[0:1, :], e.shape)
+    )
+    with pytest.raises(ValueError):
+        income.scale_groups_to_shares(e, omega, np.array([0.5, 0.5]))
+    with pytest.raises(ValueError):
+        income.scale_groups_to_shares(e, omega, -target)
+
+
+def test_tilt_to_gini_hits_the_target():
+    rng = np.random.default_rng(2)
+    e = rng.uniform(0.5, 2.0, size=(80, 7)) * np.arange(1, 8)
+    omega = rng.uniform(0.5, 1.5, size=(80, 7)) * LAMBDAS.reshape(1, 7)
+    omega /= omega.sum()
+    for target in (0.35, 0.516, 51.6):
+        tilted = income.tilt_to_gini(e, omega, LAMBDAS, target)
+        want = target / 100 if target > 1 else target
+        assert income.implied_gini(tilted, omega, LAMBDAS) == pytest.approx(
+            want, abs=1e-6
+        )
+    with pytest.raises(ValueError):
+        income.tilt_to_gini(e, omega, LAMBDAS, 0.0)
 
 
 def test_age_factor_peaks_early_and_falls():
@@ -151,9 +177,33 @@ def test_get_e_interp_applies_both_factors(synthetic_usa_e):
     )
     ratio = e / base
     age_factor = income.earnings_age_factor(income.model_ages(20, 80))
-    group_factor = income.earnings_group_factor(LAMBDAS)
-    expected = age_factor.reshape(80, 1) * group_factor.reshape(1, 7)
-    np.testing.assert_allclose(ratio / ratio[0, 0], expected / expected[0, 0])
+    for j in range(7):
+        np.testing.assert_allclose(
+            ratio[:, j] / ratio[0, j], age_factor / age_factor[0]
+        )
+    np.testing.assert_allclose(
+        income.implied_group_shares(e, omega),
+        income.wid_group_shares("ETH", LAMBDAS),
+        atol=1e-4,
+    )
+
+
+def test_get_e_interp_alternative_targets(synthetic_usa_e):
+    omega = np.full((80, 7), 1 / 80) * LAMBDAS.reshape(1, 7)
+    own = np.array([0.06, 0.14, 0.17, 0.11, 0.15, 0.27, 0.10])
+    e_own = income.get_e_interp(20, 80, 7, LAMBDAS, omega, group_shares=own)
+    np.testing.assert_allclose(
+        income.implied_group_shares(e_own, omega), own, atol=1e-6
+    )
+    e_gini = income.get_e_interp(20, 80, 7, LAMBDAS, omega, gini_to_match=0.45)
+    assert income.implied_gini(e_gini, omega, LAMBDAS) == pytest.approx(
+        0.45, abs=1e-6
+    )
+    assert (e_gini * omega).sum() == pytest.approx(1.0)
+    with pytest.raises(ValueError):
+        income.get_e_interp(
+            20, 80, 7, LAMBDAS, omega, group_shares=own, gini_to_match=0.45
+        )
 
 
 def test_packaged_e_is_the_reshaped_matrix(packaged):
@@ -165,11 +215,14 @@ def test_packaged_e_is_the_reshaped_matrix(packaged):
     assert e.shape == (80, 7)
     assert (e * omega).sum() == pytest.approx(1.0, abs=1e-6)
     shares = income.implied_group_shares(e, omega)
+    np.testing.assert_allclose(
+        shares, income.wid_group_shares("ETH", lambdas), atol=1e-4
+    )
     means = shares / lambdas
-    assert means[0] == pytest.approx(0.544, abs=0.01)
-    assert means[-1] == pytest.approx(5.87, abs=0.05)
+    assert means[0] == pytest.approx(0.176, abs=0.005)
+    assert means[-1] == pytest.approx(10.47, abs=0.05)
     gini = income.implied_gini(e, omega, lambdas)
-    assert gini == pytest.approx(0.347, abs=0.005)
+    assert gini == pytest.approx(0.526, abs=0.005)
     profile = (e * omega).sum(axis=1) / omega.sum(axis=1)
     thirties, fifties, sixties = (
         profile[10:20].mean(),

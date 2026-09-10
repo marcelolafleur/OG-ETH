@@ -6,7 +6,7 @@ group (OG-Core by-(t, j) noncompliance parameters, PR #816): the bottom five of
 seven groups (90% of households by population weight, close to ILO's 85%
 informal-employment figure) pay none of the income tax owed, group 6 pays half,
 and the top group complies fully. The compliant-group effective rate
-(etr 0.1207) is solved from a revenue identity to hit the PIT anchor in the
+(etr 0.0871) is solved from a revenue identity to hit the PIT anchor in the
 first model period, and re-solved whenever the earnings profiles change; the
 marginal rate (0.35) is Ethiopia's statutory top PIT rate; the CIT collections
 factor (0.327) is re-anchored so corporate-tax revenue matches actual
@@ -66,7 +66,7 @@ def test_informality_tax_rates(p):
     """Compliant-group effective and marginal tax rates carry the anchors."""
     # linear tax funcs => one param per (t, age); index SS row, first age.
     assert p.tax_func_type == "linear"
-    assert np.asarray(p.etr_params)[-1, 0].tolist() == pytest.approx([0.1207])
+    assert np.asarray(p.etr_params)[-1, 0].tolist() == pytest.approx([0.0871])
     assert np.asarray(p.mtrx_params)[-1, 0].tolist() == pytest.approx([0.35])
     assert np.asarray(p.mtry_params)[-1, 0].tolist() == pytest.approx([0.2])
 

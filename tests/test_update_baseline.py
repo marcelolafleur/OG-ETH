@@ -54,7 +54,7 @@ def test_main_json_updates_specifications(monkeypatch, tmp_path):
     # A baseline regeneration only overrides the calibrated macro params, so
     # the hand-set informality tax parameters must round-trip through main()
     # unchanged. Guards against an accidental regen wiping the calibration.
-    assert np.asarray(p.etr_params)[-1, 0].tolist() == pytest.approx([0.1207])
+    assert np.asarray(p.etr_params)[-1, 0].tolist() == pytest.approx([0.0871])
     assert np.asarray(p.mtrx_params)[-1, 0].tolist() == pytest.approx([0.35])
     assert np.asarray(p.labor_income_tax_noncompliance_rate)[
         0

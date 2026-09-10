@@ -4,12 +4,11 @@ Lifetime earnings profiles for OG-ETH.
 The ability matrix e starts from the OG-USA profiles, which are estimated
 on US micro data, and is reshaped with Ethiopian data along its two
 dimensions: over age with the National Transfer Accounts (NTA) labor
-income profile, and across lifetime-income groups with the World
-Inequality Database (WID) pre-tax income shares. Both reshapings are
-Ethiopia-to-United-States ratios of the same series in the same source,
-so the differences of concept between the OG-USA profiles (lifetime
-labor earnings of workers) and the survey aggregates (annual income per
-adult) cancel to first order.
+income profile per worker, as an Ethiopia-to-United-States ratio; and
+across lifetime-income groups so that the income shares the matrix
+implies equal the World Inequality Database (WID) pre-tax income shares
+for Ethiopia. A caller can pass other target shares, or a single Gini
+coefficient to tilt the groups to instead.
 """
 
 import json
@@ -19,6 +18,7 @@ import urllib.request
 import numpy as np
 import pandas as pd
 import scipy.interpolate as si
+import scipy.optimize as opt
 from ogcore import parameter_plots as pp
 from ogcore import utils
 
@@ -325,21 +325,6 @@ def wid_gini(country):
     return float(df.value.iloc[0])
 
 
-def earnings_group_factor(lambdas):
-    """
-    Ethiopia-to-US ratio of each lifetime-income group's mean income
-    relative to the economy-wide mean, from the WID shares.
-
-    Args:
-        lambdas (Numpy array): population share of each group, length J
-
-    Returns:
-        factor (Numpy array): multiplicative group factor, length J
-
-    """
-    return wid_group_shares("ETH", lambdas) / wid_group_shares("US", lambdas)
-
-
 def implied_group_shares(e, age_wgts):
     """
     Share of total ability-weighted labor accruing to each group when
@@ -374,13 +359,89 @@ def implied_gini(e, age_wgts, lambdas):
     return utils.Inequality(e, age_wgts, np.asarray(lambdas), S, J).gini()
 
 
-def get_e_interp(E, S, J, lambdas, age_wgts, plot_path=None):
+def scale_groups_to_shares(e, age_wgts, group_shares):
+    """
+    Rescale each lifetime-income group's profile so that the income shares
+    implied by the matrix equal the target shares.
+
+    Args:
+        e (Numpy array): ability matrix, size (S, J)
+        age_wgts (Numpy array): joint population distribution, size (S, J)
+        group_shares (Numpy array): target income share of each group,
+            length J; they are normalized to sum to one
+
+    Returns:
+        e_scaled (Numpy array): rescaled ability matrix, size (S, J)
+
+    """
+    target = np.asarray(group_shares, dtype=float).flatten()
+    if target.shape[0] != e.shape[1] or (target <= 0).any():
+        raise ValueError("group_shares must be J positive income shares")
+    target = target / target.sum()
+    scale = target / implied_group_shares(e, age_wgts)
+    return e * scale.reshape(1, -1)
+
+
+def tilt_to_gini(e, age_wgts, lambdas, gini_to_match):
+    """
+    Tilt the matrix, e * exp(a * e), so that its Gini coefficient over the
+    population equals the target. The tilt keeps every profile's shape
+    over age and stretches or compresses the gaps between groups.
+
+    Args:
+        e (Numpy array): ability matrix, size (S, J)
+        age_wgts (Numpy array): joint population distribution, size (S, J)
+        lambdas (Numpy array): population share of each group, length J
+        gini_to_match (float): target Gini coefficient, in (0, 1) or in
+            percent
+
+    Returns:
+        e_tilted (Numpy array): tilted ability matrix, size (S, J)
+
+    """
+    gini = float(gini_to_match)
+    if gini > 1:
+        gini = gini / 100
+    if not 0 < gini < 1:
+        raise ValueError("gini_to_match must be between 0 and 1")
+
+    def gap(a):
+        return implied_gini(e * np.exp(a * e), age_wgts, lambdas) - gini
+
+    # the tilt is measured against the largest ability so that the bracket
+    # means the same thing whatever the scale of e; widen it until the
+    # target is straddled
+    scale = 1.0 / float(np.max(e))
+    for width in (1.0, 2.0, 4.0, 8.0):
+        lo, hi = -width * scale, width * scale
+        if gap(lo) < 0 < gap(hi):
+            sol = opt.root_scalar(
+                gap, bracket=[lo, hi], method="bisect", xtol=1e-12
+            )
+            return e * np.exp(sol.root * e)
+    raise ValueError(f"cannot tilt the ability matrix to a Gini of {gini}")
+
+
+def get_e_interp(
+    E,
+    S,
+    J,
+    lambdas,
+    age_wgts,
+    group_shares=None,
+    gini_to_match=None,
+    plot_path=None,
+):
     """
     Build the OG-ETH ability matrix from the OG-USA profiles.
 
-    The OG-USA matrix is interpolated onto the model's age and group grid,
-    multiplied by the NTA-based age factor and the WID-based group factor,
-    and scaled so that the population-weighted average ability is one.
+    The OG-USA matrix is interpolated onto the model's age and group grid
+    and multiplied by the NTA-based age factor. The gaps between the
+    lifetime-income groups are then set in one of two ways: to reproduce
+    target income shares by group (by default the WID pre-tax income
+    shares for Ethiopia), or to reproduce a single target Gini
+    coefficient. The result is scaled so that the population-weighted
+    average ability is one.
 
     Args:
         E (int): age at which agents become economically active
@@ -390,6 +451,10 @@ def get_e_interp(E, S, J, lambdas, age_wgts, plot_path=None):
         age_wgts (Numpy array): steady-state population distribution,
             either the joint distribution over age and group, size (S, J),
             or the age distribution alone, length S
+        group_shares (Numpy array): target income share of each group,
+            length J; None uses the WID shares for Ethiopia
+        gini_to_match (float): target Gini coefficient; when given, the
+            groups are tilted to this Gini instead of to income shares
         plot_path (str): directory to save a plot of the profiles to
 
     Returns:
@@ -403,14 +468,18 @@ def get_e_interp(E, S, J, lambdas, age_wgts, plot_path=None):
     if age_wgts.ndim == 1:
         age_wgts = age_wgts.reshape(S, 1) * lambdas.reshape(1, J)
     assert age_wgts.shape == (S, J)
+    if gini_to_match is not None and group_shares is not None:
+        raise ValueError("pass either group_shares or gini_to_match, not both")
     e_usa, lambdas_usa = load_ogusa_e()
     e_base = interpolate_usa_e(e_usa, lambdas_usa, E, S, lambdas)
     ages = model_ages(E, S)
-    e_new = (
-        e_base
-        * earnings_age_factor(ages).reshape(S, 1)
-        * earnings_group_factor(lambdas).reshape(1, J)
-    )
+    e_age = e_base * earnings_age_factor(ages).reshape(S, 1)
+    if gini_to_match is not None:
+        e_new = tilt_to_gini(e_age, age_wgts, lambdas, gini_to_match)
+    else:
+        if group_shares is None:
+            group_shares = wid_group_shares("ETH", lambdas)
+        e_new = scale_groups_to_shares(e_age, age_wgts, group_shares)
     emat_new_scaled = e_new / (e_new * age_wgts).sum()
     if plot_path is not None:
         pp.plot_income_data(
@@ -472,6 +541,16 @@ def main():
     print(
         f"model Gini {gini:.3f}; WID Ethiopia {wid_gini('ETH'):.3f}, "
         f"WID US {wid_gini('US'):.3f}"
+    )
+    e_gini = get_e_interp(
+        p.E, p.S, p.J, lambdas, p.omega_SS, gini_to_match=wid_gini("ETH")
+    )
+    print(
+        "for comparison, matching the WID Gini alone gives group means "
+        + ", ".join(
+            f"{m:.3f}"
+            for m in implied_group_shares(e_gini, p.omega_SS) / lambdas
+        )
     )
     write_json_parameters(json_path, {"e": e.tolist()})
     print(f"wrote e to {json_path}")

@@ -13,20 +13,20 @@ The age profile of the disutility of labor, $\chi^n_s$, sets how much labor hous
 
 The target is hours worked per week per person by age from the 2021 Labour Force and Migration Survey of the Ethiopian Statistics Service {cite}`ESS:2021`: the employment-to-population ratio (Table 5.1) times the mean weekly hours of the employed (Table 5.16a), in five-year age bands. Per person rather than per worker because the model has no extensive margin — every household of an age supplies some labor — so the model's average labor supply by age corresponds to hours per person in the data, with the non-employed counted at zero. Following OG-USA, labor supply is measured as a share of a 16-hour waking day, seven days a week, so a target of 25 hours a week is $n \approx 0.22$. Ethiopian hours per person rise from 18 a week at ages 20–24 to about 25 at 30–44, fall to 20 in the fifties and 16 at 60–64, and are still 10.6 at 65 and over: participation stays high into old age because most work is self-employed farming, but hours per worker are low (32 a week at their peak against 40 in the United States) and participation among the young is held down by schooling and underemployment. The survey's last band is open (65+), so beyond age 67 the target tapers with the National Transfer Accounts labor-income profile used in {ref}`Chap_LfEarn`, which falls faster than hours alone, and it never goes below two percent of the time endowment.
 
-The calibration solves the steady state repeatedly. Between solves each $\chi^n_s$ is rescaled by the ratio of the marginal disutility of labor at the model's average labor supply to that at the target, which is the exact adjustment to the household's labor first-order condition when consumption and prices are held fixed; the steady state then re-solves with the new profile, and the loop stops when every age between 20 and 79 is within two percent of its target. Starting from the OG-USA profile it converges in six solves, the last within 1.7 percent everywhere (`python -m ogeth.labor` runs it and writes the result into the packaged parameters).
+The calibration solves the steady state repeatedly. Between solves each $\chi^n_s$ is rescaled by the ratio of the marginal disutility of labor at the model's average labor supply to that at the target, which is the exact adjustment to the household's labor first-order condition when consumption and prices are held fixed; the steady state then re-solves with the new profile, and the loop stops when every age between 20 and 79 is within two percent of its target. Starting from the OG-USA profile it converges in six solves, and from the previous calibrated profile in three, the last within 1 percent everywhere (`python -m ogeth.labor` runs it and writes the result into the packaged parameters).
 
 | Age | LFMS 2021, hours per person per week | Model steady state |
 |---|---|---|
-| 20–24 | 18.6 | 18.9 |
-| 25–29 | 23.2 | 23.6 |
-| 30–34 | 24.9 | 25.2 |
-| 35–39 | 24.9 | 25.3 |
-| 40–44 | 24.4 | 24.7 |
-| 45–49 | 23.3 | 23.6 |
-| 50–54 | 20.3 | 20.6 |
-| 55–59 | 19.1 | 19.4 |
-| 60–64 | 15.9 | 16.1 |
-| 65–69 | 10.2 | 10.4 |
+| 20–24 | 18.6 | 18.8 |
+| 25–29 | 23.2 | 23.4 |
+| 30–34 | 24.9 | 25.1 |
+| 35–39 | 24.9 | 25.2 |
+| 40–44 | 24.4 | 24.6 |
+| 45–49 | 23.3 | 23.5 |
+| 50–54 | 20.3 | 20.5 |
+| 55–59 | 19.1 | 19.3 |
+| 60–64 | 15.9 | 16.0 |
+| 65–69 | 10.2 | 10.3 |
 | 70–79 (NTA taper) | 6.6 | 6.7 |
 | 80–99 (NTA taper) | 3.2 | 3.5 |
 
@@ -38,7 +38,7 @@ name: FigLaborVsData
 Steady-state average labor supply by age against LFMS 2021 hours per person, and the calibrated $\chi^n_s$ against the OG-USA profile.
 ```
 
-The calibrated profile is far from the US one, in level and in shape. With the US values Ethiopian households in the model worked about 46 percent of their time endowment at every age from 20 to 64, twice the survey's hours; the disutility weights that bring them to the data are 250–500 in the prime ages against 20–25 in OG-USA, about 1,900 at ages 20–24, and they climb steeply after 55 to OG-Core's upper bound of 10,000 from the late seventies, where the target is an extrapolation and little labor is supplied in any case. The level of labor supply halves, which the model absorbs through the `factor` that converts model units to birr; the calibrated ratios in {ref}`Chap_MacroCalib` are not affected by it, and the steady-state return on capital is unchanged to the third decimal.
+The calibrated profile is far from the US one, in level and in shape. With the US values Ethiopian households in the model worked about 46 percent of their time endowment at every age from 20 to 64, twice the survey's hours; the disutility weights that bring them to the data are 300–500 in the prime ages against 20–25 in OG-USA, about 2,200 at age 20, and they climb steeply after 60 to OG-Core's upper bound of 10,000 around age 80, where the target is an extrapolation and little labor is supplied in any case. The level of labor supply halves, which the model absorbs through the `factor` that converts model units to birr; the calibrated ratios in {ref}`Chap_MacroCalib` are not affected by it, and the steady-state return on capital is unchanged to the third decimal.
 
 Two limits. Hours per person mix the decision to work with hours conditional on working, and the elliptical disutility function governs both through one intensive margin, so the Frisch elasticity of 0.4 above should be read as applying to total hours per person. And $\chi^n_s$ has no lifetime-income dimension in OG-Core, so differences in hours between the formal and informal groups (OG-ZAF's #95 looks at the same limit) cannot be represented; the model's groups differ in hours only through their wealth and productivity.
 
