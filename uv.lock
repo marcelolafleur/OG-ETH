@@ -1656,7 +1656,7 @@ wheels = [
 [[package]]
 name = "ogcore"
 version = "0.20.0"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/marcelolafleur/OG-Core.git?rev=edaa78ab91f834bcc9d07803422e6d44af3a0204#edaa78ab91f834bcc9d07803422e6d44af3a0204" }
 dependencies = [
     { name = "dask" },
     { name = "distributed" },
@@ -1669,10 +1669,6 @@ dependencies = [
     { name = "pygam", version = "0.9.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "requests" },
     { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/a7/cfb46571d24330effc1e44fbf7141c7a2759ee19c7bf6b105192bdb5c321/ogcore-0.20.0.tar.gz", hash = "sha256:bcac551584635fac332c1b0f5166d53ab9a60faeed6f01a534eec274334dcbc8", size = 1065083, upload-time = "2026-08-24T15:00:28.811Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/4f/fa2979ba9eededb6345e728ae2737ece297beb4b99a6a8aa9db7d10c0fb2/ogcore-0.20.0-py3-none-any.whl", hash = "sha256:8379299e2c6f93ff4d696cc181c2369ccc06ea6b1a732ce3a2dcd6a44eccdbf6", size = 1126646, upload-time = "2026-08-24T15:00:27.219Z" },
 ]
 
 [[package]]
@@ -1736,7 +1732,7 @@ requires-dist = [
     { name = "linecheck" },
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "ogcore", specifier = ">=0.20.0" },
+    { name = "ogcore", git = "https://github.com/marcelolafleur/OG-Core.git?rev=edaa78ab91f834bcc9d07803422e6d44af3a0204" },
     { name = "openpyxl", specifier = ">=3.1.2" },
     { name = "pandas", specifier = ">=1.2.5" },
     { name = "paramtools", specifier = ">=0.20.0" },
