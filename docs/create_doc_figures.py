@@ -4,6 +4,7 @@ This script creates tables and figures from the OG-ETH documentation.
 
 # import
 import os
+import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
 from importlib.resources import files
@@ -265,6 +266,185 @@ def calibration_vs_data(output_dir=None, save_path=None, program=None):
         "OG-ETH baseline transition vs. the IMF program path (shaded: program "
         "years, model periods held at program values)"
     )
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=300)
+    return fig
+
+
+def earnings_vs_data(save_path=None):
+    """
+    Plot the calibrated ability matrix against its data sources: the age
+    profile against the NTA per-worker earnings profiles and the group
+    means against the WID income shares.
+
+    Args:
+        save_path (str): where to save the figure; defaults to the docs
+            images folder
+
+    Returns:
+        matplotlib Figure
+    """
+    from ogeth import income
+
+    if save_path is None:
+        save_path = os.path.join(plot_path, "earnings_vs_data.png")
+    content = (
+        files("ogeth")
+        .joinpath("ogeth_default_parameters.json")
+        .read_text(encoding="utf-8")
+    )
+    params = json.loads(content)
+    e = np.asarray(params["e"])
+    omega = np.asarray(params["omega_SS"])
+    lambdas = np.asarray(params["lambdas"])
+    S, J = e.shape
+    ages = income.model_ages(20, S)
+    e_usa, lambdas_usa = income.load_ogusa_e()
+    e_base = income.interpolate_usa_e(e_usa, lambdas_usa, 20, S, lambdas)
+
+    def age_profile(mat):
+        prof = (mat * omega).sum(axis=1) / omega.sum(axis=1)
+        return prof / prof[(ages >= 30) & (ages < 40)].mean()
+
+    def per_worker(country):
+        y = income.per_worker_earnings(country, ages)
+        return y / y[(ages >= 30) & (ages < 40)].mean()
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    ax = axes[0]
+    shown = ages < income.OLDEST_MEASURED_AGE
+    ax.plot(ages, age_profile(e), label="OG-ETH $e$ (calibrated)")
+    ax.plot(
+        ages, age_profile(e_base), "--", label="OG-USA profiles, unadjusted"
+    )
+    ax.plot(
+        ages[shown],
+        per_worker("ETH")[shown],
+        "o",
+        ms=3,
+        color="C3",
+        label="NTA Ethiopia 2005, labor income per worker",
+    )
+    ax.plot(
+        ages[shown],
+        per_worker("US")[shown],
+        "s",
+        ms=3,
+        color="C7",
+        label="NTA United States 2006, labor income per worker",
+    )
+    ax.set_xlabel("Age")
+    ax.set_ylabel("Relative to the mean at ages 30-39")
+    ax.set_title("Age profile of earnings")
+    ax.legend(loc="best", fontsize=8)
+
+    ax = axes[1]
+    x = np.arange(J)
+    width = 0.27
+    ax.bar(
+        x - width,
+        100 * income.implied_group_shares(e, omega),
+        width,
+        label="OG-ETH $e$, implied income share",
+    )
+    ax.bar(
+        x,
+        100 * income.wid_group_shares("ETH", lambdas),
+        width,
+        color="C3",
+        label="WID Ethiopia 2021",
+    )
+    ax.bar(
+        x + width,
+        100 * income.wid_group_shares("US", lambdas),
+        width,
+        color="C7",
+        label="WID United States 2021",
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(
+        ["0-25", "25-50", "50-70", "70-80", "80-90", "90-99", "Top 1"]
+    )
+    ax.set_xlabel("Lifetime-income group (percentiles)")
+    ax.set_ylabel("Share of income (%)")
+    ax.set_title("Income shares by lifetime-income group")
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=300)
+    return fig
+
+
+def labor_supply_vs_data(output_dir=None, save_path=None):
+    """
+    Plot the steady-state average labor supply by age against hours worked
+    per person in the 2021 Labour Force and Migration Survey.
+
+    Args:
+        output_dir (str): OUTPUT_BASELINE directory of an example run;
+            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE
+        save_path (str): where to save the figure; defaults to the docs
+            images folder
+
+    Returns:
+        matplotlib Figure
+    """
+    from ogcore.utils import safe_read_pickle
+    from ogeth import income, labor
+
+    if output_dir is None:
+        output_dir = os.path.join(
+            CUR_DIR, "..", "examples", "OG-ETH-Example", "OUTPUT_BASELINE"
+        )
+    if save_path is None:
+        save_path = os.path.join(plot_path, "labor_supply_vs_data.png")
+    ss = safe_read_pickle(os.path.join(output_dir, "SS", "SS_vars.pkl"))
+    params = safe_read_pickle(os.path.join(output_dir, "model_params.pkl"))
+    ages = income.model_ages(params.E, params.S)
+    n_model = labor.average_labor_supply(np.asarray(ss["n"]), params.omega_SS)
+    target = labor.labor_supply_target(params.E, params.S, params.ltilde)
+    hours = labor.hours_per_person()
+    hours = hours[hours.age_band.map(labor.HOURS_BAND_MIDPOINTS) >= 20]
+    scale = labor.WEEKLY_TIME_ENDOWMENT / params.ltilde
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    ax = axes[0]
+    ax.plot(ages, scale * n_model, label="OG-ETH steady state")
+    ax.plot(
+        ages,
+        scale * target,
+        "--",
+        color="C3",
+        label="Calibration target (LFMS bands interpolated, NTA taper)",
+    )
+    ax.plot(
+        hours.age_band.map(labor.HOURS_BAND_MIDPOINTS),
+        hours.hours_per_person,
+        "o",
+        color="C3",
+        label="LFMS 2021: employment ratio x weekly hours of the employed",
+    )
+    ax.set_xlabel("Age")
+    ax.set_ylabel("Weekly hours worked per person")
+    ax.set_title("Labor supply by age: model vs. survey")
+    ax.legend(loc="best", fontsize=8)
+
+    ax = axes[1]
+    chi_n = labor.steady_state_chi_n(params)
+    ax.semilogy(ages, chi_n, label="OG-ETH, calibrated to LFMS hours")
+    with urllib.request.urlopen(income.OGUSA_PARAMS_URL) as response:
+        chi_n_usa = np.asarray(json.load(response)["chi_n"], dtype=float)
+    if chi_n_usa.ndim == 2:
+        chi_n_usa = chi_n_usa[-1]
+    ax.semilogy(
+        income.model_ages(income.OGUSA_E, income.OGUSA_S),
+        chi_n_usa,
+        "--",
+        label="OG-USA (shipped before)",
+    )
+    ax.set_xlabel("Age")
+    ax.set_ylabel(r"$\chi^n_s$ (log scale)")
+    ax.set_title("Disutility of labor by age")
+    ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
     return fig

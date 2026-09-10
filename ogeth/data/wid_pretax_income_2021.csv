@@ -1,0 +1,17 @@
+country,year,variable,percentile,value
+ETH,2021,sptincj992,p0p25,0.0439
+ETH,2021,sptincj992,p0p50,0.1734
+ETH,2021,sptincj992,p50p90,0.4218
+ETH,2021,sptincj992,p70p80,0.1099
+ETH,2021,sptincj992,p80p90,0.1519
+ETH,2021,sptincj992,p90p100,0.4047
+ETH,2021,sptincj992,p99p100,0.1046
+ETH,2021,gptincj992,p0p100,0.5157
+US,2021,sptincj992,p0p25,0.0337
+US,2021,sptincj992,p0p50,0.1346
+US,2021,sptincj992,p50p90,0.4047
+US,2021,sptincj992,p70p80,0.1075
+US,2021,sptincj992,p80p90,0.1501
+US,2021,sptincj992,p90p100,0.4607
+US,2021,sptincj992,p99p100,0.1988
+US,2021,gptincj992,p0p100,0.5831

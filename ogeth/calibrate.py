@@ -94,27 +94,14 @@ class Calibration:
                 download_path=demographic_data_path,
             )
 
-            # demographics for 80 period lives (needed for getting e below)
-            demog80 = demographics.get_pop_objs(
-                20,
-                80,
-                p.T,
-                0,
-                99,
-                country_id="231",
-                initial_data_year=p.start_year - 1,
-                final_data_year=p.start_year + 1,
-                income_percentiles=p.lambdas.flatten(),
-                GraphDiag=False,
-            )
-
-            # earnings profiles
+            # earnings profiles, reshaped with Ethiopian data and scaled on
+            # the model's own joint age-by-group population distribution
             self.e = income.get_e_interp(
                 p.E,
                 p.S,
                 p.J,
                 p.lambdas,
-                demog80["omega_SS"],
+                self.demographic_params["omega_SS"],
                 plot_path=output_path,
             )
 

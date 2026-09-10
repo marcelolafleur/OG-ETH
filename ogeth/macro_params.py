@@ -675,7 +675,7 @@ R_GOV_CONVERGENCE_PERIODS = 4
 R_GOV_FLOOR = -0.10
 # Steady-state return on capital the r_gov_shift path is evaluated at: the
 # solved baseline steady state of examples/run_og_eth.py.
-R_SS_FOR_R_GOV = 0.0756
+R_SS_FOR_R_GOV = 0.0788
 
 # Formalization along the program. The informality calibration (taxes.md)
 # grades income-tax compliance by lifetime-income group: the bottom five
