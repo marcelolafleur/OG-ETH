@@ -374,6 +374,141 @@ def earnings_vs_data(save_path=None):
     return fig
 
 
+def demographics_by_income_group(save_path=None):
+    """
+    Plot the income gradients in fertility and mortality: the survey and
+    census measurements they come from, the gradient applied by age, and
+    the mortality and survival by lifetime-income group they produce in
+    the packaged steady state.
+
+    Args:
+        save_path (str): where to save the figure; defaults to the docs
+            images folder
+
+    Returns:
+        matplotlib Figure
+    """
+    import pandas as pd
+    from ogeth import calibrate, income
+
+    if save_path is None:
+        save_path = os.path.join(plot_path, "demographics_by_income.png")
+    content = (
+        files("ogeth")
+        .joinpath("ogeth_default_parameters.json")
+        .read_text(encoding="utf-8")
+    )
+    params = json.loads(content)
+    E, S = 20, int(params["S"])
+    lambdas = np.asarray(params["lambdas"])
+    rho = np.asarray(params["rho"])[-1]
+    omega = np.asarray(params["omega_SS"])
+    ages = income.model_ages(E, S)
+    lib = pd.read_csv(calibrate.GRADIENT_FILE)
+    gradients = calibrate.demographic_gradients(E, S)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 9))
+    quintiles = np.arange(1, 6)
+    ax = axes[0, 0]
+    for indicator, label, color in [
+        ("TFR", "Total fertility rate (children per woman)", "C0"),
+        ("IMR", "Infant mortality (per 1,000 births, ÷ 10)", "C3"),
+    ]:
+        row = lib[lib.indicator == indicator].iloc[0]
+        values = np.array([row[f"q{q}"] for q in quintiles], dtype=float)
+        if indicator == "IMR":
+            values = values / 10
+        ax.plot(
+            quintiles,
+            values,
+            "o-",
+            color=color,
+            label=f"{label}, tilt {row.slope:.2f}",
+        )
+    ax.set_xticks(quintiles)
+    ax.set_xticklabels(["poorest", "2", "3", "4", "richest"])
+    ax.set_xlabel("Wealth quintile, DHS 2024")
+    ax.set_title("Survey data: fertility and infant mortality by wealth")
+    ax.legend(loc="best", fontsize=8)
+
+    ax = axes[0, 1]
+    bands = lib[(lib.indicator == "AMR") & (lib.measure == "mx")]
+    for row in bands.itertuples():
+        values = np.array([row.q1, row.q2, row.q3], dtype=float)
+        used = row.age_lo < calibrate.OLDEST_MEASURED_MORTALITY_AGE
+        ax.plot(
+            [1, 2, 3],
+            values / values[0],
+            "o-" if used else "s--",
+            label=f"ages {int(row.age_lo)}-{int(row.age_hi)}, tilt {row.slope:+.2f}"
+            + ("" if used else " (not applied)"),
+        )
+    ax.axhline(1.0, color="grey", lw=0.8)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(["poorest third", "middle", "richest third"])
+    ax.set_xlabel("Asset-index group, 2007 census household deaths")
+    ax.set_ylabel("Death rate relative to the poorest third")
+    ax.set_title("Census data: adult mortality by wealth and age")
+    ax.legend(loc="best", fontsize=8)
+
+    ax = axes[1, 0]
+    all_ages = np.arange(E + S)
+    ax.step(
+        all_ages,
+        100 * gradients["mort_gradient"],
+        where="post",
+        color="C3",
+        label="mortality tilt applied, by age",
+    )
+    ax.axhline(
+        100 * gradients["fert_gradient"],
+        color="C0",
+        ls="--",
+        label="fertility tilt applied (all ages)",
+    )
+    ax.axhline(
+        100 * gradients["infmort_gradient"],
+        color="C1",
+        ls=":",
+        label="infant-mortality tilt applied (age 0)",
+    )
+    ax.axhline(0.0, color="grey", lw=0.8)
+    ax.set_xlabel("Age")
+    ax.set_ylabel("Change in log rate, poorest to richest")
+    ax.set_title("Gradients passed to OG-Core (before ÷ 100)")
+    ax.legend(loc="best", fontsize=8)
+
+    ax = axes[1, 1]
+    survival = np.cumprod(1 - rho, axis=0)
+    for j, label, color in [
+        (0, "bottom 25%", "C0"),
+        (2, "50-70%", "C2"),
+        (6, "top 1%", "C3"),
+    ]:
+        ax.plot(ages, 100 * survival[:, j], color=color, label=label)
+    ax.set_xlabel("Age")
+    ax.set_ylabel("Survivors from age 20 (%)")
+    ax.set_title("Model steady state: survival by lifetime-income group")
+    shares = omega.sum(axis=0)
+    text = "adult population share vs. birth share:\n" + "\n".join(
+        f"  group {j + 1}: {100 * shares[j]:.2f}% vs {100 * lambdas[j]:.0f}%"
+        for j in range(len(lambdas))
+    )
+    ax.text(
+        0.02,
+        0.05,
+        text,
+        transform=ax.transAxes,
+        fontsize=7.5,
+        family="monospace",
+        va="bottom",
+    )
+    ax.legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=300)
+    return fig
+
+
 def labor_supply_vs_data(output_dir=None, save_path=None):
     """
     Plot the steady-state average labor supply by age against hours worked

@@ -192,6 +192,14 @@ The measurements come from the [EAPD-DRB/Demographic-Gradients](https://github.c
 
 Two properties of the mechanics are worth keeping in mind. Because OG-Core preserves the UN aggregate at every age, the gradients redistribute births and deaths across groups without changing the total population path, so $g_n$ and the aggregate age distribution are unchanged; what changes is the joint distribution $\omega_{s,j}$ and the survival probabilities each group faces. And because the model's groups are defined by *lifetime income* while the surveys rank households by current *wealth*, the gradients are a proxy: a household's wealth rank and its lifetime-income rank are correlated but not the same thing.
 
+```{figure} ./images/demographics_by_income.png
+---
+height: 500px
+name: FigDemogIncome
+---
+Top: the measurements behind the gradients — DHS 2024 fertility and infant mortality by wealth quintile, and the 2007 census death rates by asset group and age band (dashed: the older bands that are not applied). Bottom: the tilts passed to OG-Core by age, and the survival curves by lifetime-income group they produce in the packaged steady state, with each group's share of the adult population against its share of births.
+```
+
 The effects on the packaged demographics are modest, for two reasons. The fertility gradient does not change how many households are born into each group — that is fixed by $\lambda_j$, and OG-Core's households have no children to raise — so its footprint is confined to the ages at which each group's births occur. And the adult-mortality gradient is applied only through age 44, where Ethiopia's census measures a gradient of the expected sign, while the deaths that shape the age distribution happen later. In the steady state the poorest quarter of births make up 24.5 percent of the adult population and the richest percent 1.02, against 25 and 1 without gradients; the probability of surviving from 20 to 65 is 73.1 percent in the poorest group and 74.2 in the richest. The remittance and transfer allocation matrices, which are per capita within groups, are rebuilt on the new distribution (`python -m ogeth.update_baseline --demographics-only` regenerates all of it from the UN data, without touching the rest of the file).
 
 (SecDemogPopSSTP)=
