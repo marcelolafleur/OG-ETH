@@ -5,7 +5,7 @@ from importlib.resources import files
 import numpy as np
 from ogeth.calibrate import Calibration
 from ogeth.income import write_json_parameters
-from ogeth.macro_params import derived_remittance_params, fiscal_program_params
+from ogeth.macro_params import scenario_params
 from ogcore.parameters import Specifications
 from ogcore.utils import params_to_json
 
@@ -57,9 +57,10 @@ def main(demographics_only=False):
         d = dict(c.demographic_params)
         d["e"] = c.e
         p.update_specifications({k: _jsonable(v) for k, v in d.items()})
-        # the fiscal program paths depend on the regenerated g_n through
-        # the implied real rate on debt
-        d.update(fiscal_program_params(p))
+        # the baseline's fiscal paths and remittance path depend on the
+        # regenerated g_n (through the implied real rate on debt and the
+        # on-trend remittance growth), so they are rebuilt with it
+        d.update(scenario_params(p))
         write_json_parameters(
             json_path, {k: _jsonable(v) for k, v in d.items()}
         )
@@ -71,12 +72,10 @@ def main(demographics_only=False):
     d = c.get_dict()
     # update parameters
     p.update_specifications(d)
-    # remittance growth path and allocation are derived from the demographics
-    # just regenerated, so they are rebuilt here rather than left stale
-    p.update_specifications(derived_remittance_params(p))
-    # the fiscal program paths depend on the regenerated g_n through the
-    # implied real rate on debt, so they are rebuilt as well
-    p.update_specifications(fiscal_program_params(p))
+    # the baseline's fiscal paths and the remittance objects are derived
+    # from the demographics just regenerated, so they are rebuilt here
+    # rather than left stale
+    p.update_specifications(scenario_params(p))
     # save to json file
     params_to_json(p, json_path)
 

@@ -1,4 +1,5 @@
 # imports
+import argparse
 import multiprocessing
 from distributed import Client
 import os
@@ -23,7 +24,17 @@ dask.config.set(scheduler="synchronous")
 plt.style.use("ogcore.OGcorePlots")
 
 
-def main():
+def main(scenario=macro_params.DEFAULT_SCENARIO):
+    """
+    Run the baseline and a corporate-tax-cut reform.
+
+    Args:
+        scenario (str): ``"history"`` runs the packaged history-anchored
+            baseline; ``"program"`` overlays the IMF program paths
+            (``macro_params.scenario_params``) and writes its results under
+            ``OG-ETH-Example/program`` so the two can be compared
+    """
+    scenario = macro_params.check_scenario(scenario)
     # Define parameters to use for multiprocessing
     num_workers = min(multiprocessing.cpu_count(), 7)
     client = Client(n_workers=num_workers, threads_per_worker=1)
@@ -32,6 +43,8 @@ def main():
     # Directories to save data
     CUR_DIR = os.path.dirname(os.path.realpath(__file__))
     save_dir = os.path.join(CUR_DIR, "OG-ETH-Example")
+    if scenario != macro_params.DEFAULT_SCENARIO:
+        save_dir = os.path.join(save_dir, scenario)
     base_dir = os.path.join(save_dir, "OUTPUT_BASELINE")
     reform_dir = os.path.join(save_dir, "OUTPUT_REFORM")
 
@@ -55,6 +68,12 @@ def main():
     ):
         defaults = json.load(file)
     p.update_specifications(defaults)
+    # The packaged file is the history-anchored baseline; the program
+    # scenario overlays the IMF program's fiscal, borrowing and remittance
+    # paths and its long-run debt ratio (see macro.md).
+    if scenario != macro_params.DEFAULT_SCENARIO:
+        p.update_specifications(macro_params.scenario_params(p, scenario))
+        print(f"Running the {scenario} scenario; results in {save_dir}")
     # Anchor initial household wealth to the data (see macro.md) where the
     # installed OG-Core supports it (PSLmodels/OG-Core#1189); older releases
     # start the transition from steady-state wealth.
@@ -166,4 +185,11 @@ def main():
 
 if __name__ == "__main__":
     # execute only if run as a script
-    main()
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument(
+        "--scenario",
+        choices=macro_params.SCENARIOS,
+        default=macro_params.DEFAULT_SCENARIO,
+        help="baseline scenario to run (default: %(default)s)",
+    )
+    main(parser.parse_args().scenario)

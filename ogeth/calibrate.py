@@ -299,8 +299,10 @@ def match_steady_state(
             "chi_n": s["chi_n"].tolist(),
             "beta_annual": s["beta"].tolist(),
             "chi_b": [CHI_B_DEFAULT] * len(s["beta"]),
-            **macro_params.program_compliance_paths(
-                s["compliance_scale"], s["pension_scale"]
+            **macro_params.compliance_paths(
+                macro_params.DEFAULT_SCENARIO,
+                s["compliance_scale"],
+                s["pension_scale"],
             ),
         }
 
@@ -315,6 +317,12 @@ def match_steady_state(
 
     history = []
     solved = None
+    # per-group damping of the beta step: halved for a group whenever the
+    # sign of its wealth-share gap flips between solves, because the share
+    # of the most patient groups is very elastic to beta once beta(1 + r)
+    # nears one and a fixed step overshoots and oscillates
+    beta_damping = np.full(len(state["beta"]), BETA_DAMPING)
+    prev_sign = None
     for iteration in range(max_iter):
         for attempt in range(MATCH_RETRIES + 1):
             p.update_specifications(as_params(state))
@@ -371,10 +379,17 @@ def match_steady_state(
         if max(gaps.values()) < tol:
             break
         lo, hi = MATCH_STEP_BOUNDS
+        sign = np.sign(wealth_target - m["wealth_shares"])
+        if prev_sign is not None:
+            beta_damping = np.where(
+                sign * prev_sign < 0, beta_damping / 2, beta_damping
+            )
+        prev_sign = sign
+        step = BETA_STEP ** (beta_damping / BETA_DAMPING)
         share_ratio = np.clip(
-            (wealth_target / m["wealth_shares"]) ** BETA_DAMPING,
-            1 / BETA_STEP,
-            BETA_STEP,
+            (wealth_target / m["wealth_shares"]) ** beta_damping,
+            1 / step,
+            step,
         )
         level_ratio = np.clip(
             (wealth_level_target / m["wealth_ratio"]) ** BETA_DAMPING,

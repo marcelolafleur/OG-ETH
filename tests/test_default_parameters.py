@@ -99,8 +99,9 @@ def test_statutory_tax_functions(p):
 
 def test_informality_noncompliance_by_group(p):
     """Bottom 5 groups fully non-compliant, group 6 half, top compliant."""
-    # period 0 (FY2024/25) carries the informality calibration; the path then
-    # broadens the base along the IMF program (tests/test_fiscal_program.py)
+    # period 0 (FY2024/25) carries the informality calibration and the
+    # history baseline holds it; the program scenario broadens the base
+    # (tests/test_fiscal_program.py)
     labor = np.asarray(p.labor_income_tax_noncompliance_rate)
     capital = np.asarray(p.capital_income_tax_noncompliance_rate)
     assert labor[0].tolist() == pytest.approx(NONCOMPLIANCE_BY_GROUP)
@@ -110,11 +111,13 @@ def test_informality_noncompliance_by_group(p):
 
 def test_cit_collections_factor(p):
     """CIT collections factor re-anchored to hit FY2024/25 corporate-tax
-    revenue in period 0, then rising along the IMF program's revenue path
-    (see tests/test_fiscal_program.py for the path itself)."""
+    revenue and held there in the history baseline; the program scenario
+    raises it along the IMF revenue path (tests/test_fiscal_program.py)."""
     factor = np.asarray(p.adjustment_factor_for_cit_receipts)
     assert float(factor[0]) == pytest.approx(0.327)
-    assert float(factor[-1]) > float(factor[0])
+    assert np.allclose(factor, factor[0])
+    prog = mp.program_revenue_paths(0.06, float(factor[0]))
+    assert prog["adjustment_factor_for_cit_receipts"][-1] > float(factor[0])
 
 
 def test_all_households_are_filers(p):

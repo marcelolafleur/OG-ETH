@@ -584,24 +584,28 @@ def program_share_g_RM(g_y, g_n, shares=None):
     return g_RM
 
 
-def remittance_level_params(shares=None):
+def remittance_level_params(shares=None, scenario=None):
     """
     The remittance share of GDP in the first period and in the long run.
 
     Args:
         shares (array_like): remittance share of GDP in each program year,
             percent; defaults to ``IMF_PRIVATE_TRANSFERS``
+        scenario (str): ``"history"`` holds the measured FY2024/25 share
+            for the long run; ``"program"`` takes the last program-year
+            share, held like the other program series; defaults to
+            DEFAULT_SCENARIO
 
     Returns:
-        dict: ``{"alpha_RM_1", "alpha_RM_T"}`` -- the measured FY2024/25
-            share and the last program-year share, held for the long run
-            like the other program series
+        dict: ``{"alpha_RM_1", "alpha_RM_T"}``
     """
     if shares is None:
         shares = IMF_PRIVATE_TRANSFERS
+    scenario = check_scenario(scenario)
+    long_run = shares[-1] if scenario == "program" else shares[0]
     return {
         "alpha_RM_1": round(float(shares[0]) / 100, 6),
-        "alpha_RM_T": round(float(shares[-1]) / 100, 6),
+        "alpha_RM_T": round(float(long_run) / 100, 6),
     }
 
 
@@ -643,7 +647,7 @@ def remittance_eta(omega_SS, lambdas, quintile_value_shares=None):
     return within * group_share.reshape(1, -1)
 
 
-def derive_remittance_params(g_y, g_n, omega_SS, lambdas):
+def derive_remittance_params(g_y, g_n, omega_SS, lambdas, scenario=None):
     """
     The remittance parameters that depend on a given set of demographics.
 
@@ -652,33 +656,49 @@ def derive_remittance_params(g_y, g_n, omega_SS, lambdas):
         g_n (array_like): population growth path, length T + S
         omega_SS (array_like): steady-state population distribution, (S, J)
         lambdas (array_like): population shares of the J groups
+        scenario (str): ``"history"`` keeps the remittance share of GDP at
+            its measured FY2024/25 value; ``"program"`` moves it along the
+            IMF projection (see SCENARIOS); defaults to DEFAULT_SCENARIO
 
     Returns:
         dict: ``{"g_RM": list, "eta_RM": nested list}`` ready for
             ``Specifications.update_specifications``
     """
+    scenario = check_scenario(scenario)
+    if scenario == "program":
+        g_RM = program_share_g_RM(g_y, g_n)
+    else:
+        g_RM = flat_share_g_RM(g_y, g_n)
     return {
-        "g_RM": program_share_g_RM(g_y, g_n).tolist(),
+        "g_RM": g_RM.tolist(),
         "eta_RM": remittance_eta(omega_SS, lambdas).tolist(),
     }
 
 
-def derived_remittance_params(p):
+def derived_remittance_params(p, scenario=None):
     """
     The remittance parameters that depend on the demographics in ``p``.
 
     Args:
         p (Specifications): parameters carrying ``g_y``, ``g_n``,
             ``omega_SS`` and ``lambdas``
+        scenario (str): see ``derive_remittance_params``
 
     Returns:
         dict: see ``derive_remittance_params``
     """
     g_n = np.asarray(p.g_n, dtype=float)[: p.T + p.S]
-    return derive_remittance_params(p.g_y, g_n, p.omega_SS, p.lambdas)
+    return derive_remittance_params(
+        p.g_y, g_n, p.omega_SS, p.lambdas, scenario
+    )
 
 
 # ---------------------------------------------------------------------------
+# Long-run debt ratio of the program scenario: the IMF program's FY2030/31
+# debt ratio is 28.6 percent of GDP and the authorities' medium-term
+# objective a ratio near 30 percent (macro.md).
+PROGRAM_DEBT_RATIO_SS = 0.30
+
 # Fiscal program path (IMF Country Report 26/174, fifth ECF review, Tables 1,
 # 2b and 4b). Ethiopian fiscal years FY2024/25 (model period 0, start year
 # 2025) through FY2030/31 (period 6); the last value of each series is held
@@ -768,7 +788,7 @@ R_GOV_CONVERGENCE_PERIODS = 4
 R_GOV_FLOOR = -0.10
 # Steady-state return on capital the r_gov_shift path is evaluated at: the
 # solved baseline steady state of examples/run_og_eth.py.
-R_SS_FOR_R_GOV = 0.0794
+R_SS_FOR_R_GOV = 0.0901
 
 # Formalization along the program. The informality calibration (taxes.md)
 # grades income-tax compliance by lifetime-income group: the bottom five
@@ -795,7 +815,7 @@ PIT_FORMALIZATION_GAIN = 0.012
 # outside Schedule A. The scale is calibrated so that personal income tax
 # collects PIT_REVENUE_TARGET of GDP in FY2024/25
 # (ogeth.calibrate.match_steady_state).
-COMPLIANCE_SCALE = 0.204
+COMPLIANCE_SCALE = 0.198381
 PIT_REVENUE_TARGET = 0.014
 # The matching sees only the steady state; the first-period collections it
 # infers from the steady-state incidence came out 5 percent above the solved
@@ -830,7 +850,7 @@ PENSION_CAREER_YEARS = 40
 # far more than the scheme's 800,000 pensioners and two percent of the
 # working-age population, so the scale is well below one. Calibrated by
 # ogeth.calibrate.match_steady_state.
-PENSION_COVERAGE_SCALE = 0.8689
+PENSION_COVERAGE_SCALE = 0.876028
 # Pension outlays relative to GDP rise along the transition as the population
 # ages: in the solved transition they are 1.6 times higher in the steady state
 # than in FY2024/25. The data anchor is today's 0.5 percent of GDP, so the
@@ -1349,12 +1369,14 @@ def fiscal_program_params(p, r_ss=None):
         p.g_n,
         float(np.asarray(p.r_gov_scale).flatten()[0]),
         float(p.r_gov_DY2),
-        float(p.debt_ratio_ss),
+        PROGRAM_DEBT_RATIO_SS,
         r_ss,
     )
     out["initial_debt_ratio"] = IMF_PUBLIC_DEBT[0] / 100
+    out["debt_ratio_ss"] = PROGRAM_DEBT_RATIO_SS
+    out["r_gov_DY"] = -2 * float(p.r_gov_DY2) * PROGRAM_DEBT_RATIO_SS
     out["tG1"] = len(PROGRAM_YEARS)
-    out.update(remittance_level_params())
+    out.update(remittance_level_params(scenario="program"))
     out.update(statutory_tax_params())
     if PENSIONS_ON:
         out.update(defined_benefit_params())
@@ -1381,3 +1403,252 @@ DOMESTIC_DEBT_TO_GDP = 0.187
 INITIAL_WEALTH_RATIO = round(
     PWT_CAPITAL_OUTPUT_RATIO - FDI_STOCK_TO_GDP + DOMESTIC_DEBT_TO_GDP, 3
 )
+
+
+# ---------------------------------------------------------------------------
+# Baseline scenarios
+#
+# The packaged baseline is history-anchored: every fiscal and external input
+# takes its measured FY2024/25 value or the enacted FY2025/26 budget and is
+# held there, legislated tax changes included, and debt, growth and the
+# external balance are model outcomes. The IMF program path is kept as a
+# scenario (fiscal_program_params) that the example can overlay; the two are
+# compared in macro.md.
+# ---------------------------------------------------------------------------
+SCENARIOS = ("history", "program")
+DEFAULT_SCENARIO = "history"
+# Fiscal years whose ratios are known when the baseline is built: the
+# FY2024/25 outturn (model period 0) and the enacted FY2025/26 budget
+# (period 1); the budget-year values are held for the long run.
+HISTORY_KNOWN_YEARS = 2
+# History-anchored long-run debt ratio: the measured FY2024/25 ratio, so the
+# closure rule stabilizes debt where it starts rather than at a plan.
+HISTORY_DEBT_RATIO_SS = IMF_PUBLIC_DEBT[0] / 100
+
+
+def check_scenario(scenario):
+    """
+    Validate a scenario name, defaulting to DEFAULT_SCENARIO.
+
+    Args:
+        scenario (str or None): one of SCENARIOS
+
+    Returns:
+        str: the scenario
+    """
+    if scenario is None:
+        return DEFAULT_SCENARIO
+    if scenario not in SCENARIOS:
+        raise ValueError(f"scenario must be one of {SCENARIOS}: {scenario}")
+    return scenario
+
+
+def _held(path, known=HISTORY_KNOWN_YEARS):
+    """First ``known`` values of ``path``, then the last known value held."""
+    path = list(path)
+    return path[:known] + [path[known - 1]] * (len(path) - known)
+
+
+def history_spending_paths():
+    """
+    Spending ratios of the history-anchored baseline: the FY2024/25 outturn
+    and the enacted FY2025/26 budget (the first two program-table columns),
+    the budget-year values held thereafter.
+
+    Returns:
+        dict: alpha_G, alpha_T, alpha_I, alpha_FA, same lengths as
+            program_spending_paths
+    """
+    return {k: _held(v) for k, v in program_spending_paths().items()}
+
+
+def history_revenue_paths(tau_c_0, cit_factor_0):
+    """
+    Effective consumption-tax rate and CIT collections factor held at their
+    FY2024/25 values (no program revenue measures).
+
+    Args:
+        tau_c_0 (scalar): FY2024/25 effective consumption-tax rate
+        cit_factor_0 (scalar): FY2024/25 CIT collections adjustment factor
+
+    Returns:
+        dict: tau_c and adjustment_factor_for_cit_receipts, same lengths as
+            program_revenue_paths
+    """
+    n = len(PROGRAM_YEARS) + 1
+    return {
+        "tau_c": [[float(tau_c_0)]] * n,
+        "adjustment_factor_for_cit_receipts": [float(cit_factor_0)] * n,
+    }
+
+
+def history_compliance_paths(
+    compliance_scale=None, pension_coverage_scale=None
+):
+    """
+    Income-tax non-compliance held at its FY2024/25 calibration (no
+    formalization along the program); the pension-coverage matrix is the
+    same as in the program scenario.
+
+    Args:
+        compliance_scale, pension_coverage_scale: see
+            program_compliance_paths
+
+    Returns:
+        dict: see program_compliance_paths
+    """
+    d = program_compliance_paths(compliance_scale, pension_coverage_scale)
+    n = len(d["labor_income_tax_noncompliance_rate"])
+    start = list(d["labor_income_tax_noncompliance_rate"][0])
+    d["labor_income_tax_noncompliance_rate"] = [list(start) for _ in range(n)]
+    d["capital_income_tax_noncompliance_rate"] = [
+        list(start) for _ in range(n)
+    ]
+    return d
+
+
+def compliance_paths(
+    scenario=None, compliance_scale=None, pension_coverage_scale=None
+):
+    """Compliance paths of a scenario (see program_compliance_paths)."""
+    if check_scenario(scenario) == "program":
+        return program_compliance_paths(
+            compliance_scale, pension_coverage_scale
+        )
+    return history_compliance_paths(compliance_scale, pension_coverage_scale)
+
+
+def history_zeta_D_path():
+    """
+    Foreign share of new government borrowing held at LONG_RUN_ZETA_D. The
+    FY2024/25 realized flow is a restructuring-year outlier and the stock
+    share (0.63) is a poor guide to new borrowing while external debt is
+    being restructured, so the medium-term flow share the debt sustainability
+    analysis projects is the one forward-looking input this baseline keeps
+    (macro.md).
+
+    Returns:
+        list: same length as program_zeta_D_path
+    """
+    return [LONG_RUN_ZETA_D] * (len(PROGRAM_YEARS) + 1)
+
+
+def history_real_rate_on_debt(g_y, g_n):
+    """
+    Real effective rate on public debt for the history-anchored baseline:
+    the rate the FY2024/25 outturn and the FY2025/26 budget imply for the
+    stock (the first program-implied value), held through the program
+    horizon before converging to LONG_RUN_R_GOV.
+
+    Args:
+        g_y (scalar): model-period productivity growth rate
+        g_n (array_like): population growth path
+
+    Returns:
+        float: real effective rate
+    """
+    return float(implied_real_rate_on_debt(g_y, g_n)[0])
+
+
+def history_r_gov_shift_path(
+    g_y, g_n, r_gov_scale, r_gov_DY2, debt_ratio_ss, r_ss
+):
+    """
+    Level-shift path for the sovereign rate in the history-anchored
+    baseline: the budget-implied real effective rate held for the program
+    horizon, then a linear convergence to LONG_RUN_R_GOV over
+    R_GOV_CONVERGENCE_PERIODS. The debt path is a model outcome here, so
+    the shift is evaluated at the debt anchor (premium exactly zero there,
+    as in r_gov_shift_path) and the premium prices deviations from it as
+    they occur.
+
+    Args:
+        g_y (scalar): model-period productivity growth rate
+        g_n (array_like): population growth path
+        r_gov_scale (scalar): pass-through of the market return
+        r_gov_DY2 (scalar): curvature of the debt-elastic premium
+        debt_ratio_ss (scalar): debt anchor the premium is centered on
+        r_ss (scalar): steady-state market return
+
+    Returns:
+        list: r_gov_shift path, same length as r_gov_shift_path
+    """
+    n = len(PROGRAM_YEARS)
+    r0 = history_real_rate_on_debt(g_y, g_n)
+    targets = np.concatenate(
+        [
+            np.full(n, r0),
+            np.linspace(r0, LONG_RUN_R_GOV, R_GOV_CONVERGENCE_PERIODS + 2)[1:],
+        ]
+    )
+    centering = r_gov_DY2 * debt_ratio_ss**2
+    return [float(x) for x in r_gov_scale * r_ss - centering - targets]
+
+
+def history_anchored_params(p, r_ss=None):
+    """
+    All fiscal and external parameters of the history-anchored baseline,
+    derived from the Specifications object's growth and premium settings.
+
+    Args:
+        p (Specifications): parameters carrying g_y, g_n, r_gov_scale,
+            r_gov_DY2, tau_c, adjustment_factor_for_cit_receipts
+        r_ss (scalar): steady-state market return used in the shift path;
+            defaults to R_SS_FOR_R_GOV
+
+    Returns:
+        dict: ready for Specifications.update_specifications
+    """
+    if r_ss is None:
+        r_ss = R_SS_FOR_R_GOV
+    out = {}
+    out.update(history_spending_paths())
+    out.update(history_compliance_paths())
+    out["zeta_D"] = history_zeta_D_path()
+    out.update(derived_transfer_eta(p))
+    out.update(
+        history_revenue_paths(
+            float(np.asarray(p.tau_c).flatten()[0]),
+            float(
+                np.asarray(p.adjustment_factor_for_cit_receipts).flatten()[0]
+            ),
+        )
+    )
+    out["r_gov_shift"] = history_r_gov_shift_path(
+        p.g_y,
+        p.g_n,
+        float(np.asarray(p.r_gov_scale).flatten()[0]),
+        float(p.r_gov_DY2),
+        HISTORY_DEBT_RATIO_SS,
+        r_ss,
+    )
+    out["initial_debt_ratio"] = IMF_PUBLIC_DEBT[0] / 100
+    out["debt_ratio_ss"] = HISTORY_DEBT_RATIO_SS
+    out["r_gov_DY"] = -2 * float(p.r_gov_DY2) * HISTORY_DEBT_RATIO_SS
+    out["tG1"] = len(PROGRAM_YEARS)
+    out.update(remittance_level_params(scenario="history"))
+    out.update(statutory_tax_params())
+    if PENSIONS_ON:
+        out.update(defined_benefit_params())
+    return out
+
+
+def scenario_params(p, scenario=None, r_ss=None):
+    """
+    The fiscal, external and remittance parameters of a baseline scenario.
+
+    Args:
+        p (Specifications): see history_anchored_params
+        scenario (str): one of SCENARIOS; defaults to DEFAULT_SCENARIO
+        r_ss (scalar): see history_anchored_params
+
+    Returns:
+        dict: ready for Specifications.update_specifications
+    """
+    scenario = check_scenario(scenario)
+    if scenario == "program":
+        out = fiscal_program_params(p, r_ss)
+    else:
+        out = history_anchored_params(p, r_ss)
+    out.update(derived_remittance_params(p, scenario))
+    return out

@@ -167,18 +167,24 @@ if __name__ == "__main__":
     main()
 
 
-def calibration_vs_data(output_dir=None, save_path=None, program=None):
+def calibration_vs_data(
+    output_dir=None, save_path=None, program=None, title=None
+):
     """
-    Plot the baseline transition against the IMF program path (Country
-    Report 26/174) for the calibrated fiscal and external moments.
+    Plot a baseline transition against the IMF program path (Country
+    Report 26/174) for the fiscal and external moments.
 
     Args:
         output_dir (str): OUTPUT_BASELINE directory of an example run;
-            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE
+            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE (the
+            history-anchored baseline; the program scenario's run is under
+            examples/OG-ETH-Example/program)
         save_path (str): where to save the figure; defaults to the docs
             images folder
         program (module): module carrying the IMF program constants
             (defaults to ogeth.macro_params)
+        title (str): figure title; defaults to one naming the
+            history-anchored baseline
 
     Returns:
         matplotlib Figure
@@ -273,17 +279,20 @@ def calibration_vs_data(output_dir=None, save_path=None, program=None):
     ]
     fig, axes = plt.subplots(4, 2, figsize=(11, 13))
     for ax, (title, model, data) in zip(axes.flat, panels):
-        ax.plot(years[: len(model)], model, label="OG-ETH baseline")
+        ax.plot(years[: len(model)], model, label="OG-ETH")
         ax.plot(
             years_prog, data, "o--", label="IMF CR 26/174 program", color="C3"
         )
         ax.set_title(title)
         ax.axvspan(years_prog[0], years_prog[-1], color="grey", alpha=0.08)
     axes.flat[0].legend(loc="best")
-    fig.suptitle(
-        "OG-ETH baseline transition vs. the IMF program path (shaded: program "
-        "years, model periods held at program values)"
-    )
+    if title is None:
+        title = (
+            "OG-ETH history-anchored baseline vs. the IMF program path "
+            "(shaded: program years; the model imposes nothing from the "
+            "program after the FY2025/26 budget)"
+        )
+    fig.suptitle(title)
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
     return fig
@@ -749,3 +758,37 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
     return fig
+
+
+def program_scenario_vs_data(output_dir=None, save_path=None):
+    """
+    The program scenario's transition against the IMF program path it
+    follows (examples/run_og_eth.py --scenario program).
+
+    Args:
+        output_dir (str): OUTPUT_BASELINE directory of the program-scenario
+            run; defaults to examples/OG-ETH-Example/program/OUTPUT_BASELINE
+        save_path (str): defaults to the docs images folder
+
+    Returns:
+        matplotlib Figure
+    """
+    if output_dir is None:
+        output_dir = os.path.join(
+            CUR_DIR,
+            "..",
+            "examples",
+            "OG-ETH-Example",
+            "program",
+            "OUTPUT_BASELINE",
+        )
+    if save_path is None:
+        save_path = os.path.join(plot_path, "program_scenario_vs_program.png")
+    return calibration_vs_data(
+        output_dir,
+        save_path,
+        title=(
+            "OG-ETH program scenario vs. the IMF program path (shaded: "
+            "program years, fiscal paths imposed from the program)"
+        ),
+    )
