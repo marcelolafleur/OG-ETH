@@ -110,9 +110,9 @@ def test_targets_carry_sources_and_dials():
 
 def test_capital_stocks_are_rebased():
     """Total K/Y by perpetual inventory on PWT 11.0 with the rebasing's
-    investment gap phased in from FY2015/16; public capital (IMF ICSD 0.667
-    of old-base GDP) converted like other fiscal stocks."""
-    assert mp.TOTAL_CAPITAL_OUTPUT_RATIO == pytest.approx(2.514, abs=1e-3)
+    investment gap phased in from FY2015/16, over rebased GDP; public capital
+    (IMF ICSD 0.667 of old-base GDP) converted like other fiscal stocks."""
+    assert mp.TOTAL_CAPITAL_OUTPUT_RATIO == pytest.approx(2.003, abs=1e-3)
     assert mp.PUBLIC_CAPITAL_OUTPUT_RATIO == pytest.approx(
         0.667 * 15094 / 24030, abs=1e-3
     )
@@ -120,7 +120,22 @@ def test_capital_stocks_are_rebased():
     # the upper bound; the central case sits between
     low = mp.rebased_capital_output_ratio(None)
     high = mp.rebased_capital_output_ratio(1970)
-    assert 1.9 < low < mp.TOTAL_CAPITAL_OUTPUT_RATIO < high < 3.1
+    assert low < mp.TOTAL_CAPITAL_OUTPUT_RATIO < high
+    # without revision, the old-base stock over old-base GDP stays near
+    # PWT's level; over rebased GDP it is smaller by the rebasing factor
+    assert 1.9 < low * 24030 / 15094 < 2.3
+
+
+def test_investment_gap_is_measured_in_old_base_gdp():
+    """The perpetual inventory runs in old-base GDP, so the investment the
+    old accounts missed is restated there: rebased investment (35.3 percent
+    of 24,030 billion birr) less old-base investment (20.1 percent of
+    15,094), over 15,094."""
+    missed_birr = 0.353 * 24030 - 0.201 * 15094
+    assert mp.rebasing_investment_gap() * 15094 == pytest.approx(
+        missed_birr, rel=1e-6
+    )
+    assert mp.rebasing_investment_gap() == pytest.approx(0.361, abs=1e-3)
 
 
 def test_capital_and_depreciation_are_sourced(packaged):

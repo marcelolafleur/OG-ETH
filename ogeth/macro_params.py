@@ -792,16 +792,16 @@ GG_FOREIGN_DEBT_SHARE = round(
 # state-enterprise loans backed by export credit agencies, outside general
 # government. The rate below is the DSA's average across all of it.
 # The public DSA of IMF CR 26/174 (Table 2, public sector debt), fiscal years
-# ending June: FY2024/25 to FY2030/31, then 2036 and 2046.
-DSA_YEARS = [2025, 2026, 2027, 2028, 2029, 2030, 2031, 2036, 2046]
+# ending June: FY2024/25 to FY2030/31, then 2036 and 2045.
+DSA_YEARS = [2025, 2026, 2027, 2028, 2029, 2030, 2031, 2036, 2045]
 # Public external debt, percent of old-base GDP. The external debt falls with
 # it: amortization outpaces new concessional loans as the program's
 # financing surge ends and growth erodes the ratio. Ethiopia's income was 74
 # percent of IDA's operational cut-off when the program was approved (CR
 # 26/174), so concessional terms continue over the DSA horizon (the grant
 # element of new external borrowing stays at about 47 percent to FY2044/45,
-# Text Table 3) and end with IDA graduation after it: beyond 2046 the ratio
-# falls to zero at its 2036-2046 pace (external_debt_path).
+# Text Table 3) and end with IDA graduation after it: beyond 2045 the ratio
+# falls to zero at its 2036-2045 pace (external_debt_path).
 DSA_EXTERNAL_DEBT = [31.8, 29.9, 27.2, 24.7, 21.5, 18.8, 16.8, 9.2, 4.1]
 # Average nominal interest rate on external debt, percent (USD terms). The
 # rise from 0.7 to 2.6 percent is the end of the restructuring's interest
@@ -965,7 +965,7 @@ WORLD_INT_RATE_ANNUAL = 0.063
 # only, and its long-run value is the DSA's terms for new domestic borrowing:
 # 4.9 percent real on medium- and long-term debt and 4.5 on short-term, the
 # mean 4.7, which the DSA's average real rate on domestic debt reaches by
-# 2036 (4.6). Its 2046 value (6.6) is not used: by then the DSA has public
+# 2036 (4.6). Its 2045 value (6.6) is not used: by then the DSA has public
 # debt down to 13.6 percent of GDP and a thin domestic market, while the
 # model holds debt at its FY2024/25 ratio. With external debt in the
 # FY2024/25 stock near -1 percent real, the blended rate is near the 2
@@ -1522,7 +1522,7 @@ def external_debt_path():
     Government debt contracted abroad as a share of OG-Core's Y
     (alpha_D_ext), one value per year from FY2024/25: the FY2024/25 stock
     (EXTERNAL_DEBT_RATIO) moved with the DSA's public external debt ratio to
-    2046, then down to zero at the DSA's 2036-2046 pace, after which OG-Core
+    2045, then down to zero at the DSA's 2036-2045 pace, after which OG-Core
     holds the last value (zero).
 
     Returns:
@@ -1544,7 +1544,7 @@ def external_debt_path():
 def external_rate_path():
     """
     Real interest rate on external debt (r_D_ext_annual), one value per year
-    from FY2024/25 to 2046, held after: the DSA's average nominal rate on
+    from FY2024/25 to 2045, held after: the DSA's average nominal rate on
     external debt less US inflation.
 
     Returns:
@@ -1702,14 +1702,20 @@ def fiscal_program_params(p, r_ss=None):
 # Ethiopia rows of PWT 11.0, PWT year t = FY t-1/t), extended to FY2024/25
 # with the old-base investment share (20.1, and 21.15 for FY2023/24,
 # interpolated from PWT's 22.2 in FY2022/23) and real growth (8.1 and 9.2),
-# and add the rebasing's investment gap, 15.2 points of GDP in FY2024/25,
-# phased in linearly from zero in FY2015/16, the old base year. The ratio of
-# the revised to the unrevised stock-output ratio scales PWT's 2023 level.
-# The result, 2.51, sits in a range of 2.02 (no revision before FY2024/25,
-# the stock rolled forward on the old accounts) to 2.98 (the gap in every
-# year since 1970); phasing in from 2019 or 2011 gives 2.40 or 2.66. It
-# should be replaced by the Ministry's capital stocks or back series when
-# they are published.
+# and add the investment the old accounts missed, phased in linearly from
+# zero in FY2015/16, the old base year. The whole calculation runs in units
+# of old-base GDP, so the missed investment is measured there too: rebased
+# investment, 35.3 percent of rebased GDP, is 56.2 percent of old-base GDP
+# (8,483 against 3,034 billion birr), so the gap is 36.1 points of old-base
+# GDP in FY2024/25, not the 15.2-point difference between the two published
+# shares (rebasing_investment_gap). The ratio of the revised to the
+# unrevised stock-output ratio scales PWT's 2023 level, and the result is
+# converted from old-base to rebased GDP like every other ratio
+# (rebase_factors). The result, 2.00, sits in a range of 1.27 (no revision
+# before FY2024/25: the old-base stock rolled forward, over the larger
+# rebased GDP) to 2.70 (the gap in every year since 1970); phasing in from
+# 2019 or 2011 gives 1.84 or 2.22. It should be replaced by the Ministry's
+# capital stocks or back series when they are published.
 PWT_CAPITAL_OUTPUT_RATIO = 2.167
 OLD_BASE_GCF_SHARE = 0.201
 CAPITAL_REVISION_START_YEAR = 2016
@@ -1717,11 +1723,28 @@ CAPITAL_REVISION_START_YEAR = 2016
 OLD_BASE_EXTENSION = {2024: (0.2115, 0.081), 2025: (OLD_BASE_GCF_SHARE, 0.092)}
 
 
+def rebasing_investment_gap():
+    """
+    Investment the old accounts missed in FY2024/25, as a share of old-base
+    GDP: rebased investment (a share of rebased GDP) restated over old-base
+    GDP, less the old-base investment share.
+
+    Returns:
+        gap (float): missed investment over old-base GDP in FY2024/25
+    """
+    return (
+        GROSS_CAPITAL_FORMATION_REBASED / 100 / rebase_factors()[0]
+        - OLD_BASE_GCF_SHARE
+    )
+
+
 def rebased_capital_output_ratio(revision_start=CAPITAL_REVISION_START_YEAR):
     """
     Total capital-output ratio in FY2024/25 on the rebased accounts, by
     perpetual inventory on PWT 11.0 investment with the rebasing's investment
     gap phased in linearly from ``revision_start`` (None for no revision).
+    The inventory runs in units of old-base GDP; the result is converted to
+    rebased GDP.
 
     Args:
         revision_start (int or None): PWT year in which the gap starts from
@@ -1747,7 +1770,7 @@ def rebased_capital_output_ratio(revision_start=CAPITAL_REVISION_START_YEAR):
         OLD_BASE_EXTENSION
     )
     delta = float(pwt.delta.iloc[-1])
-    gap = GROSS_CAPITAL_FORMATION_REBASED / 100 - OLD_BASE_GCF_SHARE
+    gap = rebasing_investment_gap()
     last = years[-1]
 
     def stock_output(with_gap):
@@ -1768,7 +1791,8 @@ def rebased_capital_output_ratio(revision_start=CAPITAL_REVISION_START_YEAR):
 
     unrevised = stock_output(False)
     revised = stock_output(True)
-    return PWT_CAPITAL_OUTPUT_RATIO * revised[last] / unrevised[2023]
+    old_base = PWT_CAPITAL_OUTPUT_RATIO * revised[last] / unrevised[2023]
+    return old_base * rebase_factors()[0]
 
 
 TOTAL_CAPITAL_OUTPUT_RATIO = round(rebased_capital_output_ratio(), 3)

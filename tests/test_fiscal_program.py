@@ -278,6 +278,11 @@ def test_packaged_fiscal_paths_match_the_derivation(packaged, params):
         np.array(packaged["r_gov_shift"])[: len(expected["r_gov_shift"])],
         expected["r_gov_shift"],
     )
+    for key in ("alpha_D_ext", "r_D_ext_annual"):
+        assert len(packaged[key]) >= len(expected[key]), key
+        assert np.allclose(
+            np.array(packaged[key])[: len(expected[key])], expected[key]
+        ), key
 
 
 def test_initial_wealth_ratio_is_built_from_its_components():
@@ -306,13 +311,13 @@ def test_initial_wealth_ratio_is_built_from_its_components():
 def test_external_debt_follows_the_dsa_then_ends():
     """External debt moves with the DSA's public external debt ratio
     (31.8 percent of old-base GDP in FY2024/25, 16.8 in FY2030/31, 9.2 in
-    2036, 4.1 in 2046), then falls to zero at the 2036-2046 pace: no
+    2036, 4.1 in 2045), then falls to zero at the 2036-2045 pace: no
     concessional subsidy in the long run."""
     a = np.array(mp.external_debt_path())
     assert a[0] == pytest.approx(mp.EXTERNAL_DEBT_RATIO)
     assert a[6] / a[0] == pytest.approx(16.8 / 31.8, abs=1e-4)
     assert a[11] / a[0] == pytest.approx(9.2 / 31.8, abs=1e-4)
-    assert a[21] / a[0] == pytest.approx(4.1 / 31.8, abs=1e-4)
+    assert a[20] / a[0] == pytest.approx(4.1 / 31.8, abs=1e-4)
     assert (np.diff(a) <= 0).all()
     assert a[-1] == 0.0 and a[-2] > 0.0
 
@@ -320,12 +325,12 @@ def test_external_debt_follows_the_dsa_then_ends():
 def test_external_rate_is_the_dsa_external_rate_in_real_terms():
     """r_D_ext is the DSA's average nominal rate on external debt (USD) less
     US inflation: -1.3 percent real in FY2024/25, 0.6 at the FY2026/27 peak,
-    held after 2046."""
+    held after 2045."""
     r = np.array(mp.external_rate_path())
     assert r[0] == pytest.approx(0.007 - mp.US_INFLATION)
     assert r[2] == pytest.approx(0.026 - mp.US_INFLATION)
     assert r[-1] == pytest.approx(0.009 - mp.US_INFLATION)
-    assert len(r) == 2046 - 2025 + 1
+    assert len(r) == 2045 - 2025 + 1
 
 
 def test_market_debt_is_held_at_home():

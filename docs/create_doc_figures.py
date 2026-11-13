@@ -706,6 +706,17 @@ def wealth_distribution_vs_data(output_dir=None, save_path=None):
     ax.legend(loc="upper left", fontsize=8)
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
+    # the shares the household chapter quotes, from the same run
+    with open(os.path.join(plot_path, "wealth_shares.json"), "w") as f:
+        json.dump(
+            {
+                "model": model.tolist(),
+                "target": target.tolist(),
+                "wid": wid.tolist(),
+            },
+            f,
+            indent=2,
+        )
     return fig
 
 

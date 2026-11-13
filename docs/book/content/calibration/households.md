@@ -1,5 +1,50 @@
+---
+jupytext:
+  formats: md:myst
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: python3
+---
+
 (Chap_HouseholdCalib)=
 # Calibration of Household Preference Parameters
+
+```{code-cell} ipython3
+:tags: ["remove-cell"]
+
+from importlib.resources import files
+from pathlib import Path
+import json
+from myst_nb import glue
+from ogeth.calibrate import BETA_DAMPING, BETA_STEP
+
+params = json.loads(
+    files("ogeth")
+    .joinpath("ogeth_default_parameters.json")
+    .read_text(encoding="utf-8")
+)
+beta = [float(b) for b in params["beta_annual"]]
+for j, b in enumerate(beta, start=1):
+    glue(f"beta_{j}", f"{b:.3f}", display=False)
+glue("beta_low_rate", f"{100 * (1 / beta[0] - 1):.0f}", display=False)
+glue("chi_b_1", f"{float(params['chi_b'][0]):.1f}", display=False)
+glue("beta_damping", f"{BETA_DAMPING}", display=False)
+glue("beta_step", f"{100 * (BETA_STEP - 1):.0f} percent", display=False)
+
+# written by docs/create_doc_figures.py from the run behind wealth_vs_data.png
+shares = json.loads(Path("images/wealth_shares.json").read_text())
+
+def pcts(values):
+    return ", ".join(f"{100 * v:.1f}" for v in values)
+
+glue("wealth_model", pcts(shares["model"][1:]), display=False)
+glue("wealth_target", pcts(shares["target"][1:]), display=False)
+glue("wealth_floor", f"{100 * shares['model'][0]:.1f}", display=False)
+```
 
 ## Behavioral Assumptions
 
@@ -50,9 +95,9 @@ The default value for the intertemporal elasticity of substitution, $\sigma$, is
 
 Households in OG-Core save for retirement and to leave bequests, and the strength of those motives by lifetime-income group is what shapes the distribution of wealth beyond what the earnings profiles imply.  OG-USA matches the US wealth distribution with **heterogeneous discount factors** $\beta_j$ — richer groups discount the future less and so save a larger share of their income — and `OG-ETH` follows that convention.  The bequest weight $\chi^b_j$ stays at OG-USA's 80 for every group except the bottom quarter (below).
 
-The targets are the World Inequality Database's net personal wealth shares for Ethiopia {cite}`WID:2024` (equal-split adults, 2021): the bottom half of adults hold 4.8 percent of wealth, the middle 40 percent 37.1, the top decile 58.1 and the top percent 23.6; the wealth Gini is 0.735.  The seven groups' targets are read off the cumulative shares at the 25th, 50th, 70th, 80th, 90th and 99th percentiles, as for the income shares in {ref}`Chap_LfEarn`.  The bottom quarter's share is negative in the data (−0.5 percent; they are net debtors), which the model's households, who cannot borrow, cannot reproduce, so that group is given a floor of half a percent.  Its discount factor is tied to the second group's, and its share is matched instead with its own bequest weight $\chi^b_1$.  With OG-USA's 80 the poorest elderly, whose transfers and remittances are several times their consumption, saved nearly all of them for bequests: the bottom quarter held 2.3 percent of wealth, the oldest of them ten times the group's average, and that hoarding left their first-year household problem so badly conditioned that a reform's transition could not solve it (OG-Core's check on households alive in the first year caught it).  A weight of 8.7 brings the group to its floor, and the reform's transition then solves with Euler errors near 1e-10.  The wealth shares pin down *relative* patience across groups.  The *level* of the discount factors is set by gross capital formation in the first model year, FY2024/25: 35.3 percent of rebased GDP ({ref}`Sec_Rebasing`).  Ethiopia's population is far from stationary and initial household wealth is anchored to the data, so a level tuned to a steady-state capital-output ratio would make households too impatient or too patient for today, and the first years would show a consumption windfall or collapse; first-year investment is the measured flow that patience moves most directly (OG-PHL's practice, adopted in the calibration skill in November 2026).  The steady-state capital-output ratio is then an outcome ({ref}`Sec_Validation`).
+The targets are the World Inequality Database's net personal wealth shares for Ethiopia {cite}`WID:2024` (equal-split adults, 2021): the bottom half of adults hold 4.8 percent of wealth, the middle 40 percent 37.1, the top decile 58.1 and the top percent 23.6; the wealth Gini is 0.735.  The seven groups' targets are read off the cumulative shares at the 25th, 50th, 70th, 80th, 90th and 99th percentiles, as for the income shares in {ref}`Chap_LfEarn`.  The bottom quarter's share is negative in the data (−0.5 percent; they are net debtors), which the model's households, who cannot borrow, cannot reproduce, so that group is given a floor of half a percent.  Its discount factor is tied to the second group's, and its share is matched instead with its own bequest weight $\chi^b_1$.  With OG-USA's 80 the poorest elderly, whose transfers and remittances are several times their consumption, saved nearly all of them for bequests: the bottom quarter held 2.3 percent of wealth, the oldest of them ten times the group's average, and that hoarding left their first-year household problem so badly conditioned that a reform's transition could not solve it (OG-Core's check on households alive in the first year caught it).  A weight of {glue:text}`chi_b_1` brings the group to its floor, and the reform's transition then solves with Euler errors near 1e-10.  The wealth shares pin down *relative* patience across groups.  The *level* of the discount factors is set by gross capital formation in the first model year, FY2024/25: 35.3 percent of rebased GDP ({ref}`Sec_Rebasing`).  Ethiopia's population is far from stationary and initial household wealth is anchored to the data, so a level tuned to a steady-state capital-output ratio would make households too impatient or too patient for today, and the first years would show a consumption windfall or collapse; first-year investment is the measured flow that patience moves most directly (OG-PHL's practice, adopted in the calibration skill in November 2026).  The steady-state capital-output ratio is then an outcome ({ref}`Sec_Validation`).
 
-The calibration runs through `examples/tune.py`, which solves the steady state and the transition from the packaged parameters and after each run moves every fitted group's $\beta_j$ by the ratio of its target to its model wealth share, then restores the population-weighted mean of $\log\beta_j$ so that the level is untouched; the level moves separately by the ratio of the investment target to the model's first-year investment share.  A group's steady-state wealth is very elastic to its discount factor and the shares interact through the interest rate, so those updates are damped (an exponent of 0.3, no more than three percent a solve, halved for a group whenever its gap changes sign), and the level update by an exponent of 0.15 and two percent a run.
+The calibration runs through `examples/tune.py`, which solves the steady state and the transition from the packaged parameters and after each run moves every fitted group's $\beta_j$ by the ratio of its target to its model wealth share, then restores the population-weighted mean of $\log\beta_j$ so that the level is untouched; the level moves separately by the ratio of the investment target to the model's first-year investment share.  A group's steady-state wealth is very elastic to its discount factor and the shares interact through the interest rate, so those updates are damped (an exponent of {glue:text}`beta_damping`, no more than {glue:text}`beta_step` a solve, halved for a group whenever its gap changes sign), and the level update by an exponent of 0.4 and no more than four percent a run (`LEVEL_DAMPING` and `LEVEL_STEP` in `examples/tune.py`).
 
 ```{figure} ./images/wealth_vs_data.png
 ---
@@ -62,7 +107,7 @@ name: FigWealthVsData
 Left: the steady-state share of household wealth held by each lifetime-income group against the WID target (with the bottom quarter floored) and the raw WID shares. Right: the calibrated annual discount factors $\beta_j$ against the single 0.88 used before.
 ```
 
-The calibrated discount factors are 0.684 for the two groups in the bottom half, 0.834, 0.879 and 0.901 for the 50th–90th percentiles, 0.912 for the 90th–99th and 0.958 for the top percent, with a population-weighted level set by first-year investment (model 35.4 against 35.3 percent of rebased GDP).  The resulting steady-state wealth shares are 5.1, 10.8, 9.7, 15.9, 34.2, 23.8 percent for groups 2–7 against WID's 5.3, 11.0, 9.8, 16.0, 34.2 and 23.4, and 0.5 for the floored bottom quarter.  The spread is wide, and the low end has independent support: a 0.68 annual discount factor is a discount rate of about 46 percent, and the one experimental measurement of time preference in Ethiopia, among 262 farm households in the highlands, found median annual rates of 43 to 105 percent depending on the horizon, rising with poverty ({cite}`YesufBluffstone:2008`).  The 0.96 at the top is in the range OG-USA estimates for the richest US groups.  Two cautions: the wealth shares WID reports rest on the same consumption surveys as its income shares and a borrowed top correction, and with heterogeneous patience the model's response to a reform is no longer that of a representative saver — the top percent, which holds a quarter of the wealth, reacts much more to the return on capital than the bottom half does.
+The calibrated discount factors are {glue:text}`beta_1` for the two groups in the bottom half, {glue:text}`beta_3`, {glue:text}`beta_4` and {glue:text}`beta_5` for the 50th–90th percentiles, {glue:text}`beta_6` for the 90th–99th and {glue:text}`beta_7` for the top percent, with a population-weighted level set by first-year investment (the fit is in the validation table of {ref}`Sec_Validation`).  The resulting steady-state wealth shares are {glue:text}`wealth_model` percent for groups 2–7 against targets of {glue:text}`wealth_target`, and {glue:text}`wealth_floor` for the floored bottom quarter.  The spread is wide, and the low end has independent support: the bottom half's discount factor is an annual discount rate of about {glue:text}`beta_low_rate` percent, and the one experimental measurement of time preference in Ethiopia, among 262 farm households in the highlands, found median annual rates of 43 to 105 percent depending on the horizon, rising with poverty ({cite}`YesufBluffstone:2008`).  The top percent's {glue:text}`beta_7` is in the range OG-USA estimates for the richest US groups.  Two cautions: the wealth shares WID reports rest on the same consumption surveys as its income shares and a borrowed top correction, and with heterogeneous patience the model's response to a reform is no longer that of a representative saver — the top percent, which holds a quarter of the wealth, reacts much more to the return on capital than the bottom half does.
 
 ### Rate of time preference
 
