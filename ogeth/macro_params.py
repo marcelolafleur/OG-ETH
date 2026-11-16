@@ -951,14 +951,54 @@ CASH_TRANSFERS = rebased(CASH_TRANSFERS_PUBLISHED)
 # old-base GDP, rebased with the latest factor
 LONG_RUN_GRANTS = round(0.3 * float(rebase_factors(7)[-1]), 4)
 
-# Required real return of foreign investors in Ethiopian capital (OG-Core's
-# world_int_rate_annual). The 4 percent risk-free benchmark understates it for
-# a frontier market: UNCTAD's World Investment Report 2018 puts the rate of
-# return on inward FDI in Africa at 6.3 percent (2017), down from 12.3 percent
-# in 2012. With OG-Core's capital split K_f = zeta_K (K_open - K_d), where
-# K_open is capital demand at the world rate, this is the lever that sets the
-# foreign-owned capital stock against the ~0.24 of GDP FDI stock (UNCTAD).
-WORLD_INT_RATE_ANNUAL = 0.063
+# Return foreign investors earn on capital in Ethiopia (OG-Core's
+# world_int_rate_annual, a real rate). In OG-Core it sets K_open, the capital
+# firms would demand at that return, and foreign capital fills a share zeta_K
+# of the gap K_f = zeta_K (K_open - K_d), so it is the return on foreign
+# direct investment, not a bond yield. Ethiopia's own statistics cannot
+# measure it: the NBE balance of payments records investment income as
+# interest and dividends only, with dividends near zero (NBE Quarterly
+# Bulletin 2024/25 Q4, Table 5.1) and no reinvested earnings, and the IMF
+# series stops splitting direct-investment income after 2005. We therefore
+# measure it on Ethiopia's peers: direct-investment income paid abroad over
+# direct-investment liabilities (IMF Balance of Payments and International
+# Investment Position statistics, BOP DB_T.D_F_D4P over IIP L_P.D, pooled
+# over 2015-2024) for fourteen low- and lower-middle-income African
+# countries that report both, reinvested earnings included
+# (ogeth/data/imf_fdi_income_africa_peers.csv). The pooled nominal dollar
+# return is 6.1 percent, between 4.0 and 8.8 in every year (Kenya 7.1,
+# Tanzania 5.5, Uganda 3.9, Rwanda 4.6); less US inflation, as for the
+# external-debt rate, that is 4 percent real. The previous 6.3 percent was
+# UNCTAD's nominal 2017 figure for Africa used as a real rate.
+PEER_FDI_YEARS = (2015, 2024)
+
+
+def peer_fdi_return(years=PEER_FDI_YEARS):
+    """
+    Pooled nominal return on inward FDI in Ethiopia's African peers: total
+    direct-investment income paid abroad over the average of the opening and
+    closing direct-investment liabilities, summed over countries and years.
+
+    Args:
+        years (tuple): first and last year of the window
+
+    Returns:
+        float: pooled nominal return
+    """
+    df = pd.read_csv(
+        Path(__file__).parent / "data" / "imf_fdi_income_africa_peers.csv"
+    )
+    df = df.sort_values(["country", "year"])
+    df["avg_liabilities"] = df.groupby("country")[
+        "di_liabilities_usd_m"
+    ].transform(lambda s: (s + s.shift(1)) / 2)
+    used = df[(df.year >= years[0]) & (df.year <= years[1])].dropna(
+        subset=["di_income_debit_usd_m", "avg_liabilities"]
+    )
+    return float(used.di_income_debit_usd_m.sum() / used.avg_liabilities.sum())
+
+
+WORLD_INT_RATE_ANNUAL = round(peer_fdi_return() - US_INFLATION, 2)
 
 # Long-run real interest rate on market debt (r_gov in the steady state).
 # Concessional debt is modelled at its own rate, so r_gov prices market debt
@@ -1056,7 +1096,13 @@ PENSION_COVERAGE = [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0]
 # average earnings over avg_earn_num_years, so alpha_db is the replacement
 # rate per year of contribution.
 PENSIONS_ON = True
-PENSION_RETIREMENT_AGE = 60
+LEGAL_RETIREMENT_AGE = 60
+# OG-Core counts ages as years of life (households are in the economy at
+# "ages 21 to 100", so the first model age is someone aged 20), and its
+# retirement index is round((retirement_age - starting_age) S / 80) - 1:
+# retirement_age R makes the R-th year of life, age R - 1, the first with a
+# pension. A legal retirement age of 60 is therefore entered as 61.
+PENSION_RETIREMENT_AGE = LEGAL_RETIREMENT_AGE + 1
 PENSION_MIN_YEARS = 10
 PENSION_BASE_REPLACEMENT = 0.30
 PENSION_REPLACEMENT_PER_YEAR = 0.0125
@@ -1112,9 +1158,11 @@ PIT_SCHEDULE_2025 = [
 # dividends and 5 percent on interest; the model uses the dividend rate.
 CAPITAL_INCOME_TAX_RATE = 0.10
 # The model's birr are FY2024/25 birr, the start year and the rebased base
-# year: mean_income_data is rebased GDP per adult of that year (24,030
-# billion birr over the adult population in the middle of the fiscal year,
-# World Bank population and age structure, 2024, grown half a year).
+# year: mean_income_data is household factor income per adult of that year,
+# rebased GDP per adult (24,030 billion birr over the adult population in
+# the middle of the fiscal year, World Bank population and age structure,
+# 2024, grown half a year) times the model's household income share of GDP
+# (MODEL_INCOME_SHARE_OF_GDP).
 # Proclamation 979/2016 applies as written in FY2024/25; the thresholds of
 # Proclamation 1395/2025, written in FY2025/26 birr, are deflated by the
 # rebased growth of nominal GDP per head between the two years
@@ -1371,6 +1419,57 @@ def mean_income_per_adult():
     return NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"] * 1e9 / adults
 
 
+# OG-Core's factor converts model income into birr as mean_income_data over
+# the model's mean household income, r_p b + w e n per person. The data
+# counterpart is therefore household factor income per adult, not GDP per
+# adult: GDP per adult times the model's household income over GDP at market
+# prices, from the solved steady state (examples/tune.py computes it each
+# round; the converged value is folded here like the other scales).
+MODEL_INCOME_SHARE_OF_GDP = 0.834528
+
+
+def model_income_share(ss, p):
+    """
+    The model's mean household income, r_p b + w e n per person, over GDP
+    at market prices (output plus the consumption tax), in a solved steady
+    state.
+
+    Args:
+        ss (dict): steady-state output (SS_vars.pkl)
+        p (Specifications): its parameters
+
+    Returns:
+        float: household income over market-price GDP
+    """
+    e = np.asarray(p.e)[-1, :, :]
+    income = (
+        (
+            float(np.squeeze(ss["r_p"])) * np.asarray(ss["b_s"])
+            + float(np.squeeze(ss["w"])) * e * np.asarray(ss["n"])
+        )
+        * np.asarray(p.omega_SS)
+    ).sum()
+    gdp = float(np.sum(ss["Y"])) + float(np.sum(ss["cons_tax_revenue"]))
+    return float(income / gdp)
+
+
+def mean_income_data(share=None):
+    """
+    OG-Core's mean_income_data: household factor income per adult in
+    FY2024/25 birr, GDP per adult times the model's household income share.
+
+    Args:
+        share (float): household income over GDP; defaults to
+            MODEL_INCOME_SHARE_OF_GDP
+
+    Returns:
+        float: birr per year
+    """
+    if share is None:
+        share = MODEL_INCOME_SHARE_OF_GDP
+    return float(mean_income_per_adult() * share)
+
+
 def statutory_tax_params():
     """
     Income-tax function parameters from the statutory schedules: the
@@ -1397,7 +1496,7 @@ def statutory_tax_params():
         "etr_params": labor,
         "mtrx_params": [[list(p) for p in row] for row in labor],
         "mtry_params": [[flat_gs_parameters(CAPITAL_INCOME_TAX_RATE)]],
-        "mean_income_data": float(mean_income_per_adult()),
+        "mean_income_data": mean_income_data(),
     }
 
 
@@ -2031,6 +2130,7 @@ def common_params():
         out.update(payroll_tax_params())
     out.update(
         {
+            "world_int_rate_annual": [WORLD_INT_RATE_ANNUAL],
             "delta_annual": DELTA_ANNUAL,
             "delta_g_annual": DELTA_G_ANNUAL,
             "initial_Kg_ratio": INITIAL_KG_RATIO,

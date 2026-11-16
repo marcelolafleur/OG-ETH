@@ -93,7 +93,7 @@ def test_statutory_tax_functions(p):
     assert np.asarray(p.mtry_params)[-1, 0, 0] == pytest.approx(
         mp.CAPITAL_INCOME_TAX_RATE
     )
-    assert p.mean_income_data == pytest.approx(mp.mean_income_per_adult())
+    assert p.mean_income_data == pytest.approx(mp.mean_income_data())
     # the 2025 schedule, in FY2024/25 birr, at the top decile's 55,000 birr
     # a month is close to its 35 percent top rate; at the exemption
     # threshold (2,000 birr a month in FY2025/26 birr, about 1,550 in

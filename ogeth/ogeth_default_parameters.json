@@ -779,7 +779,7 @@
     "delta_g_annual": 0.02,
     "ltilde": 1.0,
     "world_int_rate_annual": [
-        0.063
+        0.04
     ],
     "initial_foreign_debt_ratio": 0.0,
     "zeta_D": [
@@ -4815,7 +4815,7 @@
     "analytical_mtrs": false,
     "age_specific": false,
     "retirement_age": [
-        60
+        61
     ],
     "pension_system": "Defined Benefits",
     "tau_p": 0.0,
@@ -874774,7 +874774,7 @@
             ]
         ]
     ],
-    "mean_income_data": 360263.9101372858,
+    "mean_income_data": 300650.3203990489,
     "frac_tax_payroll": [
         0.0
     ],

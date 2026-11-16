@@ -224,6 +224,10 @@ def next_overrides(p, ss, tm, state=None):
         float(np.squeeze(ss["r"])),
     )
     out["_r_ss"] = float(np.squeeze(ss["r"]))
+    # the birr scale follows the solved household income share of GDP
+    share = mp.model_income_share(ss, p)
+    out["mean_income_data"] = mp.mean_income_data(share)
+    sc["income_share"] = share
     out.update(
         mp.compliance_paths(
             mp.DEFAULT_SCENARIO, sc["compliance"], sc["pension"]

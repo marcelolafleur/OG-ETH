@@ -3,6 +3,9 @@ Tests of the statutory income-tax functions, the defined-benefit pension
 parameters and the wealth-share targets.
 """
 
+import json
+from importlib.resources import files
+
 import numpy as np
 import pytest
 
@@ -52,9 +55,14 @@ def test_statutory_tax_params_shape_and_anchor():
     assert len(t["etr_params"]) == 2 and len(t["etr_params"][0][0]) == 3
     assert t["mtrx_params"] == t["etr_params"]
     assert t["mtry_params"][0][0][0] == pytest.approx(0.10)
-    # rebased GDP per adult in FY2024/25 birr: 24,030 billion over about
-    # 66.7 million adults
-    assert t["mean_income_data"] == pytest.approx(360_000, rel=0.01)
+    # household factor income per adult in FY2024/25 birr: rebased GDP per
+    # adult (24,030 billion over about 66.7 million adults) times the
+    # model's household income share of GDP
+    assert mp.mean_income_per_adult() == pytest.approx(360_000, rel=0.01)
+    assert t["mean_income_data"] == pytest.approx(
+        mp.mean_income_per_adult() * mp.MODEL_INCOME_SHARE_OF_GDP
+    )
+    assert 0.6 < mp.MODEL_INCOME_SHARE_OF_GDP < 1.0
     # the FY2024/25 schedule applies as written (600 birr a month exempt)
     phi16 = t["etr_params"][0][0]
     etr_low = mp.gs_rates(12 * 700, phi16, "etr")
@@ -65,7 +73,9 @@ def test_statutory_tax_params_shape_and_anchor():
 def test_defined_benefit_parameters():
     d = mp.defined_benefit_params()
     assert d["pension_system"] == "Defined Benefits"
-    assert d["retirement_age"] == [60]
+    # legal age 60 entered as 61: OG-Core counts ages as years of life
+    assert mp.LEGAL_RETIREMENT_AGE == 60
+    assert d["retirement_age"] == [61]
     assert d["yr_contrib"] == 40 and d["avg_earn_num_years"] == 3
     # 30 percent after ten years plus 1.25 percent for each of the other 30
     # alpha_db is entered by year and lifetime-income group (OG-Core 0.21+)
@@ -112,3 +122,28 @@ def test_wealth_share_targets_floor_the_bottom_and_sum_to_one():
     assert shares[0] == pytest.approx(
         0.25 * 1 / (LAMBDAS * np.arange(1, 8)).sum()
     )
+
+
+def test_retirement_index_pays_from_the_legal_age():
+    """OG-Core's retire index for retirement_age 61 is model age 40, which
+    is someone aged 60 (model age 0 is age 20)."""
+    S, E = 80, 20
+    retire = int(round((mp.PENSION_RETIREMENT_AGE - E) * S / 80) - 1)
+    assert E + retire == mp.LEGAL_RETIREMENT_AGE
+
+
+def test_world_rate_is_the_peer_fdi_return_in_real_terms():
+    """The world rate is the pooled 2015-2024 return on inward FDI in
+    fourteen African peers (IMF BOP and IIP) less US inflation."""
+    nominal = mp.peer_fdi_return()
+    assert 0.05 < nominal < 0.07
+    assert mp.WORLD_INT_RATE_ANNUAL == pytest.approx(
+        round(nominal - mp.US_INFLATION, 2)
+    )
+    assert mp.WORLD_INT_RATE_ANNUAL == pytest.approx(0.04)
+    packaged = json.loads(
+        files("ogeth")
+        .joinpath("ogeth_default_parameters.json")
+        .read_text(encoding="utf-8")
+    )
+    assert packaged["world_int_rate_annual"] == [mp.WORLD_INT_RATE_ANNUAL]
