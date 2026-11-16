@@ -103,6 +103,12 @@ def test_targets_carry_sources_and_dials():
     for k, (target, dial, source) in targets.TRANSITION_TARGETS.items():
         assert np.isfinite(target) and dial and source, k
     assert targets.TRANSITION_TARGETS["(I+I_g)/Y"][0] == pytest.approx(0.353)
+    # first-year investment is scored; patience answers to the long run
+    assert targets.TRANSITION_TARGETS["(I+I_g)/Y"][1] == "check"
+    assert targets.SS_TARGETS["r"] == (
+        mp.WORLD_INT_RATE_ANNUAL,
+        "discount factor level",
+    )
     assert targets.TRANSITION_TARGETS["K_f/K"][0] == pytest.approx(
         mp.FDI_STOCK_TO_GDP / mp.PRIVATE_CAPITAL_OUTPUT_RATIO, abs=1e-4
     )

@@ -11,7 +11,7 @@ its own target:
     dial                               moment (ogeth/targets.py)
     chi_n by age                       hours per person by age (LFMS 2021), SS
     beta_annual across groups          WID 2021 wealth shares, SS
-    beta_annual level                  (I + I_g)/Y in FY2024/25
+    beta_annual level                  SS r at the world rate
     zeta_K                             K_f/K in FY2024/25
     compliance scale                   PIT/Y in FY2024/25
     adjustment_factor_for_cit_receipts CIT/Y in FY2024/25
@@ -53,12 +53,14 @@ from ogeth.targets import SS_TARGETS, TRANSITION_TARGETS, ss_moments
 from ogeth.targets import tpi_moments
 from ogeth.warm_start import enable, solve_ss_from
 
-# Damping of the dials tuned to first-year moments: revenue is close to
-# proportional to its rate or scale, so those take the full step; the
-# first-year investment share moves about 2.5 times as much as the level
-# of the discount factors in logs (measured between tuning runs), so the
-# level takes the inverse of that, bounded.
-LEVEL_DAMPING = 0.4
+# Revenue is close to proportional to its rate or scale, so those dials
+# take the full step. The level of the discount factors moves the
+# steady-state return: scaling all of them by 0.98, 0.96 and 0.94 gave
+# returns of 3.1, 3.9 and 4.6 percent (tuning runs of 16 November 2026), a
+# log-patience change of about -2.8 per unit of return. The level step is
+# that slope times the return gap, damped and bounded.
+R_LEVEL_SLOPE = 2.8
+LEVEL_DAMPING = 0.8
 # bequest weight of the floored group: the share responds less than one for
 # one, so a full-ratio step bounded at a factor of two per solve
 CHI_B_DAMPING = 1.0
@@ -151,7 +153,7 @@ def next_overrides(p, ss, tm, state=None):
     beta = beta * np.where(fit, step, 1.0)
     # the wealth-share step moves relative patience only: the level (the
     # population-weighted geometric mean) is restored, so it answers to
-    # first-year investment alone
+    # the long-run return alone
     beta = beta * level / np.exp(np.dot(lambdas, np.log(beta)))
     fitted = np.flatnonzero(fit)
     for j in np.flatnonzero(~fit):
@@ -175,16 +177,19 @@ def next_overrides(p, ss, tm, state=None):
         CHI_B_BOUNDS[1],
     )
     out["chi_b"] = chi_b.tolist()
+    # level of patience: the steady-state return at the world rate (lower
+    # patience, less saving, a higher return)
+    r_gap = SS_TARGETS["r"][0] - float(np.squeeze(ss["r"]))
+    beta = beta * float(
+        np.clip(
+            np.exp(-LEVEL_DAMPING * R_LEVEL_SLOPE * r_gap),
+            1 / LEVEL_STEP,
+            LEVEL_STEP,
+        )
+    )
     sc = scales_from(p)
     if tm is not None:
         t = {k: v[0] for k, v in TRANSITION_TARGETS.items()}
-        # level of patience: first-year investment share
-        beta = beta * _ratio(
-            t["(I+I_g)/Y"],
-            tm["(I+I_g)/Y"],
-            LEVEL_DAMPING,
-            (1 / LEVEL_STEP, LEVEL_STEP),
-        )
         out["zeta_K"] = [
             float(
                 np.clip(

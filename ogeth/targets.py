@@ -12,14 +12,26 @@ Two sets of targets:
 
 * ``TRANSITION_TARGETS`` are moments of the first model period, FY2024/25,
   the year the data describe. The dials tuned to them are the tax rates and
-  scales (revenue by instrument), the pension and payroll coverage scales,
-  the level of the discount factors (first-year investment) and the
-  foreign-capital fill share zeta_K (first-year foreign share of private
-  capital). Ethiopia's population is far from stationary, so these are
-  scored where the data are, not in the steady state.
+  scales (revenue by instrument), the pension and payroll coverage scales
+  and the foreign-capital fill share zeta_K (first-year foreign share of
+  private capital). Ethiopia's population is far from stationary, so these
+  are scored where the data are, not in the steady state. First-year
+  investment is scored, not tuned (see ``SS_TARGETS``).
 * ``SS_TARGETS`` are long-run anchors and the survey distributions that the
   steady state is matched to (hours by age and wealth shares are scored by
-  ``examples/tune.py``), plus moments reported as outcomes.
+  ``examples/tune.py``), plus moments reported as outcomes. The level of
+  the discount factors is set so that the long-run return equals the world
+  rate: a small open economy's domestic return converges to the return
+  foreign investors earn as capital controls and financial repression are
+  unwound (IMF CR 26/174). Tuning patience to first-year investment
+  instead would make households finance all of the 35.3 percent of GDP the
+  rebased accounts record, including state-enterprise investment financed
+  through state banks; that requires a long-run return of about 2 percent,
+  below the world rate, with foreign-owned capital leaving. The measurable
+  state channels (state-enterprise retained earnings about 0.7 percent of
+  GDP; repression beyond the below-market government borrowing rate the
+  model already carries about 0.2 percent) close less than a point of the
+  gap, so first-year investment is left as a scored miss (macro.md).
 """
 
 import numpy as np
@@ -65,9 +77,10 @@ TRANSITION_TARGETS = {
     ),
     "(I+I_g)/Y": (
         mp.GROSS_CAPITAL_FORMATION_REBASED / 100,
-        "discount factor level",
+        "check",
         "gross capital formation 35.3 percent of rebased GDP (rebased "
-        "national accounts, FY2024/25)",
+        "national accounts, FY2024/25); scored, not tuned: the household-"
+        "financed share is not published",
     ),
     "K_f/K": (
         mp.FOREIGN_CAPITAL_SHARE,
@@ -132,6 +145,7 @@ SS_TARGETS = {
         "debt_ratio_ss (all market debt by then)",
     ),
     "r_gov": (mp.LONG_RUN_R_GOV, "r_gov_shift (long run)"),
+    "r": (mp.WORLD_INT_RATE_ANNUAL, "discount factor level"),
     "K/Y": (mp.PRIVATE_CAPITAL_OUTPUT_RATIO, "outcome (provisional anchor)"),
 }
 
