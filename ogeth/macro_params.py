@@ -22,9 +22,6 @@ NU = 0.2
 TPI_ANDERSON_M = 5
 TPI_ANDERSON_BETA = 1.0
 
-# Public capital elasticity; see firms.md.
-GAMMA_G_LIC = 0.1
-
 # Window for the g_y_annual average-growth calculation: the mean of the
 # year-over-year GDP-per-capita growth rates for G_Y_START_YEAR through
 # G_Y_END_YEAR (inclusive). We use the post-2015 decade rather than the
@@ -328,10 +325,10 @@ def get_macro_params(
         print("Not updating from World Bank API")
 
     # gamma is deliberately NOT refreshed from the ILOSTAT labour share: the
-    # naive 1 - labour share (about 0.515 net of gamma_g) is biased by
-    # Ethiopia's self-employment, and the calibrated 0.30 is a triangulated
-    # Gollin-adjusted value (firms.md). A live refresh would silently
-    # overwrite it, so it is off the live path entirely.
+    # naive 1 - labour share is biased by Ethiopia's self-employment, and
+    # gamma is set from the firms' first-order condition at the measured
+    # capital stock (GAMMA, firms.md). A live refresh would silently overwrite
+    # it, so it is off the live path entirely.
 
     # alpha_T and alpha_G are NOT pulled from the IMF API for OG-ETH: the
     # IMF SDMX endpoint returns only 2002-vintage data for Ethiopia, and
@@ -945,7 +942,31 @@ MARKET_FOREIGN_DEBT_SHARE = 0.0
 # (about 0.5 percent of GDP). IMF CR 26/174 paragraphs 9, 20-22 and Box on
 # social safety nets.
 CASH_TRANSFERS_PUBLISHED = [2.0, 1.8, 1.5, 1.5, 1.5, 1.5, 1.5]
-CASH_TRANSFERS = rebased(CASH_TRANSFERS_PUBLISHED)
+# The path above counts public pension payouts at half a percent of GDP, a
+# round figure with no table behind it. The schemes' own accounts give much
+# less (ILO Social Security Inquiry, Ethiopia, 2024 data): the public
+# servants' scheme (PSSSA) paid 22.2 billion birr to 750,812 recipients, and
+# the private scheme (POESSA) 43,347 recipients, here at PSSSA's average
+# benefit (its reported 11.58 billion birr of expenditure includes items
+# other than pensions, about nine times PSSSA's spending per recipient):
+# about 23.5 billion birr, 0.20 percent of FY2023/24 old-base GDP (11,752
+# billion birr). Old-age pensions are about 60 percent of it: survivors are
+# the largest group (356,003) but receive fractions of the deceased member's
+# pension (Proclamation 1267/2022: spouse 50, child 20 percent), and
+# invalidity pensioners are few (10,870); range 55-65 percent.
+PENSION_BENEFITS_BIRR_BN = 22.2 + 43_347 * 22.2 / 750_812
+PENSION_BENEFITS_PUBLISHED = round(
+    100 * PENSION_BENEFITS_BIRR_BN / NOMINAL_GDP_OLD_BASE_BIRR_BN["FY2023/24"],
+    3,
+)
+OLD_AGE_PENSION_SHARE = 0.60
+PUBLISHED_PENSION_ASSUMPTION = 0.5
+CASH_TRANSFERS = rebased(
+    [
+        x - PUBLISHED_PENSION_ASSUMPTION + PENSION_BENEFITS_PUBLISHED
+        for x in CASH_TRANSFERS_PUBLISHED
+    ]
+)
 
 # Long-run grants once the program's donor surge fades: 0.3 percent of
 # old-base GDP, rebased with the latest factor
@@ -1213,7 +1234,8 @@ def program_spending_paths():
     tr = np.array(CASH_TRANSFERS) / 100
     g = rec - interest - tr
     if PENSIONS_ON:
-        # pension payouts are paid by the pension system, not as transfers
+        # old-age pensions are paid by the pension system, not as transfers;
+        # survivor and invalidity benefits stay in the cash transfers
         tr = tr - PENSIONS_SHARE_OF_GDP / 100
     ig = np.array(IMF_CAPITAL) / 100
     fa = np.array(IMF_GRANTS) / 100
@@ -1554,7 +1576,15 @@ def payroll_tax_params(payroll_coverage_scale=None):
 # and lifetime-income groups; the default is population-proportional.
 # published percent of old-base GDP, rebased with the FY2024/25 factor
 PSNP_SHARE_OF_GDP = rebased([0.4])[0]
-PENSIONS_SHARE_OF_GDP = rebased([0.5])[0]
+# old-age pensions, paid by OG-Core's pension system (the pensions/Y target),
+# and survivor and invalidity benefits, paid as cash transfers to the
+# households of the covered groups (see CASH_TRANSFERS)
+PENSIONS_SHARE_OF_GDP = rebased(
+    [PENSION_BENEFITS_PUBLISHED * OLD_AGE_PENSION_SHARE]
+)[0]
+SURVIVOR_INVALIDITY_SHARE_OF_GDP = rebased(
+    [PENSION_BENEFITS_PUBLISHED * (1 - OLD_AGE_PENSION_SHARE)]
+)[0]
 FERTILIZER_SUBSIDY_SHARE_OF_GDP = rebased([0.6])[0]
 PSNP_GROUPS = [0]  # poorest quarter of households
 FARM_GROUPS = [0, 1, 2]  # bottom 70 percent: smallholder agriculture
@@ -1583,6 +1613,9 @@ def transfer_eta(omega_SS, lambdas, retire_age_index):
 
     eta += spread(PSNP_GROUPS, range(S), PSNP_SHARE_OF_GDP)
     eta += spread(FARM_GROUPS, range(S), FERTILIZER_SUBSIDY_SHARE_OF_GDP)
+    # survivor and invalidity benefits to the households of the covered
+    # groups, at all ages (widows, orphans and invalidity pensioners)
+    eta += spread(PENSION_GROUPS, range(S), SURVIVOR_INVALIDITY_SHARE_OF_GDP)
     if not PENSIONS_ON:
         # pensions inside the cash-transfer ratio, to the retired formal
         # groups; with the pension system on they are paid as benefits
@@ -1815,11 +1848,39 @@ def fiscal_program_params(p, r_ss=None):
 # rebased GDP) to 2.70 (the gap in every year since 1970); phasing in from
 # 2019 or 2011 gives 1.84 or 2.22. It should be replaced by the Ministry's
 # capital stocks or back series when they are published.
-PWT_CAPITAL_OUTPUT_RATIO = 2.167
+#
+# The level is PWT's net capital stock at current national prices over GDP at
+# current national prices (PWT 11.0 capital detail, the four asset types in
+# ogeth/data/pwt110_eth_capital_detail.csv, million birr), 2.37 in 2023: the
+# ratio at domestic prices, which is what a one-good model whose investment
+# share is a share of nominal GDP needs. PWT's cn / cgdpo (2.17 in 2023)
+# values both at international (PPP) prices instead; capital goods are
+# relatively dearer in Ethiopia, so the domestic-price ratio is higher.
 OLD_BASE_GCF_SHARE = 0.201
 CAPITAL_REVISION_START_YEAR = 2016
 # old-base investment share and real growth for the years after PWT's last
 OLD_BASE_EXTENSION = {2024: (0.2115, 0.081), 2025: (OLD_BASE_GCF_SHARE, 0.092)}
+
+
+def pwt_domestic_capital_output_ratio(year=2023):
+    """
+    PWT 11.0 net capital stock over GDP, both at current national prices.
+
+    Args:
+        year (int): PWT year
+
+    Returns:
+        float: capital-output ratio at domestic prices, old-base GDP
+    """
+    data = Path(__file__).parent / "data"
+    detail = pd.read_csv(
+        data / "pwt110_eth_capital_detail.csv", index_col="year"
+    )
+    na = pd.read_csv(data / "pwt110_eth_capital.csv", index_col="year")
+    return float(detail.net_capital_stock[year] / na.v_gdp[year])
+
+
+PWT_CAPITAL_OUTPUT_RATIO = round(pwt_domestic_capital_output_ratio(), 4)
 
 
 def rebasing_investment_gap():
@@ -1895,12 +1956,17 @@ def rebased_capital_output_ratio(revision_start=CAPITAL_REVISION_START_YEAR):
 
 
 TOTAL_CAPITAL_OUTPUT_RATIO = round(rebased_capital_output_ratio(), 3)
-# Public capital: IMF Investment and Capital Stock Dataset (April 2025)
-# general-government stock, 0.667 of old-base GDP in 2019, its latest year,
-# held at that ratio to FY2024/25. The stock is accumulated budget capital
-# spending, in birr, which rebasing does not change, so its ratio converts
-# like every other fiscal stock (times 0.628).
-PUBLIC_CAPITAL_OUTPUT_RATIO_OLD_BASE = 0.667
+# Public capital: IMF Investment and Capital Stock Dataset (api.imf.org,
+# IMF.FAD ICSD), general-government capital stock at current prices over GDP
+# at current prices, CAPSTCK_S13_V_XDC / B1GQ_V_XDC = 2,265.27 / 2,696.22
+# billion birr = 0.840 in 2019, its latest year (the IMF-World Bank PIMA of
+# June 2025 quotes the same 84 percent), held at that ratio to FY2024/25.
+# The ratio at domestic current prices matches the total stock above; the
+# real ratio at 2017 prices (CAPSTCK_S13_Q_POGDP_PT, 0.667) was used before.
+# The stock is accumulated budget capital spending, in birr, which rebasing
+# does not change, so its ratio converts like every other fiscal stock
+# (times 0.628).
+PUBLIC_CAPITAL_OUTPUT_RATIO_OLD_BASE = round(2265.27 / 2696.22, 3)
 PUBLIC_CAPITAL_OUTPUT_RATIO = round(
     PUBLIC_CAPITAL_OUTPUT_RATIO_OLD_BASE * rebase_factors()[0], 3
 )
@@ -1924,13 +1990,50 @@ DELTA_ANNUAL = round(
     / (1 - PUBLIC_CAPITAL_OUTPUT_RATIO / TOTAL_CAPITAL_OUTPUT_RATIO),
     4,
 )
-# Foreign-owned capital: UNCTAD World Investment Report 2026 inward FDI
-# stock, USD 42.5 billion at end-2024 and 46.3 billion at end-2025
-# (estimates); the mid-year average over rebased FY2024/25 GDP of USD 201.4
-# billion. Ethiopia publishes no international investment position, so the
-# FDI stock is the foreign-owned capital measure.
-FDI_STOCK_USD_BN = (42.528 + 46.324) / 2
-FDI_STOCK_TO_GDP = round(FDI_STOCK_USD_BN / 201.42, 4)
+# Foreign-owned capital. Ethiopia publishes no international investment
+# position. UNCTAD's inward FDI stock (World Investment Report 2026: USD 42.5
+# billion at end-2024) is essentially the cumulative inflows at historical
+# cost (IMF balance of payments, direct-investment equity liabilities,
+# 1990-2024: USD 40.7 billion with the unreported 1995-2002 filled at 0.25
+# billion a year), with no depreciation. The model's foreign-owned capital is
+# a net stock at replacement cost like its K, so we accumulate the same
+# inflows by perpetual inventory at the private depreciation rate, revalued
+# by 2.5 percent a year for the dollar price of capital goods
+# (ogeth/data/imf_fdi_inflows_eth.csv): USD 35.3 billion in mid-FY2024/25,
+# 0.175 of rebased GDP of USD 201.4 billion. Unrecorded reinvested earnings
+# (Ethiopia reports none) bias both measures down.
+FDI_PRICE_GROWTH = 0.025
+FDI_MISSING_YEARS_FLOW = 250.0  # USD million a year, 1995-2002
+REBASED_GDP_USD_BN = 201.42
+
+
+def fdi_stock_usd_bn(delta=None, price_growth=FDI_PRICE_GROWTH):
+    """
+    Net replacement-cost stock of foreign direct investment in mid-FY2024/25,
+    by perpetual inventory on IMF balance-of-payments equity inflows.
+
+    Args:
+        delta (float): depreciation rate; defaults to DELTA_ANNUAL
+        price_growth (float): annual growth of the dollar price of capital
+
+    Returns:
+        float: USD billion
+    """
+    if delta is None:
+        delta = DELTA_ANNUAL
+    flows = pd.read_csv(
+        Path(__file__).parent / "data" / "imf_fdi_inflows_eth.csv",
+        index_col="year",
+    ).fdi_equity_inflows_usd_m
+    k = 0.0
+    for year in range(int(flows.index.min()), int(flows.index.max()) + 1):
+        flow = flows.get(year, FDI_MISSING_YEARS_FLOW)
+        k = k * (1 - delta) * (1 + price_growth) + flow
+    # half a year more to the middle of FY2024/25
+    return k * (1 - delta) * (1 + price_growth) ** 0.5 / 1e3
+
+
+FDI_STOCK_TO_GDP = round(fdi_stock_usd_bn() / REBASED_GDP_USD_BN, 4)
 # foreign-owned share of private capital in FY2024/25, the zeta_K target
 FOREIGN_CAPITAL_SHARE = round(
     FDI_STOCK_TO_GDP / PRIVATE_CAPITAL_OUTPUT_RATIO, 4
@@ -1949,7 +2052,60 @@ INITIAL_WEALTH_RATIO = round(
     ),
     3,
 )
-INITIAL_KG_RATIO = round(to_model(PUBLIC_CAPITAL_OUTPUT_RATIO), 3)
+# Efficiency of public investment: the IMF-World Bank Public Investment
+# Management Assessment for Ethiopia (June 2025, section II) estimates a
+# hybrid efficiency gap of 53 percent (access and quality of infrastructure
+# for the capital stock per head, against the efficiency frontier). It enters
+# once: as OG-Core's leakage of new public investment
+# (infra_investment_leakage_rate) and as the share of the measured stock
+# that is productive at the start. It does not scale the elasticity gamma_g,
+# which multiplies the productive stock.
+PUBLIC_INVESTMENT_EFFICIENCY_GAP = 0.53
+INITIAL_KG_RATIO = round(
+    to_model(
+        PUBLIC_CAPITAL_OUTPUT_RATIO * (1 - PUBLIC_INVESTMENT_EFFICIENCY_GAP)
+    ),
+    3,
+)
+
+# The output elasticity of public capital, gamma_g. Bom and Ligthart (2014,
+# Journal of Economic Surveys 28(5), a meta-analysis of 578 estimates from 68
+# studies) find 0.083 in the short run and 0.122 in the long run for capital
+# supplied by central government, 0.106 on average. We take the low end,
+# 0.08, because OG-Core passes public capital's rent to the owners of private
+# capital (aggregates.get_r_p), so their return exceeds the firms' marginal
+# return by about (1 - tau_b) gamma_g Y/K: at Ethiopia's capital-output ratio
+# a larger gamma_g would push the firms' return below the 4 percent world
+# rate (WORLD_INT_RATE_ANNUAL), where foreign capital would leave.
+GAMMA_G = 0.08
+# The share of reproducible private capital, gamma. Ethiopia publishes no
+# income-side GDP, so the capital share cannot be measured directly: the
+# IFPRI 2022 SAM books the self-employed's mixed income as capital (58
+# percent of value added), and the ILO labour share (0.385) is an imputation
+# that values self-employed work at employee earnings, which in Ethiopia
+# fall far below the self-employed's value added per worker. We therefore set
+# gamma from the firms' first-order condition at a target marginal return,
+# r = (1 - tau_b) gamma Y/K - delta + tau_b delta_tau, at the measured
+# capital stock (the fallback when profits cannot be measured; Caselli and
+# Feyrer 2007). The target firms' return is 5 percent, just above the world
+# rate; with public capital's rent, owners of capital earn about 9.5 percent,
+# inside the 6-10 percent range of the evidence (realized FDI returns in
+# African peers of about 4 percent real after tax, plus the 2-4 point
+# marginal premium; Caselli and Feyrer's natural-capital-corrected returns).
+# OG-Core's labour share, 1 - gamma - gamma_g, is then household income from
+# work, land and enterprise counted as labour, inside Gollin's (2002) range
+# of 0.65-0.80 for labour shares that count the self-employed's income.
+FIRM_RETURN_TARGET = 0.05
+# effective business tax rate on capital income, FY2024/25: CIT rate 0.30 x
+# corporate share of assets 0.55 x the CIT collections factor 0.221
+BUSINESS_TAX_WEDGE = 0.0365
+DELTA_TAU_ANNUAL = 0.027
+GAMMA = round(
+    (FIRM_RETURN_TARGET + DELTA_ANNUAL - BUSINESS_TAX_WEDGE * DELTA_TAU_ANNUAL)
+    / (1 - BUSINESS_TAX_WEDGE)
+    * to_model(PRIVATE_CAPITAL_OUTPUT_RATIO),
+    3,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -2131,6 +2287,9 @@ def common_params():
     out.update(
         {
             "world_int_rate_annual": [WORLD_INT_RATE_ANNUAL],
+            "gamma": [float(GAMMA)],
+            "gamma_g": [GAMMA_G],
+            "infra_investment_leakage_rate": PUBLIC_INVESTMENT_EFFICIENCY_GAP,
             "delta_annual": DELTA_ANNUAL,
             "delta_g_annual": DELTA_G_ANNUAL,
             "initial_Kg_ratio": INITIAL_KG_RATIO,

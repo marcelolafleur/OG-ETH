@@ -112,9 +112,11 @@ def test_capital_stocks_are_rebased():
     """Total K/Y by perpetual inventory on PWT 11.0 with the rebasing's
     investment gap phased in from FY2015/16, over rebased GDP; public capital
     (IMF ICSD 0.667 of old-base GDP) converted like other fiscal stocks."""
-    assert mp.TOTAL_CAPITAL_OUTPUT_RATIO == pytest.approx(2.003, abs=1e-3)
+    assert mp.TOTAL_CAPITAL_OUTPUT_RATIO == pytest.approx(2.186, abs=1e-3)
+    # public capital: ICSD general-government stock at current prices over
+    # GDP at current prices, 2019, converted like other fiscal stocks
     assert mp.PUBLIC_CAPITAL_OUTPUT_RATIO == pytest.approx(
-        0.667 * 15094 / 24030, abs=1e-3
+        2265.27 / 2696.22 * 15094 / 24030, abs=1e-3
     )
     # no revision rolls the old-base stock forward; the full-history gap is
     # the upper bound; the central case sits between
@@ -123,7 +125,70 @@ def test_capital_stocks_are_rebased():
     assert low < mp.TOTAL_CAPITAL_OUTPUT_RATIO < high
     # without revision, the old-base stock over old-base GDP stays near
     # PWT's level; over rebased GDP it is smaller by the rebasing factor
-    assert 1.9 < low * 24030 / 15094 < 2.3
+    assert 2.0 < low * 24030 / 15094 < 2.5
+
+
+def test_capital_anchor_is_the_domestic_price_stock():
+    """PWT 11.0 net capital stock at current national prices over GDP at
+    current national prices, 2023: the four asset types of the capital
+    detail over v_gdp of the same file family; investment agrees."""
+    import pandas as pd
+    from pathlib import Path
+
+    data = Path(mp.__file__).parent / "data"
+    detail = pd.read_csv(
+        data / "pwt110_eth_capital_detail.csv", index_col="year"
+    )
+    na = pd.read_csv(data / "pwt110_eth_capital.csv", index_col="year")
+    assert mp.PWT_CAPITAL_OUTPUT_RATIO == pytest.approx(2.3655, abs=1e-4)
+    # the capital detail's investment is the national accounts' investment
+    assert detail.investment[2023] == pytest.approx(na.v_gfcf[2023], rel=1e-4)
+    # PWT's PPP ratio is lower: capital goods are relatively dear
+    assert na.cn[2023] / na.cgdpo[2023] < mp.PWT_CAPITAL_OUTPUT_RATIO
+
+
+def test_gamma_from_the_firm_first_order_condition():
+    """gamma solves r = (1 - tau_b) gamma Y/K - delta + tau_b delta_tau at
+    the target firms' return and the measured private stock (model units);
+    gamma_g is the low end of Bom and Ligthart (2014)."""
+    ky = mp.to_model(mp.PRIVATE_CAPITAL_OUTPUT_RATIO)
+    tb = mp.BUSINESS_TAX_WEDGE
+    r = (1 - tb) * mp.GAMMA / ky - mp.DELTA_ANNUAL + tb * mp.DELTA_TAU_ANNUAL
+    assert r == pytest.approx(mp.FIRM_RETURN_TARGET, abs=1e-3)
+    assert mp.GAMMA_G == pytest.approx(0.08)
+    # owners of capital earn the firms' return plus public capital's rent
+    owners = r + (1 - tb) * mp.GAMMA_G / ky
+    assert 0.06 <= owners <= 0.10
+    # the firms' return stays above the world rate
+    assert r > mp.WORLD_INT_RATE_ANNUAL
+    # the business-tax wedge is the FY2024/25 CIT x corporate share x
+    # collections factor
+    assert tb == pytest.approx(0.30 * 0.55 * 0.2211, abs=2e-4)
+
+
+def test_public_investment_efficiency_enters_once(packaged):
+    """The PIMA's 53 percent hybrid efficiency gap is the leakage of new
+    public investment and nets the initial stock; gamma_g is not scaled."""
+    assert packaged["infra_investment_leakage_rate"] == pytest.approx(0.53)
+    assert packaged["initial_Kg_ratio"] == pytest.approx(
+        mp.to_model(mp.PUBLIC_CAPITAL_OUTPUT_RATIO * 0.47), abs=1e-3
+    )
+    assert packaged["gamma"] == [pytest.approx(mp.GAMMA)]
+    assert packaged["gamma_g"] == [pytest.approx(mp.GAMMA_G)]
+
+
+def test_pension_benefits_from_the_schemes():
+    """ILO Social Security Inquiry (2024): PSSSA 22.2 billion birr to
+    750,812 recipients, POESSA's 43,347 recipients at PSSSA's average;
+    old-age 60 percent, the rest survivor and invalidity benefits."""
+    assert mp.PENSION_BENEFITS_BIRR_BN == pytest.approx(23.48, abs=0.01)
+    assert mp.PENSION_BENEFITS_PUBLISHED == pytest.approx(0.200, abs=1e-3)
+    assert mp.PENSIONS_SHARE_OF_GDP == pytest.approx(
+        0.200 * 0.6 * 15094 / 24030, abs=1e-3
+    )
+    assert mp.SURVIVOR_INVALIDITY_SHARE_OF_GDP == pytest.approx(
+        0.200 * 0.4 * 15094 / 24030, abs=1e-3
+    )
 
 
 def test_investment_gap_is_measured_in_old_base_gdp():

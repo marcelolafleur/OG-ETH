@@ -79,10 +79,13 @@ def test_program_paths_start_at_fy2024_25_values(packaged):
     assert packaged["alpha_FA"][0] == pytest.approx(
         mp.to_model(0.017 * f), abs=1e-5
     )
+    # cash transfers: the published 2.0 percent with its assumed 0.5 of
+    # pensions replaced by the schemes' measured benefits (0.20)
+    cash_total = 0.020 - 0.005 + mp.PENSION_BENEFITS_PUBLISHED / 100
     assert packaged["alpha_G"][0] == pytest.approx(
-        mp.to_model((0.071 - 0.008 - 0.020) * f), abs=1e-5
+        mp.to_model((0.071 - 0.008 - cash_total) * f), abs=1e-5
     )
-    cash = 0.020 * f - (
+    cash = cash_total * f - (
         mp.PENSIONS_SHARE_OF_GDP / 100 if mp.PENSIONS_ON else 0
     )
     assert packaged["alpha_T"][0] == pytest.approx(mp.to_model(cash), abs=1e-5)
@@ -293,8 +296,10 @@ def test_initial_wealth_ratio_is_built_from_its_components():
     assert mp.PRIVATE_CAPITAL_OUTPUT_RATIO == pytest.approx(
         mp.TOTAL_CAPITAL_OUTPUT_RATIO - mp.PUBLIC_CAPITAL_OUTPUT_RATIO
     )
+    # net replacement-cost FDI stock from IMF equity inflows; cumulative
+    # inflows match UNCTAD's 42.5 billion (end-2024) closely
     assert mp.FDI_STOCK_TO_GDP == pytest.approx(
-        (42.528 + 46.324) / 2 / 201.42, abs=1e-4
+        mp.fdi_stock_usd_bn() / 201.42, abs=1e-4
     )
     assert mp.INITIAL_WEALTH_RATIO == pytest.approx(
         mp.to_model(
@@ -353,16 +358,14 @@ def test_transfers_are_targeted_by_programme(packaged, params):
         packaged["omega_SS"], packaged["lambdas"], retire_idx
     )
     assert np.allclose(eta, expected, atol=1e-12)
-    pensions = 0.0 if mp.PENSIONS_ON else mp.PENSIONS_SHARE_OF_GDP
-    total = (
-        mp.PSNP_SHARE_OF_GDP + mp.FERTILIZER_SUBSIDY_SHARE_OF_GDP + pensions
-    )
+    # with the pension system on, old-age pensions are paid as benefits and
+    # only survivor and invalidity benefits reach the covered groups as
+    # transfers, at all ages
+    covered = mp.SURVIVOR_INVALIDITY_SHARE_OF_GDP
+    if not mp.PENSIONS_ON:
+        covered += mp.PENSIONS_SHARE_OF_GDP
+    total = mp.PSNP_SHARE_OF_GDP + mp.FERTILIZER_SUBSIDY_SHARE_OF_GDP + covered
     share = eta.sum(axis=0)
     assert share[3:5].sum() == pytest.approx(0.0)  # groups 4-5 get nothing
-    # with the pension system on, the retired formal groups are paid
-    # benefits instead of transfers
-    assert share[5:].sum() == pytest.approx(pensions / total)
-    assert eta[:retire_idx, 5:].sum() == pytest.approx(
-        0.0
-    )  # pensions: retired
+    assert share[5:].sum() == pytest.approx(covered / total)
     assert share[0] > share[1] > share[2]

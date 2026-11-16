@@ -60,8 +60,8 @@ TRANSITION_TARGETS = {
     "pensions/Y": (
         mp.PENSIONS_SHARE_OF_GDP / 100,
         "pension coverage scale",
-        "public pension outlays 0.5 percent of old-base GDP (IMF CR 26/174), "
-        "rebased",
+        "old-age pensions: PSSSA and POESSA benefits (ILO Social Security "
+        "Inquiry, 2024), 60 percent old-age, rebased",
     ),
     "(I+I_g)/Y": (
         mp.GROSS_CAPITAL_FORMATION_REBASED / 100,
