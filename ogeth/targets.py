@@ -72,8 +72,10 @@ TRANSITION_TARGETS = {
     "K_f/K": (
         mp.FOREIGN_CAPITAL_SHARE,
         "zeta_K",
-        "inward FDI stock 0.221 of GDP (UNCTAD WIR 2026) over private K/Y "
-        "1.50 (PWT 11.0 less IMF ICSD public capital)",
+        f"inward FDI stock {mp.FDI_STOCK_TO_GDP:.3f} of GDP (UNCTAD WIR "
+        f"2026) over private K/Y {mp.PRIVATE_CAPITAL_OUTPUT_RATIO:.2f} "
+        "(PWT 11.0 rebuilt on the rebased accounts, less IMF ICSD public "
+        "capital)",
     ),
     "B/Y": (
         mp.INITIAL_WEALTH_RATIO / mp.MODEL_PER_MARKET_GDP,
