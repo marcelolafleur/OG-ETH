@@ -123,7 +123,12 @@ def test_cit_collections_factor(p):
     factor = np.asarray(p.adjustment_factor_for_cit_receipts)
     # tuned so that corporate income tax plus the other capital-income lines
     # collect 1.26 percent of rebased GDP in FY2024/25 (examples/tune.py)
-    assert float(factor[0]) == pytest.approx(0.2211, abs=5e-3)
+    # the factor that the gamma derivation uses must be the tuned one
+    from ogeth import macro_params as mp
+
+    assert float(factor[0]) == pytest.approx(
+        mp.CIT_COLLECTIONS_FACTOR, abs=5e-3
+    )
     assert np.allclose(factor, factor[0])
     prog = mp.program_revenue_paths(0.06, float(factor[0]))
     assert prog["adjustment_factor_for_cit_receipts"][-1] > float(factor[0])

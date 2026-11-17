@@ -174,7 +174,20 @@ def test_gamma_from_the_firm_first_order_condition():
     assert r > mp.WORLD_INT_RATE_ANNUAL
     # the business-tax wedge is the FY2024/25 CIT x corporate share x
     # collections factor
-    assert tb == pytest.approx(0.30 * 0.55 * 0.2211, abs=2e-4)
+    assert tb == pytest.approx(
+        mp.CIT_RATE * mp.C_CORP_SHARE_OF_ASSETS * mp.CIT_COLLECTIONS_FACTOR,
+        abs=2e-4,
+    )
+    # and the factor is the one the packaged parameters carry (tuned)
+    import json
+    from importlib.resources import files
+
+    packaged = json.loads(
+        files("ogeth").joinpath("ogeth_default_parameters.json").read_text()
+    )
+    assert packaged["adjustment_factor_for_cit_receipts"][0] == pytest.approx(
+        mp.CIT_COLLECTIONS_FACTOR, abs=5e-3
+    )
 
 
 def test_public_investment_efficiency_enters_once(packaged):

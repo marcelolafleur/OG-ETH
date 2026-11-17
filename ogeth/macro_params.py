@@ -50,6 +50,17 @@ FRISCH = 0.25
 # corrected evidence; OG-Core caps sigma at 2.0, so this needs the raised
 # bound of the pinned OG-Core build.
 SIGMA = 3.0
+# Level of total factor productivity, a normalization of the model's units.
+# With CRRA preferences, scaling every income by k leaves the Euler and
+# bequest conditions unchanged and multiplies the chi_n the labor condition
+# needs by k^(1 - sigma). At sigma 3 with Z = 1, model consumption is about
+# 0.05-0.3 and chi_n would have to exceed OG-Core's bound of 10,000 at every
+# age; Z = 5 (OG-Core's upper bound) raises model incomes about 8.6 times
+# and brings chi_n back inside it. A steady-state probe at sigma 1.5 (Z 1
+# against 3, chi_n rescaled) scaled every aggregate by 4.25-4.42 against
+# 4.34 predicted, with hours unchanged: a near-normalization, the residual
+# (a return 0.13 point higher) absorbed by the tuned dials.
+Z_NORMALIZATION = 5.0
 
 # Window for the g_y_annual average-growth calculation: the mean of the
 # year-over-year GDP-per-capita growth rates for G_Y_START_YEAR through
@@ -1084,7 +1095,7 @@ LONG_RUN_R_GOV = round(sum(DSA_MARGINAL_DOMESTIC_REAL_RATES) / 200, 4)
 R_GOV_FLOOR = -0.12
 # Steady-state return on capital the r_gov_shift path is evaluated at: the
 # solved baseline steady state of examples/run_og_eth.py.
-R_SS_FOR_R_GOV = 0.079945
+R_SS_FOR_R_GOV = 0.039589
 
 # Informality. 77.65 percent of the employed are in informal employment
 # (ILOSTAT harmonised series, SDG 8.3.1, from the 2021 Labour Force and
@@ -1145,7 +1156,7 @@ PIT_FORMALIZATION_GAIN = round(0.012 * float(rebase_factors()[-1]), 5)
 # outside Schedule A. The scale is calibrated so that personal income tax
 # collects PIT_REVENUE_TARGET of GDP in FY2024/25
 # (examples/tune.py, scored on the first transition year).
-COMPLIANCE_SCALE = 0.051483
+COMPLIANCE_SCALE = 0.061036
 PIT_REVENUE_TARGET = PIT_REVENUE_SHARE
 
 # Pension coverage by lifetime-income group. Ethiopia's two schemes (PSSSA for
@@ -1181,7 +1192,7 @@ PENSION_CAREER_YEARS = 40
 # far more than the scheme's 800,000 pensioners and two percent of the
 # working-age population, so the scale is well below one. Calibrated by
 # examples/tune.py, scored on the first transition year.
-PENSION_COVERAGE_SCALE = 0.507552
+PENSION_COVERAGE_SCALE = 0.153428
 # Contributions: 7 percent from the employee and 11 from the employer
 # (Proclamations 1267/1268 of 2022). OG-Core's payroll tax can differ by
 # lifetime-income group, so the effective rate is the statutory rate on the
@@ -1197,7 +1208,7 @@ PENSION_COVERAGE_SCALE = 0.507552
 # fiscal anchor here (no official FY2024/25 scheme accounts were found).
 PAYROLL_STATUTORY_RATE = 0.18
 PAYROLL_REVENUE_SHARE = round(69.0 / 24030.0, 5)
-PAYROLL_COVERAGE_SCALE = 0.131089
+PAYROLL_COVERAGE_SCALE = 0.132560
 
 # Personal income tax: the statutory employment-income schedule (Schedule A)
 # in birr per month, as (upper bound, marginal rate) with an open last
@@ -1492,7 +1503,7 @@ def mean_income_per_adult():
 # adult: GDP per adult times the model's household income over GDP at market
 # prices, from the solved steady state (examples/tune.py computes it each
 # round; the converged value is folded here like the other scales).
-MODEL_INCOME_SHARE_OF_GDP = 0.834528
+MODEL_INCOME_SHARE_OF_GDP = 0.876733
 
 
 def model_income_share(ss, p):
@@ -2142,8 +2153,16 @@ GAMMA_G = 0.08
 # of 0.65-0.80 for labour shares that count the self-employed's income.
 FIRM_RETURN_TARGET = 0.05
 # effective business tax rate on capital income, FY2024/25: CIT rate 0.30 x
-# corporate share of assets 0.55 x the CIT collections factor 0.221
-BUSINESS_TAX_WEDGE = 0.0365
+# corporate share of assets 0.55 x the CIT collections factor, the tuned
+# value in the packaged parameters (examples/tune.py matches CIT/Y). gamma
+# and the factor depend on each other (profits set collections), so the
+# factor is folded here after each retune; tests check the two agree.
+CIT_RATE = 0.30
+C_CORP_SHARE_OF_ASSETS = 0.55
+CIT_COLLECTIONS_FACTOR = 0.3814
+BUSINESS_TAX_WEDGE = round(
+    CIT_RATE * C_CORP_SHARE_OF_ASSETS * CIT_COLLECTIONS_FACTOR, 4
+)
 DELTA_TAU_ANNUAL = 0.027
 GAMMA = round(
     (FIRM_RETURN_TARGET + DELTA_ANNUAL - BUSINESS_TAX_WEDGE * DELTA_TAU_ANNUAL)
@@ -2342,6 +2361,7 @@ def common_params():
             "r_gov_floor": R_GOV_FLOOR,
             "frisch": FRISCH,
             "sigma": SIGMA,
+            "Z": [[Z_NORMALIZATION]],
             "nu": NU,
             "TPI_outer_method": "anderson",
             "TPI_anderson_m": TPI_ANDERSON_M,

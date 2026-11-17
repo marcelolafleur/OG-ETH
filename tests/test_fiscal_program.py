@@ -283,6 +283,7 @@ def test_packaged_fiscal_paths_match_the_derivation(packaged, params):
     )
     assert packaged["frisch"] == expected["frisch"] == mp.FRISCH
     assert packaged["sigma"] == expected["sigma"] == mp.SIGMA
+    assert packaged["Z"] == expected["Z"] == [[mp.Z_NORMALIZATION]]
     for key in ("alpha_D_ext", "r_D_ext_annual"):
         assert len(packaged[key]) >= len(expected[key]), key
         assert np.allclose(
