@@ -281,6 +281,7 @@ def test_packaged_fiscal_paths_match_the_derivation(packaged, params):
         np.array(packaged["r_gov_shift"])[: len(expected["r_gov_shift"])],
         expected["r_gov_shift"],
     )
+    assert packaged["frisch"] == expected["frisch"] == mp.FRISCH
     for key in ("alpha_D_ext", "r_D_ext_annual"):
         assert len(packaged[key]) >= len(expected[key]), key
         assert np.allclose(

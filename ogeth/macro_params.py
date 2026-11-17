@@ -22,6 +22,18 @@ NU = 0.2
 TPI_ANDERSON_M = 5
 TPI_ANDERSON_BETA = 1.0
 
+# Frisch elasticity of labour supply. OG-USA's 0.4 sits at the top of the
+# range for Ethiopia. Corrected for publication bias, the micro evidence
+# puts the intensive margin at about 0.2 and total hours at about 0.25
+# (Elminejad, Havranek, Horvath and Irsova 2023, Review of Economic
+# Dynamics 51); Chetty, Guren, Manoli and Weber (2013, NBER Macroeconomics
+# Annual) bound the intensive margin below 0.47. In a setting like
+# Ethiopia's, randomly offered daily wages in rural Malawi give 0.15-0.16
+# (Goldberg 2016, AEJ: Applied), and off-farm hours in western Ethiopia
+# 0.13-0.22. Participation is near universal, so the extensive margin adds
+# little. Range 0.15-0.4.
+FRISCH = 0.25
+
 # Window for the g_y_annual average-growth calculation: the mean of the
 # year-over-year GDP-per-capita growth rates for G_Y_START_YEAR through
 # G_Y_END_YEAR (inclusive). We use the post-2015 decade rather than the
@@ -2311,6 +2323,7 @@ def common_params():
             "initial_Kg_ratio": INITIAL_KG_RATIO,
             "initial_wealth_ratio": INITIAL_WEALTH_RATIO,
             "r_gov_floor": R_GOV_FLOOR,
+            "frisch": FRISCH,
             "nu": NU,
             "TPI_outer_method": "anderson",
             "TPI_anderson_m": TPI_ANDERSON_M,
