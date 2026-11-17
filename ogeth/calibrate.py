@@ -271,7 +271,9 @@ def demographic_rates(E, S, T, start_year, download_path=None):
 # damped and each step bounded.
 BETA_DAMPING = 0.3
 BETA_STEP = 1.03
-BETA_BOUNDS = (0.5, 0.995)
+# Upper bound above 1 for the sigma check: at sigma near 3 and g_y 4.7
+# percent the top group needs beta near 1.03 (beta * exp(-sigma g_y) < 1).
+BETA_BOUNDS = (0.5, 1.1)
 # OG-USA's bequest weight, kept for every group
 CHI_B_DEFAULT = 80.0
 
