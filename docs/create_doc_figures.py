@@ -485,51 +485,80 @@ def demographics_by_income_group(save_path=None):
 
     ax = axes[0, 1]
     bands = lib[(lib.indicator == "AMR") & (lib.measure == "mx")]
+    groups = int(bands.groups.iloc[0])
     for row in bands.itertuples():
-        values = np.array([row.q1, row.q2, row.q3], dtype=float)
-        used = row.age_lo < calibrate.OLDEST_MEASURED_MORTALITY_AGE
-        ax.plot(
-            [1, 2, 3],
-            values / values[0],
-            "o-" if used else "s--",
-            label=(
-                f"ages {int(row.age_lo)}-{int(row.age_hi)}, "
-                f"tilt {row.slope:+.2f}" + ("" if used else " (not applied)")
-            ),
+        values = np.array(
+            [getattr(row, f"q{g}") for g in range(1, groups + 1)], dtype=float
         )
+        ax.plot(
+            np.arange(1, groups + 1),
+            values / values[0],
+            "o-",
+            label=f"ages {int(row.age_lo)}-{int(row.age_hi)}, "
+            f"gradient {row.slope:+.2f}",
+        )
+    g45 = lib[(lib.indicator == "AMR") & (lib.measure == "45q15")].iloc[0]
     ax.axhline(1.0, color="grey", lw=0.8)
-    ax.set_xticks([1, 2, 3])
-    ax.set_xticklabels(["poorest third", "middle", "richest third"])
+    ax.set_xticks(np.arange(1, groups + 1))
+    ax.set_xticklabels(
+        ["poorest"] + [str(g) for g in range(2, groups)] + ["richest"]
+    )
     ax.set_xlabel("Asset-index group, 2007 census household deaths")
-    ax.set_ylabel("Death rate relative to the poorest third")
-    ax.set_title("Census data: adult mortality by wealth and age")
+    ax.set_ylabel("Death rate relative to the poorest group")
+    ax.set_title(
+        f"Census 2007: adult mortality by wealth\n(45q15 gradient "
+        f"{g45.slope:+.2f}; the bands are shown, not applied)"
+    )
     ax.legend(loc="best", fontsize=8)
 
     ax = axes[1, 0]
     all_ages = np.arange(E + S)
-    ax.step(
-        all_ages,
-        100 * gradients["mort_gradient"],
-        where="post",
-        color="C3",
-        label="mortality tilt applied, by age",
+    df, offsets, rule, band = calibrate._library_tables(
+        calibrate.GRADIENT_FILE,
+        calibrate.FERTILITY_OFFSET_FILE,
+        calibrate.GENERAL_GRADIENT_FILE,
     )
-    ax.axhline(
-        100 * gradients["fert_gradient"],
+    start = int(params["start_year"])
+    for year, color, ls in [
+        (calibrate.CENSUS_YEAR, "C7", ":"),
+        (start, "C3", "-"),
+        (2063, "C3", "--"),
+    ]:
+        shift = (
+            0.0
+            if year == calibrate.CENSUS_YEAR
+            else float(
+                calibrate.income_rule_shift(
+                    [year], float(params["g_y_annual"]), rule
+                )[0]
+            )
+        )
+        ax.step(
+            all_ages,
+            calibrate.mortality_gradient_by_age(E, S, df, band, shift),
+            where="post",
+            color=color,
+            ls=ls,
+            label=f"mortality, {year}",
+        )
+    fertile = (all_ages >= 15) & (all_ages < 50)
+    ax.step(
+        all_ages[fertile],
+        100 * gradients["fert_gradient"][fertile],
+        where="post",
         color="C0",
-        ls="--",
-        label="fertility tilt applied (all ages)",
+        label="fertility (by age of mother)",
     )
     ax.axhline(
         100 * gradients["infmort_gradient"],
         color="C1",
         ls=":",
-        label="infant-mortality tilt applied (age 0)",
+        label="infant mortality (age 0)",
     )
     ax.axhline(0.0, color="grey", lw=0.8)
     ax.set_xlabel("Age")
     ax.set_ylabel("Change in log rate, poorest to richest")
-    ax.set_title("Gradients passed to OG-Core (before ÷ 100)")
+    ax.set_title("Gradients passed to OG-Core (before ÷ 100 (1 − p))")
     ax.legend(loc="best", fontsize=8)
 
     ax = axes[1, 1]
