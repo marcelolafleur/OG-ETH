@@ -18,113 +18,160 @@ UN_COUNTRY_CODE = "231"
 # (used when no UN API token is registered) ends in 2099, so 2098 is the
 # last usable year; ogcore also caps it at start_year + 74.
 DEMOG_FINAL_DATA_YEAR = 2098
-# Ethiopia's rows of the EAPD-DRB/Demographic-Gradients library: DHS
-# wealth-quintile tilts for fertility and infant mortality (2024 survey) and
-# the 2007 census household-deaths gradient for adult mortality by age band
+# Ethiopia's rows of the EAPD-DRB/Demographic-Gradients library (commit
+# ccf53a0, 2026-11-16): DHS 2024 wealth-quintile gradients in fertility
+# (TFR), infant mortality (IMR) and child mortality at ages 1-4 (CMR), and
+# the 2007 census household-deaths gradients in adult mortality (45q15 and
+# age bands, four wealth groups). A gradient is the slope of the log rate on
+# household wealth rank (0 to 1).
 GRADIENT_FILE = os.path.join(CUR_PATH, "data", "demographic_gradients_ETH.csv")
-# the library's tilt is the change in the log rate from the bottom to the
-# top of the wealth distribution; OG-Core's gradient is per centered
-# percentile point
-TILT_PER_PERCENTILE = 1 / 100
-# the census bands from this age on measure higher mortality in wealthier
-# households, which the library flags as at least partly a reporting
-# artefact (the 15-59 summary is flat), so no tilt is applied there
-OLDEST_MEASURED_MORTALITY_AGE = 45
-# ages 1-4 take the under-five tilt; age 0 is handled by infmort_gradient
-UNDER_FIVE_AGES = (1, 5)
-# The adult-mortality gradient steepens as a country gets richer. The
-# library's income rule (general_gradient.csv, fitted on 17 censuses between
-# about $200 and $10,000 of GNI per head, r = -0.88) is
-#     tilt(45q15) = 1.291 - 0.2443 ln(GNI per capita, current US$),
-# and Ethiopia's census measurement is from 2007, when GNI per head was a
-# fifth of today's. The measured tilts are therefore shifted by the rule's
-# change since the census year, and keep shifting along the model's own
-# per-capita growth, capped where the rule's fit ends.
-INCOME_RULE_SLOPE = -0.2443
-INCOME_RULE_MAX_GNI = 10000.0
-# World Bank Atlas GNI per capita, current US$ (NY.GNP.PCAP.CD)
-GNI_PER_CAPITA = {2007: 210.0, 2024: 1100.0}
+# The library's pooled fertility offsets by age of mother (added to the TFR
+# gradient so that the timing of births differs across groups, not only
+# their number) and its general-gradient file: the income rule for the
+# 45q15 gradient and the offsets by age band added to it
+FERTILITY_OFFSET_FILE = os.path.join(
+    CUR_PATH, "data", "demographic_fertility_age_offsets.csv"
+)
+GENERAL_GRADIENT_FILE = os.path.join(
+    CUR_PATH, "data", "demographic_general_gradient.csv"
+)
+# OG-Core reads a log-odds slope per centered percentile point, so a
+# library gradient g at a rate p is passed as g / (100 (1 - p)), p being
+# OG-Core's own rate at that age and year (births per person per year for
+# fertility, the annual probability of death for mortality); see the
+# library's calibration guide, "Converting a gradient to OG-Core's units"
+PERCENT = 100.0
+# ages 1-4 take the child-mortality gradient; age 0 is infmort_gradient
+CHILD_AGES = (1, 5)
+# the 45q15 gradient plus the band offsets sets ages 5-59 (5-14 take the
+# 15-29 value); from 60 the 45-59 value falls in a straight line to 0 at 75,
+# and it is 0 from 75 on (the library's recipe; the measured 60-74 band is
+# not used)
+ADULT_BANDS = ((5, 30, "15-29"), (30, 45, "30-44"), (45, 60, "45-59"))
+TAPER_AGES = (60, 75)
+# The adult-mortality gradient steepens as a country gets richer: the
+# library's income rule is
+#     gradient(45q15) = intercept + slope ln(GDP per capita, PPP, constant
+#                       2021 international $; World Bank NY.GDP.PCAP.PP.KD),
+# fitted on GDP per capita between about $1,100 and $18,000 and not
+# extrapolated beyond. Ethiopia's measurement is from the 2007 census, so
+# the measured gradient is shifted by the rule's change since 2007 and keeps
+# shifting along the model's growth path, held where the rule's range ends.
+# (The library also allows holding it fixed; its ruling on the choice is
+# pending, and the two bracket the treatment.)
 CENSUS_YEAR = 2007
-GNI_LATEST_YEAR = 2024
-# the rule describes mortality between 15 and 60, so the shift is applied
-# at those ages only
-INCOME_RULE_AGES = (15, 60)
+GDP_PPP_PER_CAPITA = {2007: 1109.14, 2025: 3094.87}
+GDP_LATEST_YEAR = 2025
+INCOME_RULE_MAX_GDP = 18000.0
 
 
-def measured_mortality_gradient(E, S, df):
+def _library_tables(path, offset_path, general_path):
+    df = pd.read_csv(path)
+    offsets = pd.read_csv(offset_path)
+    general = pd.read_csv(general_path)
+    rule = general[general.component == "income_rule"].set_index("key").value
+    band = general[general.component == "age_offset"].set_index("key").value
+    return df, offsets, rule, band
+
+
+def _gradient(df, indicator, path):
+    rows = df[df.indicator == indicator]
+    if rows.empty:
+        raise ValueError(f"No {indicator} gradient in {path}")
+    return float(rows.slope.iloc[0])
+
+
+def fertility_gradient_by_age(E, S, df, offsets, path=GRADIENT_FILE):
     """
-    The census adult-mortality tilts by single age, at the census year.
-
-    Args:
-        E (int): age at which agents become economically active
-        S (int): number of model periods in a lifetime
-        df (Pandas DataFrame): the library's Ethiopian rows
+    The library's fertility gradient by single age: the TFR gradient plus
+    the pooled offset of the age group (ages below 15 take the 15-19
+    offset, ages 50 and above the 45-49 offset), in the library's units.
 
     Returns:
-        mort (Numpy array): gradient by age, length E+S, on OG-Core's scale
+        Numpy array: length E+S
+    """
+    ages = np.arange(E + S)
+    tfr = _gradient(df, "TFR", path)
+    off = offsets.sort_values("age_lo")
+    lo, val = off.age_lo.to_numpy(), off.offset.to_numpy()
+    idx = np.clip(np.searchsorted(lo, ages, side="right") - 1, 0, len(lo) - 1)
+    return tfr + val[idx]
 
+
+def mortality_gradient_by_age(E, S, df, band, shift=0.0, path=GRADIENT_FILE):
+    """
+    The library's mortality gradient by single age, in the library's units:
+    0 at age 0 (infant mortality is separate), the child-mortality gradient
+    at ages 1-4, the 45q15 gradient (plus ``shift``) plus the band offsets
+    at ages 5-59, a straight-line fall from the 45-59 value at 60 to 0 at
+    75, and 0 from 75 on.
+
+    Returns:
+        Numpy array: length E+S
     """
     ages = np.arange(E + S)
     mort = np.zeros(E + S)
-    u5 = df[df.indicator == "U5MR"]
-    if not u5.empty:
-        mort[(ages >= UNDER_FIVE_AGES[0]) & (ages < UNDER_FIVE_AGES[1])] = (
-            float(u5.slope.iloc[0]) * TILT_PER_PERCENTILE
-        )
-    bands = df[(df.indicator == "AMR") & (df.measure == "mx")]
-    for row in bands.itertuples():
-        if row.age_lo >= OLDEST_MEASURED_MORTALITY_AGE:
-            continue
-        sel = (ages >= row.age_lo) & (ages <= row.age_hi)
-        mort[sel] = float(row.slope) * TILT_PER_PERCENTILE
+    mort[(ages >= CHILD_AGES[0]) & (ages < CHILD_AGES[1])] = _gradient(
+        df, "CMR", path
+    )
+    adult = df[(df.indicator == "AMR") & (df.measure == "45q15")]
+    if adult.empty:
+        raise ValueError(f"No 45q15 adult-mortality gradient in {path}")
+    g45 = float(adult.slope.iloc[0]) + shift
+    for lo, hi, key in ADULT_BANDS:
+        mort[(ages >= lo) & (ages < hi)] = g45 + float(band[key])
+    top = g45 + float(band["45-59"])
+    taper = (ages >= TAPER_AGES[0]) & (ages < TAPER_AGES[1])
+    mort[taper] = (
+        top * (TAPER_AGES[1] - ages[taper]) / (TAPER_AGES[1] - TAPER_AGES[0])
+    )
     return mort
 
 
-def mortality_gradient_path(mort, T, S, start_year, g_y_annual):
+def income_rule_shift(years, g_y_annual, rule):
     """
-    Spread the census-year mortality gradient over the model's time path,
-    steepening it with income per head along the library's income rule.
-
-    Args:
-        mort (Numpy array): gradient by age at the census year, length E+S
-        T (int): number of periods in the transition path
-        S (int): number of model periods in a lifetime
-        start_year (int): calendar year of the first model period
-        g_y_annual (float): annual growth of income per head
-
-    Returns:
-        path (Numpy array): gradient by period and age, size (T+S, E+S)
-
+    Change in the 45q15 gradient since the census year along the income
+    rule, with GDP per head growing at g_y_annual from its latest value and
+    held at the top of the rule's range.
     """
-    years = start_year + np.arange(T + S)
-    gni = GNI_PER_CAPITA[GNI_LATEST_YEAR] * (1 + g_y_annual) ** (
-        years - GNI_LATEST_YEAR
+    years = np.asarray(years, dtype=float)
+    gdp = GDP_PPP_PER_CAPITA[GDP_LATEST_YEAR] * (1 + g_y_annual) ** (
+        years - GDP_LATEST_YEAR
     )
-    gni = np.minimum(gni, INCOME_RULE_MAX_GNI)
-    shift = (
-        INCOME_RULE_SLOPE
-        * np.log(gni / GNI_PER_CAPITA[CENSUS_YEAR])
-        * TILT_PER_PERCENTILE
+    gdp = np.minimum(gdp, INCOME_RULE_MAX_GDP)
+    return float(rule["slope_ln_income"]) * np.log(
+        gdp / GDP_PPP_PER_CAPITA[CENSUS_YEAR]
     )
-    ages = np.arange(mort.shape[0])
-    adult = (ages >= INCOME_RULE_AGES[0]) & (ages < INCOME_RULE_AGES[1])
-    path = np.tile(mort, (T + S, 1))
-    path[:, adult] += shift.reshape(-1, 1)
-    return path
+
+
+def to_ogcore_units(gradient, rate):
+    """
+    gradient / (100 (1 - p)); 0 where the rate is 1 (OG-Core's final age).
+    """
+    rate = np.asarray(rate, dtype=float)
+    out = np.zeros(np.broadcast(gradient, rate).shape)
+    ok = rate < 1.0
+    g = np.broadcast_to(gradient, out.shape)
+    p = np.broadcast_to(rate, out.shape)
+    out[ok] = g[ok] / (PERCENT * (1 - p[ok]))
+    return out
 
 
 def demographic_gradients(
-    E, S, T=None, start_year=None, g_y_annual=None, path=GRADIENT_FILE
+    E,
+    S,
+    T=None,
+    start_year=None,
+    g_y_annual=None,
+    rates=None,
+    path=GRADIENT_FILE,
+    offset_path=FERTILITY_OFFSET_FILE,
+    general_path=GENERAL_GRADIENT_FILE,
 ):
     """
     Income gradients in fertility and mortality for OG-Core's demographics,
-    read from the packaged Ethiopian rows of the Demographic-Gradients
-    library and converted to OG-Core's per-percentile-point scale.
-
-    Model periods are years, so the mortality gradient is built by single
-    age from 0 to E+S-1. When T, start_year and g_y_annual are given it is
-    also spread over the T+S periods of the population path, steepening
-    with income per head; otherwise it is the census-year gradient.
+    from the Demographic-Gradients library's values for Ethiopia, by age
+    and year, in OG-Core's units.
 
     Args:
         E (int): age at which agents become economically active
@@ -132,31 +179,88 @@ def demographic_gradients(
         T (int): number of periods in the transition path
         start_year (int): calendar year of the first model period
         g_y_annual (float): annual growth of income per head
-        path (str): CSV with the library's rows for Ethiopia
+        rates (dict): OG-Core's own rates on the rows of its rate paths
+            (``demographic_rates``): ``fert`` and ``mort`` (n, E+S),
+            ``infmort`` (n,), and ``first_year`` of the first row. Without
+            them the conversion takes p = 0 (division by 100 only) and the
+            gradients are those of the census year.
+        path, offset_path, general_path (str): the library's tables
 
     Returns:
-        gradients (dict): fert_gradient and infmort_gradient (scalars) and
-            mort_gradient (length E+S, or size (T+S, E+S) with a time
-            path), ready for get_pop_objs
-
+        gradients (dict): fert_gradient, mort_gradient (period by age, or
+            by age without rates) and infmort_gradient (by period, or a
+            scalar without rates), ready for get_pop_objs
     """
-    df = pd.read_csv(path)
-
-    def tilt(indicator):
-        rows = df[df.indicator == indicator]
-        if rows.empty:
-            raise ValueError(f"No {indicator} gradient in {path}")
-        return float(rows.slope.iloc[0]) * TILT_PER_PERCENTILE
-
-    mort = measured_mortality_gradient(E, S, df)
-    if T is not None:
-        mort = mortality_gradient_path(
-            mort, int(T), S, int(start_year), float(g_y_annual)
-        )
+    df, offsets, rule, band = _library_tables(path, offset_path, general_path)
+    fert = fertility_gradient_by_age(E, S, df, offsets, path)
+    infmort = _gradient(df, "IMR", path)
+    if rates is None:
+        return {
+            "fert_gradient": fert / PERCENT,
+            "infmort_gradient": infmort / PERCENT,
+            "mort_gradient": mortality_gradient_by_age(
+                E, S, df, band, 0.0, path
+            )
+            / PERCENT,
+        }
+    years = rates["first_year"] + np.arange(rates["fert"].shape[0])
+    if g_y_annual is None:
+        shifts = np.zeros(len(years))
+    else:
+        shifts = income_rule_shift(years, g_y_annual, rule)
+    mort = np.vstack(
+        [mortality_gradient_by_age(E, S, df, band, s, path) for s in shifts]
+    )
+    mort[:, -1] = 0.0  # final age: everyone dies
     return {
-        "fert_gradient": tilt("TFR"),
-        "infmort_gradient": tilt("IMR"),
-        "mort_gradient": mort,
+        "fert_gradient": to_ogcore_units(fert.reshape(1, -1), rates["fert"]),
+        "infmort_gradient": to_ogcore_units(infmort, rates["infmort"]),
+        "mort_gradient": to_ogcore_units(mort, rates["mort"]),
+    }
+
+
+def demographic_rates(E, S, T, start_year, download_path=None):
+    """
+    OG-Core's own fertility and mortality rates on the rows of the rate
+    paths get_pop_objs builds (from start_year - 2, the year before the
+    initial data year, to DEMOG_FINAL_DATA_YEAR, then the last year held to
+    T + S rows), so that each gradient is converted at the rate it is
+    applied to.
+    """
+    from ogcore import demographics
+
+    first = start_year - 2
+    fert = demographics.get_fert(
+        E + S,
+        0,
+        99,
+        UN_COUNTRY_CODE,
+        first,
+        DEMOG_FINAL_DATA_YEAR,
+        download_path=download_path,
+    )
+    mort, infmort = demographics.get_mort(
+        E + S,
+        0,
+        99,
+        UN_COUNTRY_CODE,
+        first,
+        DEMOG_FINAL_DATA_YEAR,
+        download_path=download_path,
+    )
+
+    def hold(x):
+        x = np.asarray(x, dtype=float)
+        n = T + S - x.shape[0]
+        if n <= 0:
+            return x[: T + S]
+        return np.concatenate([x, np.repeat(x[-1:], n, axis=0)], axis=0)
+
+    return {
+        "fert": hold(fert),
+        "mort": hold(mort),
+        "infmort": hold(np.asarray(infmort).reshape(-1)),
+        "first_year": first,
     }
 
 
@@ -284,7 +388,16 @@ class Calibration:
             income_percentiles=p.lambdas.flatten(),
             GraphDiag=False,
             download_path=demographic_data_path,
-            **demographic_gradients(p.E, p.S, p.T, p.start_year, p.g_y_annual),
+            **demographic_gradients(
+                p.E,
+                p.S,
+                p.T,
+                p.start_year,
+                p.g_y_annual,
+                rates=demographic_rates(
+                    p.E, p.S, p.T, p.start_year, demographic_data_path
+                ),
+            ),
         )
 
         # earnings profiles, reshaped with Ethiopian data and scaled on

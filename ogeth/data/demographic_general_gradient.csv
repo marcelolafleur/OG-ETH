@@ -1,0 +1,24 @@
+component,key,value,note
+income_rule,intercept,2.9747,"tilt_45q15 = intercept + slope_ln_income * ln(GDP per capita, PPP, constant 2021 international $; World Bank NY.GDP.PCAP.PP.KD)"
+income_rule,slope_ln_income,-0.4324,
+income_rule,se_intercept,0.7639,"standard error, OLS"
+income_rule,se_slope,0.0909,"standard error, OLS"
+income_rule,slope_ci95_lo,-0.6241,"95% confidence interval, Student's t with n - 2 df"
+income_rule,slope_ci95_hi,-0.2407,
+income_rule,se_slope_cluster,0.0983,sensitivity: slope standard error clustered by country
+income_rule,residual_sd,0.3177,"residual standard error, n - 2 df"
+income_rule,mean_ln_income,8.3688,for the prediction interval (see the script docstring)
+income_rule,sxx_ln_income,12.2284,sum of squared deviations of ln income
+income_rule,t_95,2.1098,"Student's t, 0.975 quantile, n - 2 df"
+income_rule,r,-0.756,
+income_rule,n_observations,19.0,censuses and surveys in the fit
+validation,loo_mae_income,0.2716,leave-one-out mean absolute error of the chosen rule
+fallback,pooled_median_tilt,-0.5818,use when income is unavailable
+age_offset,15-29,-0.4063,add to the 45q15 tilt to get this band's tilt
+age_offset,30-44,-0.18,add to the 45q15 tilt to get this band's tilt
+age_offset,45-59,0.2069,add to the 45q15 tilt to get this band's tilt
+age_offset,60-74,0.4098,add to the 45q15 tilt to get this band's tilt
+validation,age_offset_mae,0.15,"median abs error of (45q15 tilt + offset) vs a measured band tilt, offsets estimated leaving the country out"
+validation,loo_mae_rule_constant,0.4025,
+validation,loo_mae_rule_income,0.2716,
+validation,loo_mae_rule_region,0.4263,
