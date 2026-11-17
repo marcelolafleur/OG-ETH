@@ -10,8 +10,8 @@ its own target:
 
     dial                               moment (ogeth/targets.py)
     chi_n by age                       hours per person by age (LFMS 2021), SS
-    beta_annual across groups          WID 2021 wealth shares, SS
-    beta_annual level                  SS r at the world rate
+    beta_annual (one value, all groups) SS r at the world rate
+    initial_hhwealth_dist              burn-in: the shape chosen in period 0
     zeta_K                             K_f/K in FY2024/25
     compliance scale                   PIT/Y in FY2024/25
     adjustment_factor_for_cit_receipts CIT/Y in FY2024/25
@@ -46,9 +46,9 @@ from ogcore.execute import runner
 from ogcore.parameters import Specifications
 from ogcore.utils import safe_read_pickle
 
-from ogeth import income, labor
+from ogeth import income, initial_wealth, labor
 from ogeth import macro_params as mp
-from ogeth.calibrate import BETA_BOUNDS, BETA_DAMPING, BETA_STEP
+from ogeth.calibrate import BETA_BOUNDS
 from ogeth.targets import SS_TARGETS, TRANSITION_TARGETS, ss_moments
 from ogeth.targets import tpi_moments
 from ogeth.warm_start import enable, solve_ss_from
@@ -61,14 +61,6 @@ from ogeth.warm_start import enable, solve_ss_from
 # that slope times the return gap, damped and bounded.
 R_LEVEL_SLOPE = 2.8
 LEVEL_DAMPING = 0.8
-# bequest weight of the floored group: the share responds less than one for
-# one, so a full-ratio step bounded at a factor of two per solve
-CHI_B_DAMPING = 1.0
-CHI_B_STEP = 2.0
-CHI_B_BOUNDS = (0.01, 10000.0)
-# halving the wealth-share damping on every sign change stops here, so a
-# group that oscillated early can still close its gap
-BETA_DAMPING_FLOOR = 0.05
 LEVEL_STEP = 1.04
 DIAL_BOUNDS = (0.5, 2.0)
 
@@ -105,7 +97,7 @@ def scales_from(p):
     }
 
 
-def next_overrides(p, ss, tm, state=None):
+def next_overrides(p, ss, tm, tpi=None):
     """
     The dial values for the next iteration.
 
@@ -113,8 +105,8 @@ def next_overrides(p, ss, tm, state=None):
         p (Specifications): parameters just solved
         ss (dict): solved steady state
         tm (dict): first-period transition moments (may be None)
-        state (dict): the wealth-share step state carried between runs
-            (per-group damping and the sign of each group's last gap)
+        tpi (dict): the solved transition (may be None); with it the
+            initial wealth distribution takes one burn-in step
 
     Returns:
         dict: overrides for the next tune.py run
@@ -126,62 +118,15 @@ def next_overrides(p, ss, tm, state=None):
     chi_n = np.asarray(p.chi_n, dtype=float)
     chi_n = chi_n[-1] if chi_n.ndim > 1 else chi_n
     out["chi_n"] = labor.chi_n_step(chi_n, n_model, n_target, p).tolist()
-    # wealth shares across groups: damped step, floored groups tied to the
-    # nearest fitted group
+    # One discount factor for every group. The WID wealth shares for
+    # Ethiopia are imputed (from income inequality and similar countries,
+    # WID technical notes 2023/2025), not measured; matching them forced
+    # patience above one for the richest group and to 0.5 for the poorest.
+    # Wealth inequality is an outcome of measured earnings dispersion and
+    # bequests, reported against WID as a check. chi_b keeps its values.
     lambdas = np.asarray(p.lambdas).flatten()
-    target = income.wealth_share_targets(lambdas)
-    fit = target > income.WEALTH_SHARE_FLOOR
-    model = income.implied_wealth_shares(np.asarray(ss["b_s"]), p.omega_SS)
     beta = np.asarray(p.beta_annual, dtype=float).flatten()
-    # A group's wealth share is very elastic to its own beta and the shares
-    # interact through r, so a fixed step overshoots and oscillates: each
-    # group's damping halves whenever its gap changes sign between runs.
-    state = state or {}
-    damping = np.asarray(
-        state.get("damping", [BETA_DAMPING] * len(beta)), dtype=float
-    )
-    sign = np.sign(target - model)
-    if "sign" in state:
-        damping = np.where(
-            sign * np.asarray(state["sign"]) < 0,
-            np.maximum(damping / 2, BETA_DAMPING_FLOOR),
-            damping,
-        )
-    bound = BETA_STEP ** (damping / BETA_DAMPING)
-    step = np.clip((target / model) ** damping, 1 / bound, bound)
-    # the wealth-share step moves relative patience only: the level is
-    # restored as the geometric mean weighted by each group's share of
-    # wealth, because saving, and so the return, answers to the patience of
-    # the groups that hold the wealth. Weighting by population let the step
-    # raise the richest groups' patience on net and cancel most of the
-    # level step toward the world rate.
-    w = np.clip(model, 1e-6, None)
-    w = w / w.sum()
-    level = np.exp(np.dot(w, np.log(beta)))
-    beta = beta * np.where(fit, step, 1.0)
-    beta = beta * level / np.exp(np.dot(w, np.log(beta)))
-    fitted = np.flatnonzero(fit)
-    for j in np.flatnonzero(~fit):
-        beta[j] = beta[fitted[np.argmin(np.abs(fitted - j))]]
-    # A floored group (the bottom quarter, a net debtor in the data) shares
-    # its neighbour's patience, and its own wealth share is matched with its
-    # bequest weight: with OG-USA's chi_b = 80 the poorest elderly, whose
-    # transfers and remittances far exceed their consumption, save nearly
-    # all of them for bequests, which both overstates the group's wealth and
-    # leaves their first-year problem badly conditioned.
-    chi_b = np.asarray(p.chi_b, dtype=float).flatten().copy()
-    floored = ~fit
-    chi_b[floored] = np.clip(
-        chi_b[floored]
-        * np.clip(
-            (target[floored] / model[floored]) ** CHI_B_DAMPING,
-            1 / CHI_B_STEP,
-            CHI_B_STEP,
-        ),
-        CHI_B_BOUNDS[0],
-        CHI_B_BOUNDS[1],
-    )
-    out["chi_b"] = chi_b.tolist()
+    beta = np.full_like(beta, np.exp(np.dot(lambdas, np.log(beta))))
     # level of patience: the steady-state return at the world rate (lower
     # patience, less saving, a higher return)
     r_gap = SS_TARGETS["r"][0] - float(np.squeeze(ss["r"]))
@@ -245,7 +190,11 @@ def next_overrides(p, ss, tm, state=None):
     )
     out.update(mp.payroll_tax_params(sc["payroll"]))
     out["_scales"] = sc
-    out["_beta_state"] = {"damping": damping.tolist(), "sign": sign.tolist()}
+    if tpi is not None:
+        # burn-in of the initial wealth distribution (ogeth/initial_wealth)
+        out["initial_hhwealth_dist"] = initial_wealth.burn_in_dist(
+            tpi, np.asarray(p.omega)[0]
+        ).tolist()
     return out
 
 
@@ -274,13 +223,12 @@ def main():
     ) as file:
         p.update_specifications(json.load(file))
     overrides = {}
-    beta_state = None
     if args.overrides:
         with open(args.overrides) as f:
             overrides = json.load(f)
         overrides.pop("_scales", None)
         overrides.pop("_r_ss", None)
-        beta_state = overrides.pop("_beta_state", None)
+        overrides.pop("_beta_state", None)
         p.update_specifications(overrides)
     print(f"label {args.label}; overrides: {sorted(overrides)}", flush=True)
 
@@ -298,6 +246,7 @@ def main():
     client.close()
 
     tm = None
+    tpi = None
     if args.tpi:
         tpi = safe_read_pickle(os.path.join(out, "TPI", "TPI_vars.pkl"))
         tm = tpi_moments(tpi)
@@ -306,6 +255,11 @@ def main():
             print(f"{k:20s} {tm[k]:8.4f} {target:8.4f}  {dial}")
         for k in sorted(set(tm) - set(TRANSITION_TARGETS)):
             print(f"{k:20s} {tm[k]:8.4f}")
+        omega0 = np.asarray(p.omega)[0]
+        print(
+            "initial wealth shape gap (period-0 choice vs start) "
+            f"{initial_wealth.shape_gap(tpi, omega0):.3f}"
+        )
 
     model = ss_moments(ss)
     n_target = labor.labor_supply_target(p.E, p.S, p.ltilde)
@@ -350,7 +304,7 @@ def main():
         # every override of this run carries forward, the dials replaced by
         # their next values, so a tuning sequence is one tune.py call per
         # step with nothing to merge by hand
-        nxt = {**overrides, **next_overrides(p, ss, tm, beta_state)}
+        nxt = {**overrides, **next_overrides(p, ss, tm, tpi)}
         with open(args.next, "w") as f:
             json.dump(nxt, f, default=float)
         print(f"next overrides -> {args.next}; scales {nxt['_scales']}")
