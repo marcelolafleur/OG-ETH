@@ -114,6 +114,7 @@ def test_calibration_passes_gradients_to_demographics():
     demog = {"omega_SS": omega, "g_n": np.full(400, 0.02)}
     with patch("ogeth.calibrate.macro_params") as mock_macro:
         mock_macro.get_macro_params.return_value = {}
+        mock_macro.EARNINGS_SCALE = 1.0
         mock_macro.derive_remittance_params.return_value = {}
         mock_macro.transfer_eta.return_value = np.zeros((80, 7))
         with patch("ogeth.calibrate.demographic_rates") as mock_rates:

@@ -50,17 +50,20 @@ FRISCH = 0.25
 # corrected evidence; OG-Core caps sigma at 2.0, so this needs the raised
 # bound of the pinned OG-Core build.
 SIGMA = 3.0
-# Level of total factor productivity, a normalization of the model's units.
-# With CRRA preferences, scaling every income by k leaves the Euler and
-# bequest conditions unchanged and multiplies the chi_n the labor condition
-# needs by k^(1 - sigma). At sigma 3 with Z = 1, model consumption is about
-# 0.05-0.3 and chi_n would have to exceed OG-Core's bound of 10,000 at every
-# age; Z = 5 (OG-Core's upper bound) raises model incomes about 8.6 times
-# and brings chi_n back inside it. A steady-state probe at sigma 1.5 (Z 1
-# against 3, chi_n rescaled) scaled every aggregate by 4.25-4.42 against
-# 4.34 predicted, with hours unchanged: a near-normalization, the residual
-# (a return 0.13 point higher) absorbed by the tuned dials.
-Z_NORMALIZATION = 5.0
+# Units of effective labor, a normalization. The earnings matrix e is
+# built with a population-weighted mean of one; multiplying it by k scales
+# every income in the model by k, which leaves every equilibrium condition
+# unchanged except the labor condition, where the chi_n it needs scales by
+# k^(1 - sigma). At sigma 3 with k = 1, model consumption is about
+# 0.05-0.3 and chi_n would have to exceed OG-Core's bound of 10,000 at
+# every age. Production has constant returns in K, K_g and L, and OG-Core's
+# capital demand at the world rate is proportional to L, so the open-economy
+# block scales exactly too: a steady-state probe with e x 4 (and chi_n x
+# 4^(1-sigma)) reproduced r, K/Y, B/Y, C/Y, K_f/K and the wealth shares to
+# every printed digit. (Scaling productivity Z is not neutral: OG-Core's
+# capital demand at the world rate omits public capital, so Z moves the
+# foreign capital share.)
+EARNINGS_SCALE = 10.0
 
 # Window for the g_y_annual average-growth calculation: the mean of the
 # year-over-year GDP-per-capita growth rates for G_Y_START_YEAR through
@@ -2361,7 +2364,6 @@ def common_params():
             "r_gov_floor": R_GOV_FLOOR,
             "frisch": FRISCH,
             "sigma": SIGMA,
-            "Z": [[Z_NORMALIZATION]],
             "nu": NU,
             "TPI_outer_method": "anderson",
             "TPI_anderson_m": TPI_ANDERSON_M,

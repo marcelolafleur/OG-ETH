@@ -404,13 +404,16 @@ class Calibration:
 
         # earnings profiles, reshaped with Ethiopian data and scaled on
         # the model's own joint age-by-group population distribution
-        self.e = income.get_e_interp(
-            p.E,
-            p.S,
-            p.J,
-            p.lambdas,
-            self.demographic_params["omega_SS"],
-            plot_path=output_path,
+        self.e = (
+            income.get_e_interp(
+                p.E,
+                p.S,
+                p.J,
+                p.lambdas,
+                self.demographic_params["omega_SS"],
+                plot_path=output_path,
+            )
+            * macro_params.EARNINGS_SCALE
         )
 
         # the remittance growth path and allocation matrix are derived

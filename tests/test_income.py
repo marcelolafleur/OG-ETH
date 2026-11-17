@@ -208,8 +208,11 @@ def test_get_e_interp_alternative_targets(synthetic_usa_e):
 
 def test_packaged_e_is_the_reshaped_matrix(packaged):
     """The shipped e carries the WID group pattern and the NTA age pattern
-    and averages to one over the shipped population."""
-    e = np.asarray(packaged["e"])
+    and averages to one over the shipped population, times the unit
+    normalization EARNINGS_SCALE."""
+    from ogeth import macro_params as mp
+
+    e = np.asarray(packaged["e"]) / mp.EARNINGS_SCALE
     omega = np.asarray(packaged["omega_SS"])
     lambdas = np.asarray(packaged["lambdas"])
     assert e.shape == (80, 7)
