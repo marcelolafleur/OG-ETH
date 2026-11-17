@@ -34,6 +34,23 @@ TPI_ANDERSON_BETA = 1.0
 # little. Range 0.15-0.4.
 FRISCH = 0.25
 
+# Coefficient of relative risk aversion, the inverse of the intertemporal
+# elasticity of substitution (EIS). OG-Core's households face no income
+# risk, so sigma acts as 1/EIS. Corrected for publication bias, the EIS of
+# households with assets is about 0.36 (95 percent interval 0.33-0.39) and
+# the preferred value 1/3 (Havranek 2015, JEEA 13(6)); calibrations with
+# an EIS above 0.8 are inconsistent with the evidence. Near subsistence the
+# EIS is lower still (Ogaki, Ostry and Reinhart 1996, IMF Staff Papers): with
+# EIS = 0.36 (1 - c_min / c) and c_min the cost of an energy-sufficient diet
+# (World Bank/FAO Food Prices for Nutrition 2021), Ethiopia's sigma is about
+# 3.4 today, falling toward 2.8 as consumption grows; the richer groups that
+# hold the capital are at 2.8-2.9. One constant for the whole horizon: 3.0.
+# Working value, pending Marcelo's decision (sigma-evidence analysis in
+# ~/Projects/og-issue-drafts/sigma-evidence). OG-USA's 1.5 is outside the
+# corrected evidence; OG-Core caps sigma at 2.0, so this needs the raised
+# bound of the pinned OG-Core build.
+SIGMA = 3.0
+
 # Window for the g_y_annual average-growth calculation: the mean of the
 # year-over-year GDP-per-capita growth rates for G_Y_START_YEAR through
 # G_Y_END_YEAR (inclusive). We use the post-2015 decade rather than the
@@ -2324,6 +2341,7 @@ def common_params():
             "initial_wealth_ratio": INITIAL_WEALTH_RATIO,
             "r_gov_floor": R_GOV_FLOOR,
             "frisch": FRISCH,
+            "sigma": SIGMA,
             "nu": NU,
             "TPI_outer_method": "anderson",
             "TPI_anderson_m": TPI_ANDERSON_M,
