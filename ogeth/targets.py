@@ -108,10 +108,13 @@ TRANSITION_TARGETS = {
         "private consumption 64.4 percent of rebased GDP",
     ),
     "G/Y": (
-        mp.GOVERNMENT_CONSUMPTION_REBASED / 100,
+        mp.GOVERNMENT_CONSUMPTION_SHARE,
         "check",
-        "government consumption, derived from the rebased accounts (about "
-        "4.7); the fiscal-accounts mapping gives 2.8",
+        "government final consumption 881.4 bn birr (NBE Q4 Report "
+        "2024/25, Table 20) over rebased GDP; model G plus depreciation of "
+        "recorded public capital, as in the national accounts. The "
+        "derived 4.7 also holds non-profit institutions and the "
+        "statistical discrepancy",
     ),
     "NX/Y": (
         mp.IMF_TRADE_BALANCE[0] / 100,
@@ -148,6 +151,16 @@ SS_TARGETS = {
     "r": (mp.WORLD_INT_RATE_ANNUAL, "discount factor level"),
     "K/Y": (mp.PRIVATE_CAPITAL_OUTPUT_RATIO, "outcome (provisional anchor)"),
 }
+
+
+def _cfc_g(k_g):
+    """
+    Consumption of fixed capital on public capital as the national accounts
+    record it: depreciation on the stock at cost. The model's K_g is in
+    efficiency units (netted by the PIMA efficiency gap), so the recorded
+    stock is K_g over the efficiency.
+    """
+    return mp.DELTA_G_ANNUAL * k_g / (1 - mp.PUBLIC_INVESTMENT_EFFICIENCY_GAP)
 
 
 def _market_y(y, cons_tax):
@@ -189,7 +202,7 @@ def tpi_moments(tpi, t=0):
         "B/Y": at("B") / Y,
         "D/Y": (at("D") + at("D_ext")) / Y,
         "C/Y purch.": (at("C") + at("cons_tax_revenue")) / Y,
-        "G/Y": at("G") / Y,
+        "G/Y": (at("G") + _cfc_g(at("K_g"))) / Y,
         "NX/Y": nx / Y,
         "RM/Y": at("RM") / Y,
         "factor payments/Y": (
@@ -233,7 +246,7 @@ def ss_moments(ss):
         "D/Y": (sc("D") + sc("D_ext")) / Y,
         "D market/Y": sc("D") / Y,
         "D_f/D": sc("D_f") / sc("D") if sc("D") else np.nan,
-        "G/Y": sc("G") / Y,
+        "G/Y": (sc("G") + _cfc_g(sc("K_g"))) / Y,
         "TR/Y": sc("TR") / Y,
         "I_g/Y": sc("I_g") / Y,
         "(I+I_g)/Y": (sc("I_total") + sc("I_g")) / Y,

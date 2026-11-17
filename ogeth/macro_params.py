@@ -834,6 +834,22 @@ DSA_MARGINAL_DOMESTIC_REAL_RATES = (4.9, 4.5)
 PRIVATE_CONSUMPTION_REBASED = 64.4
 GROSS_CAPITAL_FORMATION_REBASED = 35.3
 GOVERNMENT_CONSUMPTION_REBASED = 4.7
+# The 4.7 above is a residual (GDP less private consumption, capital
+# formation and net exports), so it also holds the non-profit institutions
+# serving households and any statistical discrepancy; the rebasing has not
+# published government consumption itself. The measured series is the
+# NBE's government final consumption expenditure, FY2024/25, 881.4 billion
+# birr at current prices (NBE Fourth Quarter Report 2024/25, Table 20; the
+# rebasing note names capital formation, private consumption and
+# non-profit coverage as the revised components). National-accounts
+# government consumption includes the consumption of fixed capital on
+# public capital, an imputed cost the model does not count in G, so the
+# model moment adds delta_g times K_g (ogeth/targets.py).
+GOVERNMENT_CONSUMPTION_BIRR_BN = 881.4
+GOVERNMENT_CONSUMPTION_SHARE = round(
+    GOVERNMENT_CONSUMPTION_BIRR_BN / NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"],
+    5,
+)
 
 # Price basis. OG-Core's output Y is GDP at producer prices: the consumption
 # tax is collected on top of it, so GDP at market prices, the basis of every
