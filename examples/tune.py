@@ -149,12 +149,17 @@ def next_overrides(p, ss, tm, state=None):
         )
     bound = BETA_STEP ** (damping / BETA_DAMPING)
     step = np.clip((target / model) ** damping, 1 / bound, bound)
-    level = np.exp(np.dot(lambdas, np.log(beta)))
+    # the wealth-share step moves relative patience only: the level is
+    # restored as the geometric mean weighted by each group's share of
+    # wealth, because saving, and so the return, answers to the patience of
+    # the groups that hold the wealth. Weighting by population let the step
+    # raise the richest groups' patience on net and cancel most of the
+    # level step toward the world rate.
+    w = np.clip(model, 1e-6, None)
+    w = w / w.sum()
+    level = np.exp(np.dot(w, np.log(beta)))
     beta = beta * np.where(fit, step, 1.0)
-    # the wealth-share step moves relative patience only: the level (the
-    # population-weighted geometric mean) is restored, so it answers to
-    # the long-run return alone
-    beta = beta * level / np.exp(np.dot(lambdas, np.log(beta)))
+    beta = beta * level / np.exp(np.dot(w, np.log(beta)))
     fitted = np.flatnonzero(fit)
     for j in np.flatnonzero(~fit):
         beta[j] = beta[fitted[np.argmin(np.abs(fitted - j))]]
