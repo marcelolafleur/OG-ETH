@@ -43,11 +43,12 @@ FRISCH = 0.25
 # EIS of poor households comes from the subsistence floor below rather than
 # from sigma: with Stone-Geary preferences the EIS of total consumption is
 # (1/sigma)(1 - c_min/c) (Ogaki, Ostry and Reinhart 1996, IMF Staff Papers),
-# so the effective sigma is about 1.7 at mean consumption and about 2.8 for
-# the poorest group. A sigma of 3 for everyone (the earlier working value)
-# put that curvature on the richer households too, where with 4.7 percent
-# growth it made them borrow against higher future income in the model's
-# Euler condition, which pushed patience to its bound; the ESS 2021/22
+# so in the solved steady state the effective sigma is 1.63 at mean
+# consumption and 2.2 for the poorest group (the floor is 32 percent of its
+# consumption), against 1.5 for the richest. A sigma of 3 for everyone
+# (the earlier working value) put that curvature on the richer households
+# too, where with 4.7 percent growth it made them want to consume against
+# higher future income, which pushed patience to its bound; the ESS 2021/22
 # shows credit is informal and saving is precautionary (80 percent of
 # savers save for emergencies, 0.9 percent for old age).
 SIGMA = 1.5

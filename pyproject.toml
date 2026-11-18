@@ -119,9 +119,7 @@ ogeth = { workspace = true, editable = true }
 # interest rate, alpha_D_ext and r_D_ext_annual, for Issue #1125): its
 # branch concessional-debt on marcelolafleur/OG-Core. uv-only; the PyPI
 # metadata above keeps ogcore>=0.24.5. Move to a release once #1279 merges.
-# Run branch for the sigma check: concessional-debt-sigma (sigma bound 5.0,
-# beta_annual bound 1.1).
-ogcore = { git = "https://github.com/marcelolafleur/OG-Core", rev = "f27f87da99645ac19e19adee55332b84bd0848fc" }
+ogcore = { git = "https://github.com/marcelolafleur/OG-Core", rev = "ad22ad92e10ee8f44888b56723e7fcc387a9925e" }
 
 [dependency-groups]
 dev = [
