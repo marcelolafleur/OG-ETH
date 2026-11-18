@@ -193,7 +193,7 @@ def next_overrides(p, ss, tm, tpi=None):
     if tpi is not None:
         # burn-in of the initial wealth distribution (ogeth/initial_wealth)
         out["initial_hhwealth_dist"] = initial_wealth.burn_in_dist(
-            tpi, np.asarray(p.omega)[0]
+            tpi, np.asarray(p.omega)[0], E=int(p.E)
         ).tolist()
     return out
 

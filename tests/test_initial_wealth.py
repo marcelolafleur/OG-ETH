@@ -17,10 +17,17 @@ def test_burn_in_dist_is_shares_of_wealth():
     dist = initial_wealth.burn_in_dist(_tpi(b, b), omega0)
     # a damped step lies between the start and the period-0 choice
     c = b * rng.uniform(0.5, 1.5, b.shape)
-    half = initial_wealth.burn_in_dist(_tpi(b, c), omega0, step=0.5)
+    half = initial_wealth.burn_in_dist(
+        _tpi(b, c), omega0, step=0.5, max_age=200
+    )
     start = b * omega0 / (b * omega0).sum()
     chosen = c * omega0 / (c * omega0).sum()
     assert np.allclose(half, (start + chosen) / 2)
+    # the oldest ages keep their starting shares
+    kept = initial_wealth.burn_in_dist(_tpi(b, c), omega0, step=0.5)
+    old = np.arange(21, 101) >= initial_wealth.BURN_IN_MAX_AGE
+    assert np.allclose(kept[old], start[old])
+    assert kept.sum() == pytest.approx(1.0)
     assert dist.shape == (80, 7)
     assert dist.sum() == pytest.approx(1.0)
     # OG-Core divides by the first-period population: that returns the

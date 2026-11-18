@@ -42,9 +42,17 @@ def per_person(b, omega):
 # feeding them back whole left the poorest group's oldest households so rich
 # that the transition stalled (75 iterations, against 17).
 BURN_IN_STEP = 0.3
+# The burn-in applies to life-cycle wealth only. From this age on, the
+# savings chosen in period 0 are mostly bequests (several times the
+# starting wealth at ages 98-100), and feeding them back raised the period-0
+# bequests the same group's young receive enough that a start cohort of the
+# poorest group failed to solve; the oldest ages keep the starting shape.
+BURN_IN_MAX_AGE = 80
 
 
-def burn_in_dist(tpi, omega0, step=BURN_IN_STEP):
+def burn_in_dist(
+    tpi, omega0, step=BURN_IN_STEP, E=20, max_age=BURN_IN_MAX_AGE
+):
     """
     One damped burn-in step for the starting shape: the shape that started
     the solved transition moved ``step`` of the way toward the savings
@@ -56,6 +64,9 @@ def burn_in_dist(tpi, omega0, step=BURN_IN_STEP):
             ``b_sp1``)
         omega0 (array_like): first-period population, (S, J)
         step (float): share of the way toward the period-0 choice
+        E (int): age at which households enter the model (row s is age
+            E + s + 1)
+        max_age (int): ages from this one keep the starting shape
 
     Returns:
         Numpy array: (S, J) shares summing to one
@@ -68,7 +79,16 @@ def burn_in_dist(tpi, omega0, step=BURN_IN_STEP):
 
     start = shares(tpi["b_sp1_preTP"])
     chosen = shares(np.asarray(tpi["b_sp1"])[0])
-    dist = (1 - step) * start + step * chosen
+    ages = E + 1 + np.arange(omega0.shape[0])
+    young = (ages < max_age).reshape(-1, 1)
+    # move the life-cycle cells and keep the oldest ages' starting wealth
+    # per person: the rescaling below then only spreads the change in the
+    # young cells' total
+    dist = np.where(young, (1 - step) * start + step * chosen, start)
+    # hold the life-cycle cells' total share at its start value, so the
+    # oldest ages' shares are unchanged
+    life = young.ravel()
+    dist[life] *= start[life].sum() / dist[life].sum()
     return dist / dist.sum()
 
 
