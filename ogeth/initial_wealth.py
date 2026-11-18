@@ -36,23 +36,40 @@ def per_person(b, omega):
     return b / mean
 
 
-def burn_in_dist(tpi, omega0):
+# Share of the way the starting shape moves toward the period-0 choice in
+# one burn-in step. A full step overshoots: the oldest cohorts' period-0
+# savings (mostly bequests) are several times their starting wealth, and
+# feeding them back whole left the poorest group's oldest households so rich
+# that the transition stalled (75 iterations, against 17).
+BURN_IN_STEP = 0.3
+
+
+def burn_in_dist(tpi, omega0, step=BURN_IN_STEP):
     """
-    The starting shape implied by the first period of a solved transition:
-    the savings households choose in period 0, as shares of the aggregate
-    weighted by the first-period population.
+    One damped burn-in step for the starting shape: the shape that started
+    the solved transition moved ``step`` of the way toward the savings
+    households chose in period 0, as shares of aggregate wealth weighted by
+    the first-period population.
 
     Args:
-        tpi (dict): a solved ``TPI_vars.pkl`` (needs ``b_sp1``)
+        tpi (dict): a solved ``TPI_vars.pkl`` (needs ``b_sp1_preTP`` and
+            ``b_sp1``)
         omega0 (array_like): first-period population, (S, J)
+        step (float): share of the way toward the period-0 choice
 
     Returns:
         Numpy array: (S, J) shares summing to one
     """
-    b0 = np.asarray(tpi["b_sp1"], dtype=float)[0]
     omega0 = np.asarray(omega0, dtype=float)
-    w = np.clip(b0, 0.0, None) * omega0
-    return w / w.sum()
+
+    def shares(b):
+        w = np.clip(np.asarray(b, dtype=float), 0.0, None) * omega0
+        return w / w.sum()
+
+    start = shares(tpi["b_sp1_preTP"])
+    chosen = shares(np.asarray(tpi["b_sp1"])[0])
+    dist = (1 - step) * start + step * chosen
+    return dist / dist.sum()
 
 
 def shape_gap(tpi, omega0, min_share=1e-3):

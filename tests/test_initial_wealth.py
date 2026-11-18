@@ -15,6 +15,12 @@ def test_burn_in_dist_is_shares_of_wealth():
     omega0 = rng.uniform(0.5, 1.5, (80, 7))
     b = rng.uniform(0.0, 2.0, (80, 7))
     dist = initial_wealth.burn_in_dist(_tpi(b, b), omega0)
+    # a damped step lies between the start and the period-0 choice
+    c = b * rng.uniform(0.5, 1.5, b.shape)
+    half = initial_wealth.burn_in_dist(_tpi(b, c), omega0, step=0.5)
+    start = b * omega0 / (b * omega0).sum()
+    chosen = c * omega0 / (c * omega0).sum()
+    assert np.allclose(half, (start + chosen) / 2)
     assert dist.shape == (80, 7)
     assert dist.sum() == pytest.approx(1.0)
     # OG-Core divides by the first-period population: that returns the
