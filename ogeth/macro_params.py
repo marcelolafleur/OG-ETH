@@ -35,21 +35,37 @@ TPI_ANDERSON_BETA = 1.0
 FRISCH = 0.25
 
 # Coefficient of relative risk aversion, the inverse of the intertemporal
-# elasticity of substitution (EIS). OG-Core's households face no income
-# risk, so sigma acts as 1/EIS. Corrected for publication bias, the EIS of
-# households with assets is about 0.36 (95 percent interval 0.33-0.39) and
-# the preferred value 1/3 (Havranek 2015, JEEA 13(6)); calibrations with
-# an EIS above 0.8 are inconsistent with the evidence. Near subsistence the
-# EIS is lower still (Ogaki, Ostry and Reinhart 1996, IMF Staff Papers): with
-# EIS = 0.36 (1 - c_min / c) and c_min the cost of an energy-sufficient diet
-# (World Bank/FAO Food Prices for Nutrition 2021), Ethiopia's sigma is about
-# 3.4 today, falling toward 2.8 as consumption grows; the richer groups that
-# hold the capital are at 2.8-2.9. One constant for the whole horizon: 3.0.
-# Working value, pending Marcelo's decision (sigma-evidence analysis in
-# ~/Projects/og-issue-drafts/sigma-evidence). OG-USA's 1.5 is outside the
-# corrected evidence; OG-Core caps sigma at 2.0, so this needs the raised
-# bound of the pinned OG-Core build.
-SIGMA = 3.0
+# elasticity of substitution (EIS) above subsistence. OG-Core's households
+# face no income risk, so sigma acts as 1/EIS. OG-Core's default, 1.5 (EIS
+# 0.67): below the 0.8 above which Havranek (2015, JEEA 13(6)) finds
+# calibrations inconsistent with the evidence, and above his reported mean
+# of 0.5 and his bias-corrected 0.3-0.4 for asset holders. The low
+# EIS of poor households comes from the subsistence floor below rather than
+# from sigma: with Stone-Geary preferences the EIS of total consumption is
+# (1/sigma)(1 - c_min/c) (Ogaki, Ostry and Reinhart 1996, IMF Staff Papers),
+# so the effective sigma is about 1.7 at mean consumption and about 2.8 for
+# the poorest group. A sigma of 3 for everyone (the earlier working value)
+# put that curvature on the richer households too, where with 4.7 percent
+# growth it made them borrow against higher future income in the model's
+# Euler condition, which pushed patience to its bound; the ESS 2021/22
+# shows credit is informal and saving is precautionary (80 percent of
+# savers save for emergencies, 0.9 percent for old age).
+SIGMA = 1.5
+# Subsistence floor (OG-Core's c_min), consumption per adult in model units
+# that households buy before the rest of consumption enters utility. Its
+# source is the cost of an energy-sufficient diet in Ethiopia (World
+# Bank/FAO Food Prices for Nutrition, 2021 PPP USD 1.17 a day), 12.2
+# percent of mean consumption per person on the rebased accounts (analysis
+# in ~/Projects/og-issue-drafts/sigma-evidence). Applied as that share times
+# private consumption over GDP (0.644) times GDP per model adult, the floor
+# would be 0.136 in the FY2024/25 solution; the value used is 0.1088, 80
+# percent of it, because the floor applies to every age of every group and
+# the poorest group (a quarter of the population) has to clear it at its
+# lowest-consumption age, which it does with 0.02 to spare; in the data
+# about 6 percent of people consume less than the diet costs. OG-Core
+# expresses c_min in growth-adjusted units, so the floor grows with labor
+# productivity (a constant share of average income).
+C_MIN = 0.1088
 # Units of effective labor, a normalization. The earnings matrix e is
 # built with a population-weighted mean of one; multiplying it by k scales
 # every income in the model by k, which leaves every equilibrium condition
@@ -1098,7 +1114,7 @@ LONG_RUN_R_GOV = round(sum(DSA_MARGINAL_DOMESTIC_REAL_RATES) / 200, 4)
 R_GOV_FLOOR = -0.12
 # Steady-state return on capital the r_gov_shift path is evaluated at: the
 # solved baseline steady state of examples/run_og_eth.py.
-R_SS_FOR_R_GOV = 0.047529
+R_SS_FOR_R_GOV = 0.039873
 
 # Informality. 77.65 percent of the employed are in informal employment
 # (ILOSTAT harmonised series, SDG 8.3.1, from the 2021 Labour Force and
@@ -1159,7 +1175,7 @@ PIT_FORMALIZATION_GAIN = round(0.012 * float(rebase_factors()[-1]), 5)
 # outside Schedule A. The scale is calibrated so that personal income tax
 # collects PIT_REVENUE_TARGET of GDP in FY2024/25
 # (examples/tune.py, scored on the first transition year).
-COMPLIANCE_SCALE = 0.066262
+COMPLIANCE_SCALE = 0.056081
 PIT_REVENUE_TARGET = PIT_REVENUE_SHARE
 
 # Pension coverage by lifetime-income group. Ethiopia's two schemes (PSSSA for
@@ -1195,7 +1211,7 @@ PENSION_CAREER_YEARS = 40
 # far more than the scheme's 800,000 pensioners and two percent of the
 # working-age population, so the scale is well below one. Calibrated by
 # examples/tune.py, scored on the first transition year.
-PENSION_COVERAGE_SCALE = 0.133525
+PENSION_COVERAGE_SCALE = 0.103575
 # Contributions: 7 percent from the employee and 11 from the employer
 # (Proclamations 1267/1268 of 2022). OG-Core's payroll tax can differ by
 # lifetime-income group, so the effective rate is the statutory rate on the
@@ -1211,7 +1227,7 @@ PENSION_COVERAGE_SCALE = 0.133525
 # fiscal anchor here (no official FY2024/25 scheme accounts were found).
 PAYROLL_STATUTORY_RATE = 0.18
 PAYROLL_REVENUE_SHARE = round(69.0 / 24030.0, 5)
-PAYROLL_COVERAGE_SCALE = 0.131020
+PAYROLL_COVERAGE_SCALE = 0.097067
 
 # Personal income tax: the statutory employment-income schedule (Schedule A)
 # in birr per month, as (upper bound, marginal rate) with an open last
@@ -1506,7 +1522,7 @@ def mean_income_per_adult():
 # adult: GDP per adult times the model's household income over GDP at market
 # prices, from the solved steady state (examples/tune.py computes it each
 # round; the converged value is folded here like the other scales).
-MODEL_INCOME_SHARE_OF_GDP = 0.871092
+MODEL_INCOME_SHARE_OF_GDP = 0.864859
 
 
 def model_income_share(ss, p):
@@ -2364,6 +2380,7 @@ def common_params():
             "r_gov_floor": R_GOV_FLOOR,
             "frisch": FRISCH,
             "sigma": SIGMA,
+            "c_min": [C_MIN],
             "nu": NU,
             "TPI_outer_method": "anderson",
             "TPI_anderson_m": TPI_ANDERSON_M,
