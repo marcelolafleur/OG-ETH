@@ -2075,8 +2075,8 @@ DELTA_ANNUAL = round(
 # a net stock at replacement cost like its K, so we accumulate the same
 # inflows by perpetual inventory at the private depreciation rate, revalued
 # by 2.5 percent a year for the dollar price of capital goods
-# (ogeth/data/imf_fdi_inflows_eth.csv): USD 35.3 billion in mid-FY2024/25,
-# 0.175 of rebased GDP of USD 201.4 billion. Unrecorded reinvested earnings
+# (ogeth/data/imf_fdi_inflows_eth.csv): USD 34.0 billion in mid-FY2024/25,
+# 0.169 of rebased GDP of USD 201.4 billion. Unrecorded reinvested earnings
 # (Ethiopia reports none) bias both measures down.
 FDI_PRICE_GROWTH = 0.025
 FDI_MISSING_YEARS_FLOW = 250.0  # USD million a year, 1995-2002

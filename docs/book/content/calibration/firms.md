@@ -1,5 +1,62 @@
+---
+jupytext:
+  formats: md:myst
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: python3
+---
+
 (Chap_FirmCalib)=
 # Calibration of Firm Parameters
+
+```{code-cell} ipython3
+:tags: ["remove-cell"]
+
+from importlib.resources import files
+import json
+import numpy as np
+from myst_nb import glue
+from ogcore.parameters import Specifications
+from ogeth import macro_params as mp
+
+params = json.loads(
+    files("ogeth")
+    .joinpath("ogeth_default_parameters.json")
+    .read_text(encoding="utf-8")
+)
+p = Specifications()
+p.update_specifications(params)
+alpha_I = float(np.asarray(p.alpha_I)[-1])
+kg_ss = ((1 - mp.PUBLIC_INVESTMENT_EFFICIENCY_GAP) * alpha_I
+         / (np.exp(p.g_y) * (1 + p.g_n_ss) - (1 - mp.DELTA_G_ANNUAL)))
+glue("gamma", f"{float(params['gamma'][0]):.3f}", display=False)
+glue("gamma_g", f"{float(params['gamma_g'][0]):.2f}", display=False)
+glue("labour_share", f"{1 - mp.GAMMA - mp.GAMMA_G:.2f}", display=False)
+glue("firm_r", f"{100 * mp.FIRM_RETURN_TARGET:.0f}", display=False)
+glue("world_r", f"{100 * mp.WORLD_INT_RATE_ANNUAL:.0f}", display=False)
+glue("tau_b", f"{mp.BUSINESS_TAX_WEDGE:.3f}", display=False)
+glue("delta_tau", f"{mp.DELTA_TAU_ANNUAL:.3f}", display=False)
+glue("delta", f"{float(params['delta_annual']):.4f}", display=False)
+glue("delta_g", f"{mp.DELTA_G_ANNUAL:.2f}", display=False)
+glue("pwt_delta", f"{mp.PWT_DEPRECIATION_RATE:.4f}", display=False)
+glue("ky_total", f"{mp.TOTAL_CAPITAL_OUTPUT_RATIO:.2f}", display=False)
+glue("ky_private", f"{mp.PRIVATE_CAPITAL_OUTPUT_RATIO:.2f}", display=False)
+glue("ky_private_model", f"{mp.to_model(mp.PRIVATE_CAPITAL_OUTPUT_RATIO):.2f}",
+     display=False)
+glue("kg_old", f"{mp.PUBLIC_CAPITAL_OUTPUT_RATIO_OLD_BASE:.3f}", display=False)
+glue("kg_rebased", f"{mp.PUBLIC_CAPITAL_OUTPUT_RATIO:.3f}", display=False)
+glue("pub_share", f"{mp.PUBLIC_CAPITAL_OUTPUT_RATIO / mp.TOTAL_CAPITAL_OUTPUT_RATIO:.3f}",
+     display=False)
+glue("leakage", f"{float(params['infra_investment_leakage_rate']):.2f}", display=False)
+glue("kg0", f"{float(params['initial_Kg_ratio']):.3f}", display=False)
+glue("alpha_I_lr", f"{alpha_I:.4f}", display=False)
+glue("g_n_ss", f"{p.g_n_ss:.4f}", display=False)
+glue("kg_ss", f"{kg_ss:.3f}", display=False)
+```
 
 ## Aggregate Production Function and Capital Accumulation
 
@@ -28,23 +85,26 @@ The production function is given as:
 
 ### Factor shares of output
 
-We set the private capital share to $\gamma_m = 0.30$ and the public capital share to $\gamma_{g,m} = 0.10$ (the low-income-country value from {cite}`Buffie:2012`), for a total capital share of 0.40 and a labour share of 0.60.  Because this is the single most consequential — and most contestable — calibration choice, and because it departs from the headline official statistic, the reasoning is set out in full in the next subsection.
+The private capital share is $\gamma_m =$ {glue:text}`gamma` and the public capital share $\gamma_{g,m} =$ {glue:text}`gamma_g`, so OG-Core's labour share, $1 - \gamma_m - \gamma_{g,m}$, is {glue:text}`labour_share`.  The labour share here is household income from work, land and own enterprise: in OG-Core, everything that is not a return to reproducible private or public capital.
 
 #### Calibrating the capital share
 
-The measured labour share of output for Ethiopia is low. The [UN ILOSTAT labour income share](https://rshiny.ilo.org/dataexplorer41/?lang=en&segment=indicator&id=SDG_1041_NOC_RT_A) (SDG indicator 10.4.1, series `SDG_1041_NOC_RT_A`) is 0.385 (2025), which taken at face value implies a total capital share of 0.615.  That is implausibly high for an economy that is roughly two-thirds agrarian and informal, where most output is produced by self-employed smallholder farmers and own-account workers.  The reason is a well-known measurement problem: a self-employed farmer earns no wage, so national-accounts conventions record their entire income as gross operating surplus (mixed income) — the *capital* bucket — even though most of it is a return to their own labour. The measured labour share therefore captures mainly the small formal wage sector and misses the labour income embedded in self-employed mixed income, biasing the labour share down and the capital share up.
+Ethiopia publishes no income-side GDP, so the capital share cannot be measured directly, and the two available measures both misclassify the self-employed, who are about three-quarters of employment.  The IFPRI 2022 social accounting matrix books their mixed income as capital (58 percent of value added).  The [ILOSTAT labour income share](https://rshiny.ilo.org/dataexplorer41/?lang=en&segment=indicator&id=SDG_1041_NOC_RT_A) (0.385 in 2025) imputes their labour income at employee earnings, which in Ethiopia fall far below the self-employed's value added per worker.  Taken at face value, the ILOSTAT share would need a real return on capital above 20 percent at Ethiopia's capital stock.
 
-The ILOSTAT series already applies a self-employment imputation, so 0.385 is not a raw employee-compensation figure. Adjusting *below* it (i.e. to a higher labour share) rests on three lines of evidence, the first of which does not use the labour share at all.
+We therefore set $\gamma_m$ from the firms' first-order condition at a target marginal return, the standard fallback when profits cannot be measured ({cite}`CaselliFeyrer:2007`):
 
-1. **Ethiopia's capital–output ratio implies a capital share near 0.40, independent of any labour-share measurement.** Under the competitive first-order condition, the capital share, the capital–output ratio, and the net return are linked by $\gamma = (r + \delta)\,(K/Y)$. The Penn World Table (version 11.0) puts Ethiopia's capital–output ratio at 2.17 in 2023 on the old national accounts; rebuilt on the rebased accounts it is about 2.0 ({ref}`Sec_Rebasing`, range 1.3–2.7). At $\delta \approx 0.047$, the ILOSTAT-implied total capital share of 0.615 would require a real return of $0.615/2.0 - 0.047 \approx 26$ percent (23 percent on the old-base 2.17) — far above the 9–14 percent range plausible even for a capital-scarce frontier economy. A total capital share of 0.40 implies $0.40/2.0 - 0.047 \approx 15$ percent, and 0.30 implies about 10 percent. So the observed capital–output ratio, at any defensible return, backs out a total capital share of roughly 0.30, and no more than about 0.40 — with the ILOSTAT figure, not the adjusted one, as the outlier. This is a growth-accounting identity rather than a labour-share argument, so it is an independent check.
+```{math}
+:label: EqGammaFOC
+\gamma_m = \frac{r + \delta - \tau_b\,\delta_\tau}{1 - \tau_b}\;\frac{K}{Y},
+```
 
-2. **The direction of the residual bias is known.** {cite}`Gollin:2002` shows that naive labour shares vary across countries largely because of how self-employment is treated, and that fuller self-employment adjustments raise labour shares for low-income agrarian economies to 0.65–0.80 regardless of the starting figure. ILOSTAT's imputation is comparatively conservative, so its 0.385 sits toward the low end of where a complete adjustment would land.
+with the target firms' return $r$ at {glue:text}`firm_r` percent, just above the {glue:text}`world_r` percent world rate ({ref}`Chap_MacroCalib`); private depreciation $\delta =$ {glue:text}`delta` (below); the effective business tax rate $\tau_b =$ {glue:text}`tau_b` (the CIT rate times the corporate share of assets times the CIT collections factor, {ref}`Chap_Tax`) and its depreciation allowance $\delta_\tau =$ {glue:text}`delta_tau`; and private capital of {glue:text}`ky_private` times GDP at market prices on the rebased accounts, {glue:text}`ky_private_model` in the model's output units ({ref}`Sec_Rebasing`).  This gives $\gamma_m =$ {glue:text}`gamma` (`macro_params.GAMMA`).  Because OG-Core passes public capital's rent to the owners of private capital (`aggregates.get_r_p`), they earn about 9.5 percent, inside the 6–10 percent range of the evidence: realized FDI returns in African peers of about 4 percent real after tax plus a marginal premium of 2–4 points, and Caselli and Feyrer's returns corrected for natural capital.  The implied labour share, {glue:text}`labour_share`, is inside {cite}`Gollin:2002`'s range of 0.65–0.80 for labour shares that count the self-employed's income.  Land in Ethiopia is state-owned and worked by households, so its return belongs with labour income too.
 
-3. **Ethiopia's land tenure inflates measured capital income specifically.** All land in Ethiopia is constitutionally state-owned — farmers hold use rights, not marketable title. The imputed land rent embedded in agricultural operating surplus is therefore not a return to privately owned capital in the usual sense; economically it is closer to a usufruct return on the household's own labour and effort. National-accounts conventions nonetheless book it as operating surplus, inflating the measured capital share for Ethiopia in particular.
+The capital share is decided here and is not moved to close a capital-output gap.  Patience is set by the long-run return instead ({ref}`Chap_HouseholdCalib`).  The SAM-based per-industry capital shares of the multi-industry calibration, which separate mixed income industry by industry, are the way to refine it.
 
-We adopt a labour share of **0.60**, giving a total capital share of 0.40 and, after carving out $\gamma_{g,m}=0.10$, a private share $\gamma_m = 0.30$. This is a deliberately *conservative* landing point: it is a compromise between the ILOSTAT figure (labour 0.615, $\gamma_m = 0.515$) and a full Gollin adjustment (labour ~0.70, $\gamma_m \approx 0.20$), and it coincides with the top of the range implied by the capital–output ratio. A sectoral decomposition corroborates it: weighting FY2024/25 value-added shares (agriculture 31, industry 30, services 40 percent) by typical sectoral labour intensities (agriculture ~0.75, services ~0.60, gold-mining-heavy industry ~0.45) gives $0.31\times0.75 + 0.30\times0.45 + 0.40\times0.60 \approx 0.60$.
+#### The public capital share
 
-Two honest caveats. First, this is a *triangulation, not an Ethiopian measurement*: the three lines above agree the capital share is well below the ILOSTAT-implied 0.615 and cluster it around 0.30–0.40, but the defensible range for $\gamma_m$ is roughly 0.25–0.35, with 0.30 the centre rather than a point estimate. Second, the capital share is decided here, from this evidence, and is not moved to close any capital-output gap; the discount factors are tuned to first-year investment instead ({ref}`Chap_HouseholdCalib`). The SAM-based per-industry capital shares planned for the multi-industry calibration, which strip the self-employed mixed-income bias industry by industry, are the principled way to refine the share itself.
+$\gamma_{g,m} =$ {glue:text}`gamma_g` is the low end of {cite}`BomLigthart:2014`'s meta-analysis of 578 estimates of the output elasticity of public capital (0.083 in the short run, 0.122 in the long run, for capital supplied by central government).  The low end is deliberate: OG-Core passes public capital's rent to the owners of private capital, so their return exceeds the firms' marginal return by about $(1-\tau_b)\gamma_g Y/K$, and at Ethiopia's capital-output ratio a larger $\gamma_g$ would push the firms' return below the world rate, where foreign capital would leave.
 
 ### Public-investment efficiency
 
@@ -55,33 +115,33 @@ OG-Core's law of motion for public capital is
 K_{g,m,t+1} = (1 - \delta_g)\,K_{g,m,t} + (1 - \phi_g)\,I_{g,m,t}
 ```
 
-where $\delta_g$ is the depreciation rate of public capital (the `delta_g_annual` parameter) and $\phi_g$ (`infra_investment_leakage_rate`) is the fraction of public investment lost to leakage.  We set $\phi_g = 0.5$, meaning half of public investment is lost to inefficiency, matching the value used for the average low-income country in {cite}`Buffie:2012`.
+where $\delta_g$ is the depreciation rate of public capital (`delta_g_annual`, {glue:text}`delta_g`) and $\phi_g$ (`infra_investment_leakage_rate`) is the fraction of public investment that does not become productive capital.  We set $\phi_g =$ {glue:text}`leakage`, the hybrid efficiency gap the IMF-World Bank Public Investment Management Assessment for Ethiopia estimates (June 2025, section II: access and quality of infrastructure per head, against the efficiency frontier).  The same gap discounts the measured stock at the start (below); it does not scale $\gamma_g$, which multiplies the productive stock.
 
 Public investment flow is set as a share of GDP, $I_{g,t} = \alpha_{I,t}\,Y_t$.  `alpha_I` is general-government capital expenditure from the same fiscal accounts as the rest of the budget ({cite}`IMFCR26174:2026`, Table 2b), converted from old-base GDP to the model's output ({ref}`Sec_Rebasing`):
 
 | Fiscal year (model period) | 24/25 (0) | 25/26 (1) | 26/27 (2) | 27/28 (3) | 28/29 (4) | 29/30 (5) | 30/31 (6) | long run |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| History-anchored baseline (packaged) | 0.032 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 |
+| Baseline (packaged) | 0.032 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 |
 | Program scenario | 0.032 | 0.036 | 0.034 | 0.031 | 0.034 | 0.032 | 0.032 | 0.032 |
 
-The FY2024/25 value is the outturn (5.0 percent of old-base GDP) and FY2025/26 the enacted budget (5.8 percent); the history-anchored baseline holds the budget value, and the program scenario follows the program's capital expenditure (5.5, 5.0, 5.4, 5.2 and 5.1 percent of old-base GDP) and holds its last value ({ref}`Sec_Scenarios`).  Neither follows the higher recovery path toward 6–7 percent that earlier IMF reviews projected: with Ethiopia's low general-government revenue (about 6 percent of rebased GDP), a debt-stable steady state cannot fund both that higher investment and positive government consumption even with the foreign aid modeled in {ref}`Chap_MacroCalib`.  Note also that much of Ethiopia's historical public investment ran *off-budget through state-owned enterprises*, so this on-budget general-government $\alpha_I$ understates total public-sector investment.
+The FY2024/25 value is the outturn (5.0 percent of old-base GDP) and FY2025/26 the enacted budget (5.8 percent); the baseline holds the budget value, and the program scenario follows the program's capital expenditure (5.5, 5.0, 5.4, 5.2 and 5.1 percent of old-base GDP) and holds its last value ({ref}`Sec_Scenarios`).  Much of Ethiopia's public investment runs off-budget through state-owned enterprises, so this on-budget general-government $\alpha_I$ understates total public-sector investment.
 
 ### Initial public capital to GDP ratio
 
-The parameter `initial_Kg_ratio` sets the ratio of public capital stock to GDP in the model start year.  The steady-state public-capital-to-GDP ratio implied by the (stationarized) law of motion at our calibrated $\phi_g$, $\delta_g$, $g_y$, the steady-state population growth $\bar{g}_n$, and the long-run $\alpha_I$ (the FY2025/26 budget's 5.8 percent of old-base GDP, 3.6 percent of the model's output after rebasing) is
+The parameter `initial_Kg_ratio` sets the productive public capital stock in the start year.  The measured stock is the [IMF Investment and Capital Stock Dataset](https://data.imf.org/en/Data-Explorer?datasetUrn=IMF.FAD:ICSD(1.0.0))'s general-government capital at current prices over GDP at current prices, {glue:text}`kg_old` of old-base GDP in 2019, its latest year (the PIMA quotes the same 84 percent), held at that ratio to FY2024/25.  It is accumulated budget spending in birr, so it converts like other fiscal stocks, to {glue:text}`kg_rebased` of rebased GDP.  Only the efficient share of it is productive, so the model starts from $(1-\phi_g)$ times that, {glue:text}`kg0` in the model's output units (`macro_params.INITIAL_KG_RATIO`).
+
+The steady state implied by the stationarized law of motion, at the long-run $\alpha_I$ of {glue:text}`alpha_I_lr` and steady-state population growth of {glue:text}`g_n_ss`,
 
 ```{math}
 :label: EqInitialKgSS
-\bar{K}_g / \bar{Y} = \frac{(1-\phi_g)\,\alpha_I}{e^{g_y}(1+\bar{g}_n) - (1-\delta_g)} = \frac{0.5 \times 0.0362}{e^{0.047}(0.9989) - 0.98} \approx 0.27,
+\bar{K}_g / \bar{Y} = \frac{(1-\phi_g)\,\alpha_I}{e^{g_y}(1+\bar{g}_n) - (1-\delta_g)},
 ```
 
-which matches the solved baseline steady state ($\bar{K}_g/\bar{Y} = 0.270$).  Ethiopia's *measured* public capital stock is much higher — about 0.67 of GDP in 2019 per the [IMF Investment and Capital Stock Dataset](https://data.imf.org/en/Data-Explorer?datasetUrn=IMF.FAD:ICSD(1.0.0)), the accumulated result of the state-led, largely SOE-financed infrastructure push of the 2010s (roads, rail, power, and the Grand Ethiopian Renaissance Dam, completed September 2025).
-
-We set `initial_Kg_ratio` to the measured stock, 0.667 of old-base GDP, which as a stock of accumulated budget spending in birr converts like other fiscal stocks to 0.419 of rebased GDP and 0.432 in the model's output units ({ref}`Sec_Rebasing`), and let it depreciate toward the sustainable steady state over the transition.  This starts the model from the public capital Ethiopia actually has — the infrastructure is real and productive (it enters the production function through $\gamma_{g}$) — rather than pretending it away.  Because that stock was built by an investment rate (public-sector investment reached 15–18 percent of GDP in the boom, mostly off-budget through SOEs) that is not sustainable at Ethiopia's current revenue — the same over-accumulation that produced the debt distress and the 2023 default — the model's long-run $\bar{K}_g/\bar{Y}$ (0.27) sits well below it, and the transition traces the honest counterfactual: public capital falls from 0.43 toward 0.27 over roughly a generation.  Starting from the measured stock raises output in the first years relative to starting near the steady state, a premium that fades as public capital normalizes.  (Some of the measured stock is low-return — stalled sugar complexes, underused industrial parks — so it is an upper bound on genuinely productive public capital; the model does not haircut it explicitly but depreciates the unsustainable portion away endogenously.)
+is {glue:text}`kg_ss`, close to the starting stock, so productive public capital stays roughly flat over the transition rather than running down.  The large measured stock, built by the state-led and largely SOE-financed investment of the 2010s, enters at its productive share; the rest is the inefficiency the PIMA measures.
 
 ### Depreciation
 
-OG-Core's `delta_annual` is the depreciation rate of *private* capital; public capital depreciates at its own $\delta_g$.  The Penn World Table 11.0 depreciation rate of Ethiopia's total capital stock is 0.0414 in 2023.  With public capital 0.419/2.003 = 21 percent of the rebased total (IMF ICSD over the rebuilt stock, {ref}`Sec_Rebasing`) depreciating at $\delta_g = 0.02$, the private rate that reproduces the total is $(0.0414 - 0.209 \times 0.02)/0.791 = 0.0471$ (`macro_params.DELTA_ANNUAL`).  It replaces OG-Core's US default of 0.05 with a sourced value that happens to be close to it.
+OG-Core's `delta_annual` is the depreciation rate of private capital; public capital depreciates at its own $\delta_g$.  The Penn World Table 11.0 depreciation rate of Ethiopia's total capital stock is {glue:text}`pwt_delta` in 2023.  With public capital {glue:text}`pub_share` of the rebased total ({glue:text}`kg_rebased` over {glue:text}`ky_total`, {ref}`Sec_Rebasing`) depreciating at $\delta_g =$ {glue:text}`delta_g`, the private rate that reproduces the total is $\delta =$ {glue:text}`delta` (`macro_params.DELTA_ANNUAL`).
 
 ### Total factor productivity
 
