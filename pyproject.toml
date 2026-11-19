@@ -112,14 +112,14 @@ members = [
 
 [tool.uv.sources]
 ogeth = { workspace = true, editable = true }
-# OG-Core master (f95bf154, which includes the speed fixes
+# OG-Core master (998032dc, 0.24.6, which includes the speed fixes
 # PSLmodels/OG-Core#1276 and #1277 and the Anderson-accelerated initial
-# wealth #1280, released as 0.24.5) plus the open pull request
+# wealth #1280, released in 0.24.5) plus the open pull request
 # PSLmodels/OG-Core#1279 (government debt contracted abroad at its own
 # interest rate, alpha_D_ext and r_D_ext_annual, for Issue #1125): its
 # branch concessional-debt on marcelolafleur/OG-Core. uv-only; the PyPI
 # metadata above keeps ogcore>=0.24.5. Move to a release once #1279 merges.
-ogcore = { git = "https://github.com/marcelolafleur/OG-Core", rev = "ad22ad92e10ee8f44888b56723e7fcc387a9925e" }
+ogcore = { git = "https://github.com/marcelolafleur/OG-Core", rev = "7e0599ab8182f1ff050aab0773a287153b0b5870" }
 
 [dependency-groups]
 dev = [
