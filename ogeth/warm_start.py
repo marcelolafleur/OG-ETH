@@ -60,6 +60,12 @@ def save_seed(ss_vars, path=SEED_PATH):
         "TR": scalar(ss_vars["TR"]),
         "factor": scalar(ss_vars["factor"]),
         "BQ": np.asarray(ss_vars["BQ"], dtype=float).ravel(),
+        # the rest of the solved outer state, so a scenario with other
+        # spending shares starts from the solved output and wage rather
+        # than ones rebuilt from its own transfer share and from r alone
+        "w": scalar(ss_vars["w"]),
+        "Y": scalar(ss_vars["Y"]),
+        "p_m": np.atleast_1d(np.asarray(ss_vars["p_m"], dtype=float)).ravel(),
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as fh:
@@ -97,15 +103,29 @@ def enable(path=SEED_PATH):
         # still explore around the warm point if the first attempt fails.
         r_g = r_tr_scalars[0] * seed["r"]
         r_p_g = r_tr_scalars[0] * seed["r_p"]
-        TR_g = r_tr_scalars[1] * seed["TR"]
-        Y_g = TR_g / p.alpha_T[-1]
         BQ_g = seed["BQ"] * r_tr_scalars[1]
         BQ_items = [BQ_g.sum()] if p.use_zeta else list(BQ_g)
-        w_g = firm.get_w_from_r(r_g, p, "SS")
+        if "Y" in seed and seed["p_m"].size == p.M:
+            # Start from the solved output, wage and prices. Transfers are
+            # the scenario's own share of that output, so the guesses agree
+            # with each other under any spending shares; the wage moves with
+            # r along the retry ladder as the firms' condition implies.
+            Y_g = seed["Y"]
+            TR_g = r_tr_scalars[1] * p.alpha_T[-1] * Y_g
+            w_g = (
+                seed["w"]
+                * firm.get_w_from_r(r_g, p, "SS")
+                / firm.get_w_from_r(seed["r"], p, "SS")
+            )
+            p_m_g = list(seed["p_m"])
+        else:
+            # seeds saved before the full outer state was stored
+            TR_g = r_tr_scalars[1] * seed["TR"]
+            Y_g = TR_g / p.alpha_T[-1]
+            w_g = firm.get_w_from_r(r_g, p, "SS")
+            p_m_g = list(np.ones(p.M))
 
-        guesses = (
-            [r_p_g, r_g, w_g] + list(np.ones(p.M)) + [Y_g] + BQ_items + [TR_g]
-        )
+        guesses = [r_p_g, r_g, w_g] + p_m_g + [Y_g] + BQ_items + [TR_g]
         if p.baseline:
             # Passed directly: as a parameter it can exceed the 500,000 cap.
             guesses = guesses + [seed["factor"]]

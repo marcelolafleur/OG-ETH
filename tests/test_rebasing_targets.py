@@ -279,3 +279,37 @@ def test_warm_start_seed_is_shipped_and_shaped():
         seed = pickle.load(fh)
     assert seed["b"].shape == (80, 7) and seed["n"].shape == (80, 7)
     assert seed["factor"] > 0
+    # the full solved outer state, so other scenarios start consistently
+    assert seed["Y"] > 0 and seed["w"] > 0 and seed["p_m"].size == 1
+
+
+def test_warm_start_guesses_agree_under_other_transfer_shares():
+    """
+    The warm start takes output from the seed and transfers as the
+    scenario's own share of it, so a scenario with another long-run transfer
+    share (the IMF program) starts from consistent guesses.
+    """
+    from ogcore import SS
+
+    with open(warm_start.SEED_PATH, "rb") as fh:
+        seed = pickle.load(fh)
+    p = Specifications(baseline=True)
+    p.update_specifications(
+        json.loads(
+            files("ogeth")
+            .joinpath("ogeth_default_parameters.json")
+            .read_text(encoding="utf-8")
+        )
+    )
+    original = SS.SS_initial_guesses
+    try:
+        assert warm_start.enable()
+        for share in (p.alpha_T[-1], 0.5 * p.alpha_T[-1]):
+            p.alpha_T[-1] = share
+            guesses, b, n = SS.SS_initial_guesses(p)
+            Y, TR = guesses[3 + p.M], guesses[-2]
+            assert Y == pytest.approx(seed["Y"])
+            assert TR == pytest.approx(share * seed["Y"])
+            assert guesses[2] == pytest.approx(seed["w"])
+    finally:
+        SS.SS_initial_guesses = original
