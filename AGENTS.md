@@ -1,7 +1,7 @@
 ## Workflow
 
 - Read-only actions don't need prior approval — status, log, branch listing, file reads, drafting.
-- Mutating actions need a plan and explicit approval before running — file edits, commits, pushes, branch/ref/worktree deletion, rebases, merges.
+- Mutating actions need a plan and explicit approval before running — file edits, pushes, branch/ref/worktree deletion, rebases, merges. Local commits on a work branch, as part of work already approved, are fine.
 
 ## Project: OG-ETH
 
