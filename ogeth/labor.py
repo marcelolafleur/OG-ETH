@@ -56,8 +56,7 @@ R_GUESS_MARGIN = 1.3
 # OG-Core caps the factor guess at this value; the solver's own sweep over
 # the guess covers the rest
 MAX_FACTOR_GUESS = 500000.0
-# OG-Core's upper bound on chi_n; it binds only at the oldest ages, where
-# the target is an extrapolation and little labor is supplied anyway
+# OG-Core's upper bound on chi_n
 MAX_CHI_N = 10000.0
 
 
@@ -91,14 +90,45 @@ def hours_per_person():
     return df
 
 
-def labor_supply_target(E, S, ltilde=1.0):
+def pay_per_hour_by_age(e, lambdas):
+    """
+    The model's pay per hour by age: the earnings matrix averaged over
+    lifetime-income groups with their population shares.
+
+    Args:
+        e (Numpy array): earnings matrix, size (S, J), or (T, S, J), in
+            which case its steady-state slice is used
+        lambdas (Numpy array): population shares of the groups, length J
+
+    Returns:
+        pay (Numpy array): average pay per hour by age, length S
+
+    """
+    e = np.asarray(e, dtype=float)
+    if e.ndim == 3:
+        e = e[-1]
+    lambdas = np.asarray(lambdas, dtype=float).flatten()
+    return e @ lambdas / lambdas.sum()
+
+
+def labor_supply_target(E, S, e, lambdas, ltilde=1.0):
     """
     Average labor supply by model age, as a share of the time endowment,
     from LFMS hours per person.
 
+    Beyond the survey's open 65+ band the target follows NTA labor income
+    per person divided by the model's own pay per hour (the earnings
+    matrix): labor income per person is hours per person times pay per
+    hour, and the earnings matrix already carries the fall in pay with
+    age, so tapering hours by NTA income alone would count that fall
+    twice. NTA reports a single open band from 85, so the target is not
+    allowed to rise with age beyond the survey.
+
     Args:
         E (int): age at which agents become economically active
         S (int): number of model periods in a lifetime
+        e (Numpy array): earnings matrix, size (S, J) or (T, S, J)
+        lambdas (Numpy array): population shares of the groups, length J
         ltilde (float): time endowment per period
 
     Returns:
@@ -114,10 +144,15 @@ def labor_supply_target(E, S, ltilde=1.0):
     target = np.interp(ages, x, y)
     old = ages > OLDEST_SURVEY_AGE
     if old.any():
-        nta = income.nta_labor_income(
-            "ETH", np.concatenate(([OLDEST_SURVEY_AGE], ages[old]))
+        both = np.concatenate(([OLDEST_SURVEY_AGE], ages[old]))
+        nta = income.nta_labor_income("ETH", both)
+        pay = np.interp(both, ages, pay_per_hour_by_age(e, lambdas))
+        hours = (
+            np.interp(OLDEST_SURVEY_AGE, x, y)
+            * (nta / pay)
+            / (nta[0] / pay[0])
         )
-        target[old] = np.interp(OLDEST_SURVEY_AGE, x, y) * nta[1:] / nta[0]
+        target[old] = np.minimum.accumulate(hours)[1:]
     return np.maximum(target, MIN_LABOR_SUPPLY * ltilde)
 
 
@@ -221,7 +256,7 @@ def estimate_chi_n(
 
     """
     p = copy.deepcopy(p)
-    target = labor_supply_target(p.E, p.S, p.ltilde)
+    target = labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
     ages = income.model_ages(p.E, p.S)
     fit = (ages >= FIT_AGES[0]) & (ages < FIT_AGES[1])
     chi_n = steady_state_chi_n(p)

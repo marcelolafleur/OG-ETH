@@ -113,7 +113,7 @@ def next_overrides(p, ss, tm, tpi=None):
     """
     out = {}
     # hours by age: chi_n's first-order step
-    n_target = labor.labor_supply_target(p.E, p.S, p.ltilde)
+    n_target = labor.labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
     n_model = labor.average_labor_supply(np.asarray(ss["n"]), p.omega_SS)
     chi_n = np.asarray(p.chi_n, dtype=float)
     chi_n = chi_n[-1] if chi_n.ndim > 1 else chi_n
@@ -262,7 +262,7 @@ def main():
         )
 
     model = ss_moments(ss)
-    n_target = labor.labor_supply_target(p.E, p.S, p.ltilde)
+    n_target = labor.labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
     n_model = labor.average_labor_supply(np.asarray(ss["n"]), p.omega_SS)
     ages = income.model_ages(p.E, p.S)
     fit = (ages >= labor.FIT_AGES[0]) & (ages < labor.FIT_AGES[1])

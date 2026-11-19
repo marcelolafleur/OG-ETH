@@ -34,8 +34,8 @@ def test_hours_per_person_is_a_hump():
     assert hpp["20-24"] < hpp["30-34"] > hpp["50-54"] > hpp["65+"]
 
 
-def test_labor_supply_target_level_shape_and_floor():
-    target = labor.labor_supply_target(20, 80)
+def test_labor_supply_target_level_shape_and_floor(p):
+    target = labor.labor_supply_target(20, 80, p.e, p.lambdas)
     ages = income.model_ages(20, 80)
     assert target.shape == (80,)
     # prime-age Ethiopians work about 25 hours a week per person, which is
@@ -43,13 +43,23 @@ def test_labor_supply_target_level_shape_and_floor():
     prime = target[(ages >= 30) & (ages < 40)].mean()
     assert prime == pytest.approx(25 / labor.WEEKLY_TIME_ENDOWMENT, rel=0.03)
     assert target[0] < prime
-    # beyond the survey the target falls with the NTA profile, never
-    # below the floor
+    # beyond the survey the target is NTA income per person over the
+    # model's pay per hour, never rising with age and never below the floor
     old = ages > labor.OLDEST_SURVEY_AGE
     assert np.all(np.diff(target[old]) <= 1e-12)
-    assert target[-1] < 0.03
+    # the first age past the survey: the 65+ band's hours per person
+    # scaled by income over pay, relative to the band's midpoint
+    pay = labor.pay_per_hour_by_age(p.e, p.lambdas)
+    a67 = labor.OLDEST_SURVEY_AGE
+    i = int(np.argmax(old))
+    ratio = income.nta_labor_income("ETH", ages[i]) / pay[i]
+    ratio67 = income.nta_labor_income("ETH", a67) / np.interp(a67, ages, pay)
+    hpp = labor.hours_per_person().set_index("age_band").hours_per_person
+    assert target[i] == pytest.approx(
+        hpp["65+"] / labor.WEEKLY_TIME_ENDOWMENT * ratio / ratio67
+    )
     assert target.min() >= labor.MIN_LABOR_SUPPLY
-    scaled = labor.labor_supply_target(20, 80, ltilde=2.0)
+    scaled = labor.labor_supply_target(20, 80, p.e, p.lambdas, ltilde=2.0)
     np.testing.assert_allclose(scaled, 2.0 * target)
 
 
@@ -64,7 +74,7 @@ def test_average_labor_supply_weights_by_population():
 def test_chi_n_step_is_exact_on_target_and_monotone(p):
     chi_n = labor.steady_state_chi_n(p)
     assert chi_n.shape == (p.S,)
-    target = labor.labor_supply_target(p.E, p.S, p.ltilde)
+    target = labor.labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
     same = labor.chi_n_step(chi_n, target, target, p)
     np.testing.assert_allclose(same, chi_n)
     # working more than the target in the model calls for a heavier
@@ -79,7 +89,7 @@ def test_chi_n_step_is_exact_on_target_and_monotone(p):
 
 
 def test_fit_table_bands(p):
-    target = labor.labor_supply_target(p.E, p.S, p.ltilde)
+    target = labor.labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
     table = labor.fit_table(target, target, p.E, p.S)
     assert list(table.age_band[:2]) == ["20-24", "25-29"]
     assert len(table) == 12

@@ -776,7 +776,9 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
     params = safe_read_pickle(os.path.join(output_dir, "model_params.pkl"))
     ages = income.model_ages(params.E, params.S)
     n_model = labor.average_labor_supply(np.asarray(ss["n"]), params.omega_SS)
-    target = labor.labor_supply_target(params.E, params.S, params.ltilde)
+    target = labor.labor_supply_target(
+        params.E, params.S, params.e, params.lambdas, params.ltilde
+    )
     hours = labor.hours_per_person()
     hours = hours[hours.age_band.map(labor.HOURS_BAND_MIDPOINTS) >= 20]
     scale = labor.WEEKLY_TIME_ENDOWMENT / params.ltilde
