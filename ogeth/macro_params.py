@@ -1658,8 +1658,34 @@ def payroll_tax_params(payroll_coverage_scale=None):
 # pensions to retired formal-sector workers, the fertilizer subsidy to farming
 # households. OG-Core's eta matrix allocates aggregate transfers across ages
 # and lifetime-income groups; the default is population-proportional.
-# published percent of old-base GDP, rebased with the FY2024/25 factor
+# published percent of old-base GDP, rebased with the FY2024/25 factor.
+# The figure matches the whole programme rather than the government's share
+# of it: PSNP5 costs US$2.28 billion over 2021-2025 (World Bank PAD P172479,
+# 2020), about US$460 million a year, 0.35-0.4 percent of old-base GDP at the
+# floated exchange rate, of which the government finances about 30 percent.
+# The urban safety net (Urban Productive Safety Net and Jobs Project, 1.7
+# million people in 88 cities, about 0.05 percent of GDP) has the same
+# design and is counted within this envelope.
 PSNP_SHARE_OF_GDP = rebased([0.4])[0]
+# PSNP's two components (PSNP IV Programme Implementation Manual, 2014,
+# section 3.5; PSNP5 PAD P172479, 2020, para. 38 and footnote 59): a
+# household with at least one able-bodied adult (over 16, not chronically
+# ill or disabled) is a public works client and receives transfers for 6
+# months a year in exchange for work; a household with none receives
+# Permanent Direct Support, unconditional transfers for 12 months a year.
+# The monthly rate per person is the same in both (15 kg of cereal and 4 kg
+# of pulses, or its cash value), so a direct-support client receives twice
+# as much a year. The model has no households or disability, so direct
+# support is proxied by age: the poorest group's members from 60, the usual
+# definition of an older person in Ethiopian social protection. That gives
+# direct support 19 percent of PSNP's value in 2025, against about 26
+# percent in the programme (15 percent of 8 million clients at 12 months
+# against 85 percent at 6); the difference is disabled and chronically ill
+# clients under 60. The cap of five transfers per household is not
+# represented.
+PSNP_DIRECT_SUPPORT_AGE = 60
+PSNP_DIRECT_SUPPORT_MONTHS = 12
+PSNP_PUBLIC_WORKS_MONTHS = 6
 # old-age pensions, paid by OG-Core's pension system (the pensions/Y target),
 # and survivor and invalidity benefits, paid as cash transfers to the
 # households of the covered groups (see CASH_TRANSFERS)
@@ -1675,13 +1701,21 @@ FARM_GROUPS = [0, 1, 2]  # bottom 70 percent: smallholder agriculture
 PENSION_GROUPS = [5, 6]  # the formal groups, as in PENSION_COVERAGE
 
 
-def transfer_eta(omega_SS, lambdas, retire_age_index):
+def transfer_eta(omega_SS, lambdas, retire_age_index, first_age=20):
     """
     Allocation matrix eta distributing aggregate transfers across households,
-    shaped (S, J): the safety net per capita within PSNP_GROUPS, the
+    shaped (S, J): the safety net within PSNP_GROUPS, twice as much per
+    person from PSNP_DIRECT_SUPPORT_AGE (direct support) as below it
+    (public works), the
     fertilizer subsidy per capita within FARM_GROUPS, and pensions per
     capita among the retired (age index >= retire_age_index) in
     PENSION_GROUPS, each programme weighted by its share of GDP.
+
+    Args:
+        omega_SS (array_like): population distribution, (S, J)
+        lambdas (array_like): population shares of the J groups
+        retire_age_index (int): model age index of retirement
+        first_age (int): age of the first model age (OG-Core's E)
 
     Returns:
         Numpy array: (S, J), sums to one
@@ -1690,12 +1724,25 @@ def transfer_eta(omega_SS, lambdas, retire_age_index):
     S, J = omega_SS.shape
     eta = np.zeros((S, J))
 
-    def spread(groups, ages, weight):
+    def spread(groups, ages, weight, per_person=None):
+        # per capita within the cells, or in proportion to per_person (by
+        # age) times the population
+        pp = np.ones(S) if per_person is None else np.asarray(per_person)
         mask = np.zeros((S, J))
-        mask[np.ix_(ages, groups)] = omega_SS[np.ix_(ages, groups)]
+        mask[np.ix_(ages, groups)] = (omega_SS * pp[:, np.newaxis])[
+            np.ix_(ages, groups)
+        ]
         return weight * mask / mask.sum()
 
-    eta += spread(PSNP_GROUPS, range(S), PSNP_SHARE_OF_GDP)
+    # PSNP: direct support (from PSNP_DIRECT_SUPPORT_AGE) pays twice the
+    # public works amount per person a year
+    age = np.arange(S) + first_age
+    psnp_per_person = np.where(
+        age >= PSNP_DIRECT_SUPPORT_AGE,
+        PSNP_DIRECT_SUPPORT_MONTHS / PSNP_PUBLIC_WORKS_MONTHS,
+        1.0,
+    )
+    eta += spread(PSNP_GROUPS, range(S), PSNP_SHARE_OF_GDP, psnp_per_person)
     eta += spread(FARM_GROUPS, range(S), FERTILIZER_SUBSIDY_SHARE_OF_GDP)
     # survivor and invalidity benefits to the households of the covered
     # groups, at all ages (widows, orphans and invalidity pensioners)
@@ -1744,7 +1791,9 @@ def allocation_path(allocation, omega, omega_SS, tol=1e-12):
     return np.concatenate([path[:n], eta_SS[np.newaxis]])
 
 
-def transfer_eta_path(omega, omega_SS, lambdas, retire_age_index):
+def transfer_eta_path(
+    omega, omega_SS, lambdas, retire_age_index, first_age=20
+):
     """
     ``transfer_eta`` for each year of the transition (see
     ``allocation_path``).
@@ -1753,7 +1802,7 @@ def transfer_eta_path(omega, omega_SS, lambdas, retire_age_index):
         Numpy array: (n + 1, S, J), each year summing to one
     """
     return allocation_path(
-        lambda om: transfer_eta(om, lambdas, retire_age_index),
+        lambda om: transfer_eta(om, lambdas, retire_age_index, first_age),
         omega,
         omega_SS,
     )
@@ -1764,7 +1813,153 @@ def derived_transfer_eta(p):
     retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
     return {
         "eta": transfer_eta_path(
-            p.omega, p.omega_SS, p.lambdas, retire_idx
+            p.omega, p.omega_SS, p.lambdas, retire_idx, int(p.E)
+        ).tolist()
+    }
+
+
+# Net family transfers (OG-Core's phi_FT): working-age members of each
+# lifetime-income group support the group's elders. Ethiopia's National
+# Transfer Accounts (2005) have consumption, labor income and the lifecycle
+# deficit but no transfer profiles (no African account in the NTA database
+# has a private-transfer age profile), so the transfers follow a rule with
+# one size, set to the NTA consumption profile:
+# * givers are ages FAMILY_GIVER_AGES, each in proportion to their earnings
+#   capacity (population times the earnings matrix e); receivers are ages
+#   FAMILY_RECEIVER_AGE and above, equal per person;
+# * each group's transfers net to zero within the group, and the group's
+#   share of the total is its share of givers' earnings capacity;
+# * a group's elders get, from the family, the group's share less the
+#   government cash transfers they already receive (PSNP direct support
+#   and the subsidies in eta); old-age pensions, about 0.1 percent of GDP,
+#   are not netted;
+# * per elder, the transfer is held fixed relative to GDP per person, so
+#   the total grows with the elderly share of the population and is
+#   FAMILY_TRANSFER_SHARE_SS of GDP in the steady state.
+# At 17 percent of GDP the steady state's consumption of people aged 65 and
+# over, relative to ages 30-49, matches NTA: 0.87 at 65-69, 0.84 at 70-79,
+# 0.81 at 80-85 (steady-state probes of 23 November 2026; 0.45 at 70-79
+# without family transfers). People aged 65 and over are 28 percent of
+# adults in the steady state, 7 percent in 2025.
+FAMILY_GIVER_AGES = (25, 65)
+FAMILY_RECEIVER_AGE = 65
+FAMILY_TRANSFER_SHARE_SS = 0.17
+
+
+def family_transfers(omega, e, eta, alpha_T, total_share, first_age=20):
+    """
+    Net family transfer shares of GDP for one period (see the rule above).
+
+    Args:
+        omega (array_like): population distribution, (S, J)
+        e (array_like): earnings matrix, (S, J)
+        eta (array_like): transfer allocation matrix, (S, J)
+        alpha_T (scalar): government transfers as a share of GDP
+        total_share (scalar): family transfers received, share of GDP,
+            before netting the government transfers to elders
+        first_age (int): age of the first model age (OG-Core's E)
+
+    Returns:
+        Numpy array: (S, J), positive for receivers, summing to zero
+    """
+    omega = np.asarray(omega, dtype=float)
+    e = np.asarray(e, dtype=float)
+    S, J = omega.shape
+    age = np.arange(S) + first_age
+    give = (age >= FAMILY_GIVER_AGES[0]) & (age < FAMILY_GIVER_AGES[1])
+    recv = age >= FAMILY_RECEIVER_AGE
+    capacity = omega * e * give[:, np.newaxis]
+    group_share = capacity.sum(axis=0) / capacity.sum()
+    public = alpha_T * np.asarray(eta, dtype=float)[recv].sum(axis=0)
+    pot = np.maximum(total_share * group_share - public, 0.0)
+    phi = np.zeros((S, J))
+    for j in range(J):
+        if pot[j] == 0.0:
+            continue
+        phi[give, j] = -pot[j] * capacity[give, j] / capacity[give, j].sum()
+        phi[recv, j] = pot[j] * omega[recv, j] / omega[recv, j].sum()
+    return phi
+
+
+def family_transfer_path(
+    omega, omega_SS, e, eta, alpha_T, first_age=20, tol=1e-12
+):
+    """
+    Net family transfer shares of GDP for each year of the transition, from
+    that year's population, transfer matrix and transfer share, ending with
+    the steady-state matrix (as ``allocation_path``).
+
+    Args:
+        omega (array_like): population distribution by year, (T+S, S, J)
+        omega_SS (array_like): steady-state population distribution, (S, J)
+        e (array_like): earnings matrix, (S, J)
+        eta (array_like): transfer matrices by year, (T+S, S, J)
+        alpha_T (array_like): government transfers, share of GDP, length T+S
+        first_age (int): age of the first model age (OG-Core's E)
+        tol (scalar): trailing years within tol of the steady state are
+            dropped
+
+    Returns:
+        Numpy array: (n + 1, S, J)
+    """
+    omega = np.asarray(omega, dtype=float)
+    omega_SS = np.asarray(omega_SS, dtype=float)
+    eta = np.asarray(eta, dtype=float)
+    alpha_T = np.asarray(alpha_T, dtype=float).flatten()
+    S = omega_SS.shape[0]
+    recv = np.arange(S) + first_age >= FAMILY_RECEIVER_AGE
+
+    def elder_share(om):
+        return om[recv].sum() / om.sum()
+
+    share_SS = elder_share(omega_SS)
+    phi_SS = family_transfers(
+        omega_SS, e, eta[-1], alpha_T[-1], FAMILY_TRANSFER_SHARE_SS, first_age
+    )
+    path = np.array(
+        [
+            family_transfers(
+                omega[t],
+                e,
+                eta[t],
+                alpha_T[min(t, alpha_T.size - 1)],
+                FAMILY_TRANSFER_SHARE_SS * elder_share(omega[t]) / share_SS,
+                first_age,
+            )
+            for t in range(omega.shape[0])
+        ]
+    )
+    n = path.shape[0]
+    while n > 0 and np.abs(path[n - 1] - phi_SS).max() < tol:
+        n -= 1
+    return np.concatenate([path[:n], phi_SS[np.newaxis]])
+
+
+def _time_path(value, length):
+    """A path of ``length`` periods from a shorter one, holding its last."""
+    value = np.asarray(value, dtype=float)
+    if value.shape[0] >= length:
+        return value[:length]
+    pad = np.repeat(value[-1:], length - value.shape[0], axis=0)
+    return np.concatenate([value, pad])
+
+
+def derived_family_transfers(p, eta, alpha_T):
+    """
+    The net family transfer path for the demographics and earnings in
+    ``p``, the transfer matrices ``eta`` and transfer shares ``alpha_T``.
+    """
+    TS = int(p.T) + int(p.S)
+    e = np.asarray(p.e, dtype=float)
+    e = e[-1] if e.ndim == 3 else e
+    return {
+        "phi_FT": family_transfer_path(
+            p.omega,
+            p.omega_SS,
+            e,
+            _time_path(eta, TS),
+            _time_path(np.asarray(alpha_T, dtype=float).flatten(), TS),
+            int(p.E),
         ).tolist()
     }
 
@@ -1928,6 +2123,7 @@ def fiscal_program_params(p, r_ss=None):
     out.update(program_compliance_paths())
     out["zeta_D"] = zeta_D_path()
     out.update(derived_transfer_eta(p))
+    out.update(derived_family_transfers(p, out["eta"], out["alpha_T"]))
     out.update(
         program_revenue_paths(
             float(np.asarray(p.tau_c).flatten()[0]),
@@ -2393,6 +2589,7 @@ def history_anchored_params(p, r_ss=None):
     out.update(history_compliance_paths())
     out["zeta_D"] = zeta_D_path()
     out.update(derived_transfer_eta(p))
+    out.update(derived_family_transfers(p, out["eta"], out["alpha_T"]))
     out.update(
         history_revenue_paths(
             float(np.asarray(p.tau_c).flatten()[0]),

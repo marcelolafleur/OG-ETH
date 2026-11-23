@@ -436,6 +436,7 @@ class Calibration:
             self.demographic_params["omega_SS"],
             p.lambdas,
             retire_idx,
+            int(p.E),
         ).tolist()
 
     # method to return all newly calibrated parameters in a dictionary
