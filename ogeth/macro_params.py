@@ -651,7 +651,9 @@ def remittance_eta(omega_SS, lambdas, quintile_value_shares=None):
     return within * group_share.reshape(1, -1)
 
 
-def derive_remittance_params(g_y, g_n, omega_SS, lambdas, scenario=None):
+def derive_remittance_params(
+    g_y, g_n, omega_SS, lambdas, scenario=None, omega=None
+):
     """
     The remittance parameters that depend on a given set of demographics.
 
@@ -663,6 +665,9 @@ def derive_remittance_params(g_y, g_n, omega_SS, lambdas, scenario=None):
         scenario (str): ``"history"`` keeps the remittance share of GDP at
             its measured FY2024/25 value; ``"program"`` moves it along the
             IMF projection (see SCENARIOS); defaults to DEFAULT_SCENARIO
+        omega (array_like): population distribution by year, (T+S, S, J);
+            if given, eta_RM is a path built from each year's population
+            (see ``allocation_path``), otherwise the steady-state matrix
 
     Returns:
         dict: ``{"g_RM": list, "eta_RM": nested list}`` ready for
@@ -673,10 +678,13 @@ def derive_remittance_params(g_y, g_n, omega_SS, lambdas, scenario=None):
         g_RM = program_share_g_RM(g_y, g_n)
     else:
         g_RM = flat_share_g_RM(g_y, g_n)
-    return {
-        "g_RM": g_RM.tolist(),
-        "eta_RM": remittance_eta(omega_SS, lambdas).tolist(),
-    }
+    if omega is None:
+        eta_RM = remittance_eta(omega_SS, lambdas)
+    else:
+        eta_RM = allocation_path(
+            lambda om: remittance_eta(om, lambdas), omega, omega_SS
+        )
+    return {"g_RM": g_RM.tolist(), "eta_RM": eta_RM.tolist()}
 
 
 def derived_remittance_params(p, scenario=None):
@@ -685,7 +693,7 @@ def derived_remittance_params(p, scenario=None):
 
     Args:
         p (Specifications): parameters carrying ``g_y``, ``g_n``,
-            ``omega_SS`` and ``lambdas``
+            ``omega``, ``omega_SS`` and ``lambdas``
         scenario (str): see ``derive_remittance_params``
 
     Returns:
@@ -693,7 +701,7 @@ def derived_remittance_params(p, scenario=None):
     """
     g_n = np.asarray(p.g_n, dtype=float)[: p.T + p.S]
     return derive_remittance_params(
-        p.g_y, g_n, p.omega_SS, p.lambdas, scenario
+        p.g_y, g_n, p.omega_SS, p.lambdas, scenario, omega=p.omega
     )
 
 
@@ -1701,10 +1709,64 @@ def transfer_eta(omega_SS, lambdas, retire_age_index):
     return eta / eta.sum()
 
 
+def allocation_path(allocation, omega, omega_SS, tol=1e-12):
+    """
+    An allocation matrix for each year of the transition. OG-Core pays
+    household (s, j) in year t the share eta[t, s, j] of an aggregate,
+    divided by its population omega[t, s, j]; held at its steady-state
+    value while the population ages, eta pays each person in a group
+    that is larger in the steady state than today more than the
+    programme's rules give (about 11 times the safety net per person for
+    the poorest group at 85 in 2025). Each year's matrix is instead built
+    from that year's population, so per-person amounts follow the
+    programme's rules every year.
+
+    Args:
+        allocation (callable): maps a population distribution, (S, J), to
+            an allocation matrix, (S, J), summing to one
+        omega (array_like): population distribution by year, (T+S, S, J)
+        omega_SS (array_like): steady-state population distribution,
+            (S, J)
+        tol (scalar): years at the end of the path whose matrix is within
+            tol of the steady-state one are dropped
+
+    Returns:
+        Numpy array: (n + 1, S, J), the matrices of the first n years and
+            then the steady-state matrix exactly, which OG-Core holds for
+            the remaining years and uses in the steady state
+    """
+    omega = np.asarray(omega, dtype=float)
+    eta_SS = allocation(np.asarray(omega_SS, dtype=float))
+    path = np.array([allocation(omega_t) for omega_t in omega])
+    n = path.shape[0]
+    while n > 0 and np.abs(path[n - 1] - eta_SS).max() < tol:
+        n -= 1
+    return np.concatenate([path[:n], eta_SS[np.newaxis]])
+
+
+def transfer_eta_path(omega, omega_SS, lambdas, retire_age_index):
+    """
+    ``transfer_eta`` for each year of the transition (see
+    ``allocation_path``).
+
+    Returns:
+        Numpy array: (n + 1, S, J), each year summing to one
+    """
+    return allocation_path(
+        lambda om: transfer_eta(om, lambdas, retire_age_index),
+        omega,
+        omega_SS,
+    )
+
+
 def derived_transfer_eta(p):
-    """The transfer allocation matrix for the demographics in ``p``."""
+    """The transfer allocation path for the demographics in ``p``."""
     retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
-    return {"eta": transfer_eta(p.omega_SS, p.lambdas, retire_idx).tolist()}
+    return {
+        "eta": transfer_eta_path(
+            p.omega, p.omega_SS, p.lambdas, retire_idx
+        ).tolist()
+    }
 
 
 def dsa_annual(values, last_year=None):

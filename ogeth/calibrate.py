@@ -424,13 +424,18 @@ class Calibration:
                 self.demographic_params["g_n"],
                 self.demographic_params["omega_SS"],
                 p.lambdas,
+                omega=self.demographic_params["omega"],
             )
         )
         # so is the transfer allocation matrix (per capita within the
-        # targeted groups, pensions to the retired)
+        # targeted groups, pensions to the retired), built for each year
+        # from that year's population
         retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
-        self.demographic_params["eta"] = macro_params.transfer_eta(
-            self.demographic_params["omega_SS"], p.lambdas, retire_idx
+        self.demographic_params["eta"] = macro_params.transfer_eta_path(
+            self.demographic_params["omega"],
+            self.demographic_params["omega_SS"],
+            p.lambdas,
+            retire_idx,
         ).tolist()
 
     # method to return all newly calibrated parameters in a dictionary

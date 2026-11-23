@@ -157,6 +157,7 @@ def test_main_rebuilds_remittance_objects_from_regenerated_demographics(
         np.asarray(saved["g_n"])[: p.T + p.S],
         saved["omega_SS"],
         saved["lambdas"],
+        omega=p.omega,
     )
     assert np.allclose(saved["g_RM"], expected["g_RM"], atol=1e-12)
     assert np.allclose(saved["eta_RM"], expected["eta_RM"], atol=1e-12)

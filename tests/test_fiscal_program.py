@@ -360,14 +360,34 @@ def test_market_debt_is_held_at_home():
 def test_transfers_are_targeted_by_programme(packaged, params):
     """eta gives the safety net to the poorest quarter, the fertilizer
     subsidy to the bottom 70 percent, and pensions to the retired in the
-    formal groups; it is rebuilt from the packaged demographics."""
-    eta = np.array(packaged["eta"])
-    assert eta.shape == (80, 7) and eta.sum() == pytest.approx(1.0)
+    formal groups; it is rebuilt from the packaged demographics, for each
+    year from that year's population, ending at the steady-state matrix."""
+    path = np.array(packaged["eta"])
+    n = path.shape[0] - 1
+    assert path.shape[1:] == (80, 7) and 0 < n < params.T
+    assert np.allclose(path.sum(axis=(1, 2)), 1.0, atol=1e-12)
     retire_idx = int(params.retirement_age[0]) - int(params.E)
+    omega = np.array(packaged["omega"])
+    for t in range(n):
+        expected = mp.transfer_eta(omega[t], packaged["lambdas"], retire_idx)
+        assert np.allclose(path[t], expected, atol=1e-12)
+    eta = path[-1]
     expected = mp.transfer_eta(
         packaged["omega_SS"], packaged["lambdas"], retire_idx
     )
-    assert np.allclose(eta, expected, atol=1e-12)
+    assert np.array_equal(eta, expected)
+    # the steady-state matrix holds for the remaining years and in the
+    # steady state
+    assert np.array_equal(
+        params.eta[n:], np.tile(eta, (params.T + params.S - n, 1, 1))
+    )
+    # per person, transfers follow each year's population: the poorest
+    # group at 85 in the first year gets close to its steady-state amount
+    # (held at the steady-state matrix it got about 11 times as much)
+    i85 = 85 - int(params.E)
+    first = path[0, i85, 0] / omega[0, i85, 0]
+    ss = eta[i85, 0] / np.array(packaged["omega_SS"])[i85, 0]
+    assert first == pytest.approx(ss, rel=0.1)
     # with the pension system on, old-age pensions are paid as benefits and
     # only survivor and invalidity benefits reach the covered groups as
     # transfers, at all ages

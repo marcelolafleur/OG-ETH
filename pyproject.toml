@@ -121,7 +121,10 @@ ogeth = { workspace = true, editable = true }
 # ogcore>=0.24.5, but no release has #1279 yet (0.24.6 lacks alpha_D_ext):
 # before publishing to PyPI, raise the floor to the release that includes
 # #1279 and check the packaged parameters load against it.
-ogcore = { git = "https://github.com/marcelolafleur/OG-Core", rev = "7e0599ab8182f1ff050aab0773a287153b0b5870" }
+# TEST BRANCH ONLY (test/eta-time-path): the build above plus the eta time
+# path change (local branch int/eth-pin-eta, not pushed). Keep off the
+# calibration branch.
+ogcore = { git = "file:///Users/marcelolafleur/Projects/OG-Core", rev = "ecf164be37e0a3bc71c29760c0af3ea16409b760" }
 
 [dependency-groups]
 dev = [

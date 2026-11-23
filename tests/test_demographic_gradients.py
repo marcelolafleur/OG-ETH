@@ -111,12 +111,16 @@ def test_calibration_passes_gradients_to_demographics():
     p.g_y = 0.04
     p.retirement_age = np.array([65])
     omega = np.full((80, 7), 1 / 80) * p.lambdas.reshape(1, 7)
-    demog = {"omega_SS": omega, "g_n": np.full(400, 0.02)}
+    demog = {
+        "omega_SS": omega,
+        "omega": np.tile(omega, (400, 1, 1)),
+        "g_n": np.full(400, 0.02),
+    }
     with patch("ogeth.calibrate.macro_params") as mock_macro:
         mock_macro.get_macro_params.return_value = {}
         mock_macro.EARNINGS_SCALE = 1.0
         mock_macro.derive_remittance_params.return_value = {}
-        mock_macro.transfer_eta.return_value = np.zeros((80, 7))
+        mock_macro.transfer_eta_path.return_value = np.zeros((1, 80, 7))
         with patch("ogeth.calibrate.demographic_rates") as mock_rates:
             mock_rates.return_value = _rates(0.05)
             with patch("ogcore.demographics.get_pop_objs") as mock_demog:

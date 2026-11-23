@@ -157,30 +157,38 @@ def test_steady_state_remittances_equal_alpha_rm_times_output(params):
 
 
 def test_eta_rm_is_a_distribution(packaged):
-    """eta_RM allocates all of aggregate remittances: (S, J), sums to 1."""
+    """eta_RM allocates all of aggregate remittances: (S, J) in each year
+    of its path, each summing to 1."""
     eta = np.array(packaged["eta_RM"])
-    assert eta.shape == (80, 7)
+    assert eta.shape[1:] == (80, 7)
     assert eta.min() >= 0
-    assert eta.sum() == pytest.approx(1.0)
+    assert np.allclose(eta.sum(axis=(1, 2)), 1.0, atol=1e-12)
 
 
 def test_eta_rm_is_per_capita_within_each_group(packaged):
     """Within a lifetime-income group, every household receives the same
-    amount: the age profile of eta_RM is the group's population profile."""
-    eta = np.array(packaged["eta_RM"])
-    omega_SS = np.array(packaged["omega_SS"])
-    within = omega_SS / omega_SS.sum(axis=0, keepdims=True)
-    group_share = eta.sum(axis=0)
-    assert np.allclose(eta, within * group_share, atol=1e-12)
+    amount: in each year the age profile of eta_RM is the group's
+    population profile that year (the steady state's in the last row)."""
+    path = np.array(packaged["eta_RM"])
+    omega = np.array(packaged["omega"])
+    pops = list(omega[: path.shape[0] - 1]) + [np.array(packaged["omega_SS"])]
+    for eta, om in zip(path, pops):
+        within = om / om.sum(axis=0, keepdims=True)
+        group_share = eta.sum(axis=0)
+        assert np.allclose(eta, within * group_share, atol=1e-12)
 
 
 def test_packaged_eta_rm_is_consistent_with_packaged_demographics(packaged):
-    """eta_RM is rebuilt from omega_SS and the quintile value shares, so a
-    regeneration that forgets it leaves the matrix stale."""
-    expected = remittances.remittance_eta(
-        packaged["omega_SS"], packaged["lambdas"]
+    """eta_RM is rebuilt from the population path and the quintile value
+    shares, so a regeneration that forgets it leaves the path stale."""
+    expected = remittances.allocation_path(
+        lambda om: remittances.remittance_eta(om, packaged["lambdas"]),
+        packaged["omega"],
+        packaged["omega_SS"],
     )
-    assert np.allclose(np.array(packaged["eta_RM"]), expected, atol=1e-12)
+    path = np.array(packaged["eta_RM"])
+    assert path.shape == expected.shape
+    assert np.allclose(path, expected, atol=1e-12)
 
 
 def test_quintile_value_shares_follow_the_2010_survey():
@@ -202,7 +210,7 @@ def test_eta_rm_tilts_remittances_toward_higher_income_groups(packaged):
     """The survey rejects the population-proportional default: the bottom
     half of households receives well under its population share and the top
     fifth well over."""
-    group_share = np.array(packaged["eta_RM"]).sum(axis=0)
+    group_share = np.array(packaged["eta_RM"])[-1].sum(axis=0)
     lambdas = np.array(packaged["lambdas"])
     assert group_share[:2].sum() < 0.5 * lambdas[:2].sum()
     assert group_share[4:].sum() > 1.5 * lambdas[4:].sum()
