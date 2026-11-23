@@ -3,7 +3,9 @@ Labor supply targets and the chi_n calibration for OG-ETH.
 
 chi_n, the age profile of the disutility of labor, is calibrated so that
 the model's average labor supply by age matches hours worked per person
-in Ethiopia's 2021 Labour Force and Migration Survey (LFMS). The
+in Ethiopia's 2021 Labour Force and Migration Survey (LFMS), with the
+shape within the survey's open 65+ band from the Ethiopia Socioeconomic
+Survey wave 5 (ESS, 2021/22). The
 calibration solves the steady state repeatedly, rescaling chi_n between
 solves by the ratio of marginal disutilities at the model's and the
 data's labor supply, which is the exact adjustment when consumption and
@@ -42,12 +44,10 @@ HOURS_BAND_MIDPOINTS = {
     "60-64": 62,
     "65+": 67,
 }
-# beyond the survey's last band the target tapers with the NTA per-capita
-# labor income profile, and never below this share of the time endowment
-OLDEST_SURVEY_AGE = 67
+# the target never falls below this share of the time endowment
 MIN_LABOR_SUPPLY = 0.02
 # ages over which the fit is judged; older households supply little labor
-# and their targets are extrapolated
+# and their targets rest on small samples
 FIT_AGES = (20, 80)
 DEFAULT_MAX_ITER = 10
 DEFAULT_TOL = 0.02
@@ -90,45 +90,41 @@ def hours_per_person():
     return df
 
 
-def pay_per_hour_by_age(e, lambdas):
+def older_hours_shape():
     """
-    The model's pay per hour by age: the earnings matrix averaged over
-    lifetime-income groups with their population shares.
-
-    Args:
-        e (Numpy array): earnings matrix, size (S, J), or (T, S, J), in
-            which case its steady-state slice is used
-        lambdas (Numpy array): population shares of the groups, length J
+    Hours worked per person within the LFMS open 65+ band, from the ESS
+    wave 5 (2021/22) labor module: hours in the last 7 days on the
+    household farm, in own-account or household business, in casual work
+    and in paid work, with people who did not work counted at zero,
+    household weights. Ages 70-79 are pooled (75-79 alone has 120 people).
+    Tabulated by ~/Projects/og-analysis/eth-ess/scripts/hours_by_age.py
+    (World Bank Microdata Library, catalog 6161).
 
     Returns:
-        pay (Numpy array): average pay per hour by age, length S
+        df (Pandas DataFrame): age_band, mean_age (weighted mean age in
+            the band), n (people), hours_per_person, ratio_to_65plus
+            (the band's hours relative to the ESS 65+ mean)
 
     """
-    e = np.asarray(e, dtype=float)
-    if e.ndim == 3:
-        e = e[-1]
-    lambdas = np.asarray(lambdas, dtype=float).flatten()
-    return e @ lambdas / lambdas.sum()
+    return pd.read_csv(
+        os.path.join(DATA_DIR, "ess2021_older_hours_by_age.csv")
+    )
 
 
-def labor_supply_target(E, S, e, lambdas, ltilde=1.0):
+def labor_supply_target(E, S, ltilde=1.0):
     """
     Average labor supply by model age, as a share of the time endowment,
     from LFMS hours per person.
 
-    Beyond the survey's open 65+ band the target follows NTA labor income
-    per person divided by the model's own pay per hour (the earnings
-    matrix): labor income per person is hours per person times pay per
-    hour, and the earnings matrix already carries the fall in pay with
-    age, so tapering hours by NTA income alone would count that fall
-    twice. NTA reports a single open band from 85, so the target is not
-    allowed to rise with age beyond the survey.
+    LFMS publishes one open band from 65. Within it the target follows
+    the ESS age shape (65-69, 70-79, 80+, each at its mean age) scaled to
+    the LFMS 65+ level, so the survey sets the level and the ESS only
+    the decline with age. The target is held flat beyond the oldest
+    point.
 
     Args:
         E (int): age at which agents become economically active
         S (int): number of model periods in a lifetime
-        e (Numpy array): earnings matrix, size (S, J) or (T, S, J)
-        lambdas (Numpy array): population shares of the groups, length J
         ltilde (float): time endowment per period
 
     Returns:
@@ -136,24 +132,22 @@ def labor_supply_target(E, S, e, lambdas, ltilde=1.0):
 
     """
     ages = income.model_ages(E, S)
-    df = hours_per_person()
-    x = df.age_band.map(HOURS_BAND_MIDPOINTS).to_numpy(dtype=float)
-    y = df.hours_per_person.to_numpy() / WEEKLY_TIME_ENDOWMENT * ltilde
-    order = np.argsort(x)
-    x, y = x[order], y[order]
-    target = np.interp(ages, x, y)
-    old = ages > OLDEST_SURVEY_AGE
-    if old.any():
-        both = np.concatenate(([OLDEST_SURVEY_AGE], ages[old]))
-        nta = income.nta_labor_income("ETH", both)
-        pay = np.interp(both, ages, pay_per_hour_by_age(e, lambdas))
-        hours = (
-            np.interp(OLDEST_SURVEY_AGE, x, y)
-            * (nta / pay)
-            / (nta[0] / pay[0])
+    df = hours_per_person().set_index("age_band")
+    level65 = df.loc["65+", "hours_per_person"]
+    df = df.drop(index="65+")
+    old = older_hours_shape()
+    x = np.concatenate(
+        (
+            df.index.map(HOURS_BAND_MIDPOINTS).to_numpy(dtype=float),
+            old.mean_age,
         )
-        target[old] = np.minimum.accumulate(hours)[1:]
-    return np.maximum(target, MIN_LABOR_SUPPLY * ltilde)
+    )
+    y = np.concatenate(
+        (df.hours_per_person.to_numpy(), level65 * old.ratio_to_65plus)
+    )
+    order = np.argsort(x)
+    target = np.interp(ages, x[order], y[order]) / WEEKLY_TIME_ENDOWMENT
+    return np.maximum(target * ltilde, MIN_LABOR_SUPPLY * ltilde)
 
 
 def average_labor_supply(n, omega_SS):
@@ -256,7 +250,7 @@ def estimate_chi_n(
 
     """
     p = copy.deepcopy(p)
-    target = labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
+    target = labor_supply_target(p.E, p.S, p.ltilde)
     ages = income.model_ages(p.E, p.S)
     fit = (ages >= FIT_AGES[0]) & (ages < FIT_AGES[1])
     chi_n = steady_state_chi_n(p)

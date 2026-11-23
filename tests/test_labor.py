@@ -34,8 +34,21 @@ def test_hours_per_person_is_a_hump():
     assert hpp["20-24"] < hpp["30-34"] > hpp["50-54"] > hpp["65+"]
 
 
-def test_labor_supply_target_level_shape_and_floor(p):
-    target = labor.labor_supply_target(20, 80, p.e, p.lambdas)
+def test_older_hours_shape_from_ess():
+    old = labor.older_hours_shape().set_index("age_band")
+    assert list(old.index) == ["65-69", "70-79", "80+"]
+    # hours fall with age within the 65+ band, steeply from 80
+    assert old.hours_per_person.is_monotonic_decreasing
+    assert (
+        old.loc["80+", "ratio_to_65plus"]
+        < 0.5
+        < old.loc["70-79", "ratio_to_65plus"]
+    )
+    assert old.n.min() >= 150
+
+
+def test_labor_supply_target_level_shape_and_floor():
+    target = labor.labor_supply_target(20, 80)
     ages = income.model_ages(20, 80)
     assert target.shape == (80,)
     # prime-age Ethiopians work about 25 hours a week per person, which is
@@ -43,23 +56,23 @@ def test_labor_supply_target_level_shape_and_floor(p):
     prime = target[(ages >= 30) & (ages < 40)].mean()
     assert prime == pytest.approx(25 / labor.WEEKLY_TIME_ENDOWMENT, rel=0.03)
     assert target[0] < prime
-    # beyond the survey the target is NTA income per person over the
-    # model's pay per hour, never rising with age and never below the floor
-    old = ages > labor.OLDEST_SURVEY_AGE
-    assert np.all(np.diff(target[old]) <= 1e-12)
-    # the first age past the survey: the 65+ band's hours per person
-    # scaled by income over pay, relative to the band's midpoint
-    pay = labor.pay_per_hour_by_age(p.e, p.lambdas)
-    a67 = labor.OLDEST_SURVEY_AGE
-    i = int(np.argmax(old))
-    ratio = income.nta_labor_income("ETH", ages[i]) / pay[i]
-    ratio67 = income.nta_labor_income("ETH", a67) / np.interp(a67, ages, pay)
+    # within the open 65+ band: the ESS shape at the LFMS 65+ level
     hpp = labor.hours_per_person().set_index("age_band").hours_per_person
-    assert target[i] == pytest.approx(
-        hpp["65+"] / labor.WEEKLY_TIME_ENDOWMENT * ratio / ratio67
-    )
+    old = labor.older_hours_shape()
+    for _, row in old.iterrows():
+        expected = (
+            hpp["65+"] * row.ratio_to_65plus / labor.WEEKLY_TIME_ENDOWMENT
+        )
+        # the model ages either side of the band's mean age bracket it
+        k = np.searchsorted(ages, row.mean_age)
+        assert target[k - 1] >= expected - 1e-12
+        assert target[min(k, len(ages) - 1)] <= expected + 1e-12
+    # never rising past the survey's last five-year band, flat beyond
+    # the oldest point, and never below the floor
+    assert np.all(np.diff(target[ages >= 62]) <= 1e-12)
+    assert np.all(target[ages >= old.mean_age.max()] == target[-1])
     assert target.min() >= labor.MIN_LABOR_SUPPLY
-    scaled = labor.labor_supply_target(20, 80, p.e, p.lambdas, ltilde=2.0)
+    scaled = labor.labor_supply_target(20, 80, ltilde=2.0)
     np.testing.assert_allclose(scaled, 2.0 * target)
 
 
@@ -74,7 +87,7 @@ def test_average_labor_supply_weights_by_population():
 def test_chi_n_step_is_exact_on_target_and_monotone(p):
     chi_n = labor.steady_state_chi_n(p)
     assert chi_n.shape == (p.S,)
-    target = labor.labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
+    target = labor.labor_supply_target(p.E, p.S, p.ltilde)
     same = labor.chi_n_step(chi_n, target, target, p)
     np.testing.assert_allclose(same, chi_n)
     # working more than the target in the model calls for a heavier
@@ -89,7 +102,7 @@ def test_chi_n_step_is_exact_on_target_and_monotone(p):
 
 
 def test_fit_table_bands(p):
-    target = labor.labor_supply_target(p.E, p.S, p.e, p.lambdas, p.ltilde)
+    target = labor.labor_supply_target(p.E, p.S, p.ltilde)
     table = labor.fit_table(target, target, p.E, p.S)
     assert list(table.age_band[:2]) == ["20-24", "25-29"]
     assert len(table) == 12
