@@ -56,21 +56,28 @@ def test_labor_supply_target_level_shape_and_floor():
     prime = target[(ages >= 30) & (ages < 40)].mean()
     assert prime == pytest.approx(25 / labor.WEEKLY_TIME_ENDOWMENT, rel=0.03)
     assert target[0] < prime
-    # within the open 65+ band: the ESS shape at the LFMS 65+ level
+    # from 65 an exponential decline fitted to the ESS bands: close to
+    # each band's hours at its mean age, about 6 percent a year of age
+    level, rate = labor.older_hours_decline()
+    assert 0.05 < rate < 0.07
     hpp = labor.hours_per_person().set_index("age_band").hours_per_person
     old = labor.older_hours_shape()
-    for _, row in old.iterrows():
-        expected = (
-            hpp["65+"] * row.ratio_to_65plus / labor.WEEKLY_TIME_ENDOWMENT
-        )
-        # the model ages either side of the band's mean age bracket it
-        k = np.searchsorted(ages, row.mean_age)
-        assert target[k - 1] >= expected - 1e-12
-        assert target[min(k, len(ages) - 1)] <= expected + 1e-12
-    # never rising past the survey's last five-year band, flat beyond
-    # the oldest point, and never below the floor
+    fitted = level * np.exp(
+        -rate * (old.mean_age - labor.OLDER_HOURS_START_AGE)
+    )
+    np.testing.assert_allclose(
+        fitted, hpp["65+"] * old.ratio_to_65plus, rtol=0.03
+    )
+    a65 = ages >= labor.OLDER_HOURS_START_AGE
+    np.testing.assert_allclose(
+        target[a65] * labor.WEEKLY_TIME_ENDOWMENT,
+        np.maximum(
+            level * np.exp(-rate * (ages[a65] - labor.OLDER_HOURS_START_AGE)),
+            labor.MIN_LABOR_SUPPLY * labor.WEEKLY_TIME_ENDOWMENT,
+        ),
+    )
+    # never rising past the survey's last five-year band
     assert np.all(np.diff(target[ages >= 62]) <= 1e-12)
-    assert np.all(target[ages >= old.mean_age.max()] == target[-1])
     assert target.min() >= labor.MIN_LABOR_SUPPLY
     scaled = labor.labor_supply_target(20, 80, ltilde=2.0)
     np.testing.assert_allclose(scaled, 2.0 * target)

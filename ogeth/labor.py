@@ -44,6 +44,8 @@ HOURS_BAND_MIDPOINTS = {
     "60-64": 62,
     "65+": 67,
 }
+# age from which the target follows the exponential decline fitted to ESS
+OLDER_HOURS_START_AGE = 65
 # the target never falls below this share of the time endowment
 MIN_LABOR_SUPPLY = 0.02
 # ages over which the fit is judged; older households supply little labor
@@ -111,16 +113,42 @@ def older_hours_shape():
     )
 
 
+def older_hours_decline():
+    """
+    Exponential decline of hours per person past 65: a weighted least
+    squares fit of log hours on age through the ESS bands (each at its
+    mean age, weighted by its sample size), at the LFMS 65+ level.
+
+    Returns:
+        (tuple): level (weekly hours per person at OLDER_HOURS_START_AGE)
+            and rate (the fall per year of age, as a log difference)
+
+    """
+    level65 = (
+        hours_per_person().set_index("age_band").loc["65+", "hours_per_person"]
+    )
+    old = older_hours_shape()
+    hours = level65 * old.ratio_to_65plus.to_numpy()
+    slope, intercept = np.polyfit(
+        old.mean_age.to_numpy() - OLDER_HOURS_START_AGE,
+        np.log(hours),
+        1,
+        w=np.sqrt(old.n.to_numpy()),
+    )
+    return float(np.exp(intercept)), float(-slope)
+
+
 def labor_supply_target(E, S, ltilde=1.0):
     """
     Average labor supply by model age, as a share of the time endowment,
     from LFMS hours per person.
 
-    LFMS publishes one open band from 65. Within it the target follows
-    the ESS age shape (65-69, 70-79, 80+, each at its mean age) scaled to
-    the LFMS 65+ level, so the survey sets the level and the ESS only
-    the decline with age. The target is held flat beyond the oldest
-    point.
+    LFMS publishes one open band from 65. From that age the target
+    declines exponentially, fitted to the ESS age shape within the band
+    (65-69, 70-79, 80+) at the LFMS 65+ level, so the survey sets the
+    level and the ESS only the decline with age (about 6 percent a year
+    of age). Between the 60-64 band's midpoint and 65 the target is
+    linear.
 
     Args:
         E (int): age at which agents become economically active
@@ -132,21 +160,19 @@ def labor_supply_target(E, S, ltilde=1.0):
 
     """
     ages = income.model_ages(E, S)
-    df = hours_per_person().set_index("age_band")
-    level65 = df.loc["65+", "hours_per_person"]
-    df = df.drop(index="65+")
-    old = older_hours_shape()
-    x = np.concatenate(
-        (
-            df.index.map(HOURS_BAND_MIDPOINTS).to_numpy(dtype=float),
-            old.mean_age,
-        )
+    df = hours_per_person()
+    df = df[df.age_band != "65+"]
+    level, rate = older_hours_decline()
+    x = np.append(
+        df.age_band.map(HOURS_BAND_MIDPOINTS).to_numpy(dtype=float),
+        OLDER_HOURS_START_AGE,
     )
-    y = np.concatenate(
-        (df.hours_per_person.to_numpy(), level65 * old.ratio_to_65plus)
-    )
+    y = np.append(df.hours_per_person.to_numpy(), level)
     order = np.argsort(x)
-    target = np.interp(ages, x[order], y[order]) / WEEKLY_TIME_ENDOWMENT
+    hours = np.interp(ages, x[order], y[order])
+    old = ages >= OLDER_HOURS_START_AGE
+    hours[old] = level * np.exp(-rate * (ages[old] - OLDER_HOURS_START_AGE))
+    target = hours / WEEKLY_TIME_ENDOWMENT
     return np.maximum(target * ltilde, MIN_LABOR_SUPPLY * ltilde)
 
 
