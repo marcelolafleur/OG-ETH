@@ -93,7 +93,7 @@ uv run python examples/run_og_eth.py
 
 #### What happens
 
-The first `uv run` creates the project environment if it does not exist yet — downloading a compatible Python interpreter if needed and installing the exact locked dependencies — and then runs the example. Early in the run you may be asked for a UN API token; just press return, and the model reads the same population data from a public mirror and continues. A full baseline-plus-reform run takes about 20 to 25 minutes on a recent laptop, longer on smaller machines; when it finishes, its plots and tables are saved under `./examples/OG-ETH-Example/` (see the list of outputs below).
+The first `uv run` creates the project environment if it does not exist yet — downloading a compatible Python interpreter if needed and installing the exact locked dependencies — and then runs the example. A full baseline-plus-reform run takes about 15 to 20 minutes on a recent laptop, longer on smaller machines; when it finishes, its plots and tables are saved under `./examples/OG-ETH-Example/` (see the list of outputs below).
 
 ### Installing for development or contributing
 
@@ -122,19 +122,21 @@ The first `uv run` creates the project environment if it does not exist yet — 
     * See [`ogcore.TPI.py`](https://github.com/PSLmodels/OG-Core/blob/master/ogcore/TPI.py) for what is in the dictionary object in this pickle file
   * An analogous set of files in the `./examples/OG-ETH-Example/OUTPUT_REFORM` directory, which represent objects from the simulation of the reform policy
 
-Note that a full model run (solving for the full time path equilibrium for the baseline and reform policies) takes about 20 to 25 minutes on a recent laptop with the pinned OG-Core, and longer on smaller machines.
+Note that a full model run (solving for the full time path equilibrium for the baseline and reform policies) takes about 15 to 20 minutes on a recent laptop with the pinned OG-Core, and longer on smaller machines.
 
 If you run into errors running the example script, please open a new issue in the OG-ETH repo with a description of the issue and any relevant tracebacks you receive.
 
-Once the package is installed, one can adjust parameters in the OG-Core `Specifications` object using the `Calibration` class as follows:
+Once the package is installed, the calibration loads into an OG-Core `Specifications` object, whose parameters can then be changed for a reform:
 
 ```
+import json
+from importlib.resources import files
 from ogcore.parameters import Specifications
-from ogeth.calibrate import Calibration
 p = Specifications()
-c = Calibration(p)
-updated_params = c.get_dict()
-p.update_specifications({'initial_debt_ratio': updated_params['initial_debt_ratio']})
+p.update_specifications(json.loads(
+    files("ogeth").joinpath("ogeth_default_parameters.json").read_text()
+))
+p.update_specifications({"cit_rate": [[0.25]]})
 ```
 
 ## Disclaimer

@@ -357,7 +357,8 @@ CASH_TRANSFERS_PUBLISHED = [2.0, 1.8]
 # Public pension benefits replace the 0.5 assumption: PSSSA paid 22.2
 # billion birr to 750,812 recipients; POESSA's 43,347 at PSSSA's average
 # (ILO Social Security Inquiry, 2024 data); over FY2023/24 old-base GDP.
-# Old-age share 60 percent, range 55-65 (taxes.md, Public pensions).
+# Old-age share about 60 percent; survivors' and invalidity pensions are
+# the rest (taxes.md, Public pensions).
 PENSION_BENEFITS_BIRR_BN = 22.2 + 43_347 * 22.2 / 750_812
 PENSION_BENEFITS_PUBLISHED = round(
     100 * PENSION_BENEFITS_BIRR_BN / NOMINAL_GDP_OLD_BASE_BIRR_BN["FY2023/24"],

@@ -5,4 +5,4 @@ The calibration matches the distributions of income, labor and wealth with these
 
 (SecLWI_avghhinc)=
 ## Average household income
-We use the average household income parameter (`mean_income_data`) to map the tax functions in country currency to model units.  It is rebased FY2024/25 GDP per adult, about 360,000 birr; the derivation is in {ref}`Chap_Tax`.
+We use the average household income parameter (`mean_income_data`) to map the tax functions in country currency to model units.  It is household income per adult in FY2024/25, about 310,000 birr: rebased GDP per adult times the household-income share of GDP in the model. The derivation is in {ref}`Chap_Tax`.

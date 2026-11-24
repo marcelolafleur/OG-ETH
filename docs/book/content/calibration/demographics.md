@@ -193,7 +193,7 @@ We discuss the approach to estimating fertility rates $f_{s,t}$, mortality rates
   Ethiopia immigration rates by age $\left(i_s\right)$ for $E+S=100$: year 2025
   ```
 
-  We calculate our immigration rates for the consecutive-year-periods of population distribution data 2024 and 2025. The immigration rates $i_{s,t}$ that we use in our model are the the residuals described in {eq}`EqPopImmRates` implied by these two consecutive periods. {numref}`Figure %s <FigImmRatesETH>` shows the estimated immigration rates for $E+S=100$ and given the fertility rates from Section {ref}`SecDemogFert` and the mortality rates from Section {ref}`SecDemogMort`.
+  The immigration rates $i_{s,t}$ are the residuals described in {eq}`EqPopImmRates` between consecutive years of the UN population data, a path by year over the data window (2024 to 2098). {numref}`Figure %s <FigImmRatesETH>` shows the estimated immigration rates for $E+S=100$ and given the fertility rates from Section {ref}`SecDemogFert` and the mortality rates from Section {ref}`SecDemogMort`.
 
   At the end of Section {ref}`SecDemogPopSSTP`, we describe a small adjustment that we make to the immigration rates after a certain number of periods in order to make computation of the transition path equilibrium of the model compute more robustly.
 
