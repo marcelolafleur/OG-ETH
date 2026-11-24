@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 * The IMF program scenario of 0.3.0 (`examples/run_og_eth.py --scenario program`): IMF reports are a source for the baseline's values, not a scenario. The official example runs the baseline and a corporate-tax reform.
 * The online refresh of `g_y_annual` from the World Bank in `Calibration(update_from_api=True)`, and the unused IMF fetch: every run uses the packaged values.
-* The legacy `chi_n` estimation loop (`python -m ogeth.labor`), `python -m ogeth.income` (it wrote the earnings matrix without its unit scaling) `examples/eth_diesel_tax.py` (it imported a module not in the repository), `examples/eth_imm_change.py` (it could not run), the unused labels in `constants.py`, and unused test fixtures and dependencies.
+* The legacy `chi_n` estimation loop (`python -m ogeth.labor`), `python -m ogeth.income` (it wrote the earnings matrix without its unit scaling), `examples/eth_diesel_tax.py` (it imported a module not in the repository), `examples/eth_imm_change.py` (it could not run), the unused labels in `constants.py`, and unused test fixtures and dependencies.
 
 ## [0.3.0] - 2026-09-10 20:00:00
 
@@ -155,6 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This version is a pre-release alpha. The example run script OG-ETH/examples/run_og_eth.py runs, but the model is not currently calibrated to represent the Ethiopian economy and population.
 
 
+[0.4.0]: https://github.com/EAPD-DRB/OG-ETH/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/EAPD-DRB/OG-ETH/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/EAPD-DRB/OG-ETH/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/EAPD-DRB/OG-ETH/compare/v0.0.8...v0.1.0
 [0.0.8]: https://github.com/EAPD-DRB/OG-ETH/compare/v0.0.7...v0.0.8
