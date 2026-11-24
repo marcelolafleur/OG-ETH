@@ -61,7 +61,7 @@ def save_seed(ss_vars, path=SEED_PATH):
         "TR": scalar(ss_vars["TR"]),
         "factor": scalar(ss_vars["factor"]),
         "BQ": np.asarray(ss_vars["BQ"], dtype=float).ravel(),
-        # the rest of the solved outer state, so a scenario with other
+        # the rest of the solved outer state, so a run with other
         # spending shares starts from the solved output and wage rather
         # than ones rebuilt from its own transfer share and from r alone
         "w": scalar(ss_vars["w"]),
@@ -108,7 +108,7 @@ def enable(path=SEED_PATH):
         BQ_items = [BQ_g.sum()] if p.use_zeta else list(BQ_g)
         if "Y" in seed and seed["p_m"].size == p.M:
             # Start from the solved output, wage and prices. Transfers are
-            # the scenario's own share of that output, so the guesses agree
+            # the run's own share of that output, so the guesses agree
             # with each other under any spending shares; the wage moves with
             # r along the retry ladder as the firms' condition implies.
             Y_g = seed["Y"]

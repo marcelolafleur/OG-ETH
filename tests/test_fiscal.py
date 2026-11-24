@@ -1,16 +1,11 @@
 """
-Tests of the two baseline scenarios' fiscal paths.
+Tests of the baseline's fiscal paths.
 
-The packaged JSON is the history-anchored baseline: every fiscal input takes
-its FY2024/25 outturn or enacted FY2025/26 budget value and is held there,
-and debt stabilizes at its measured ratio. The IMF fifth-ECF-review program
-(Country Report 26/174) is a scenario built by ``fiscal_program_params``:
-spending ratios mapped onto the model's instruments, revenue gains spread
-over the consumption and corporate taxes, and a real effective interest
-rates on market and external debt from the program's debt
-sustainability analysis. These tests pin the
-packaged paths to the history derivation and check the program mapping
-reproduces the IMF accounts. No model solve is involved.
+Every fiscal input takes its FY2024/25 outturn or enacted FY2025/26 budget
+value (IMF Country Report 26/174) and is held there, and debt stabilizes at
+its measured ratio. These tests pin the packaged paths to their derivation
+and check that the mapping onto the model's instruments reproduces the
+published accounts. No model solve is involved.
 """
 
 import json
@@ -22,7 +17,7 @@ from ogcore.parameters import Specifications
 
 from ogeth import macro_params as mp
 
-N = len(mp.PROGRAM_YEARS)
+N = len(mp.FISCAL_YEARS)
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +38,7 @@ def params(packaged):
 
 def test_spending_paths_reproduce_imf_primary_expenditure():
     """G + TR + I_g equals IMF expenditure net of interest, within 0.1 pp."""
-    sp = mp.program_spending_paths()
+    sp = mp.spending_paths()
     primary = (
         np.array(sp["alpha_G"][:N])
         + np.array(sp["alpha_T"][:N])
@@ -58,9 +53,9 @@ def test_spending_paths_reproduce_imf_primary_expenditure():
     assert np.allclose(primary, imf, atol=1e-3)
 
 
-def test_program_paths_start_at_fy2024_25_values(packaged):
+def test_paths_start_at_fy2024_25_values(packaged):
     """Period 0 is FY2024/25: general-government debt 43.3, capital spending
-    5.0, grants 1.7 and recurrent spending net of interest and transfers 4.3
+    5.0, grants 1.7 and recurrent spending net of interest and transfers 4.6
     percent of old-base GDP (IMF WEO Oct 2026; CR 26/174 Tables 1 and 2b),
     times old over rebased GDP (15,094 / 24,031), in model units."""
     f = 15094.0 / 24031.07
@@ -91,43 +86,23 @@ def test_program_paths_start_at_fy2024_25_values(packaged):
     assert packaged["alpha_T"][0] == pytest.approx(mp.to_model(cash), abs=1e-5)
 
 
-def test_closure_starts_after_the_program_horizon(packaged):
-    """Spending follows the program for its seven fiscal years; OG-Core's
-    debt-closure rule takes over from FY2031/32."""
-    assert packaged["tG1"] == N
+def test_closure_starts_in_fy2031_32(packaged):
+    """OG-Core's debt-closure rule takes over from model period 7
+    (FY2031/32); the fiscal paths are written out to it."""
+    assert packaged["tG1"] == mp.TG1 == 7
+    assert len(packaged["alpha_G"]) == mp.FISCAL_PATH_LENGTH
 
 
-def test_revenue_paths_add_the_imf_revenue_gain(params):
-    """Consumption-tax and CIT paths of the program scenario carry the
-    program's revenue increase (9.2 -> 12.3 percent of GDP) in the stated
-    two-thirds / one-third split, evaluated at the FY2024/25 collections
-    they scale."""
-    prog = mp.fiscal_program_params(params)
-    tau_c = np.asarray(prog["tau_c"])[:N, 0]
-    cit = np.asarray(prog["adjustment_factor_for_cit_receipts"])[:N]
-    gain_cons = (tau_c / tau_c[0] - 1) * mp.BASE_CONS_TAX_REVENUE
-    gain_cit = (cit / cit[0] - 1) * mp.BASE_CIT_REVENUE
-    imf_gain = (np.array(mp.IMF_REVENUE) - mp.IMF_REVENUE[0]) / 100
-    # the formalization path phases in PIT_FORMALIZATION_GAIN over the program
-    formal = mp.PIT_FORMALIZATION_GAIN * np.arange(N) / (N - 1)
-    assert np.allclose(gain_cons + gain_cit + formal, imf_gain, atol=1e-12)
-    assert np.allclose(
-        gain_cons, mp.INDIRECT_SHARE_OF_REVENUE_GAIN * (imf_gain - formal)
-    )
-
-
-def test_history_baseline_holds_fy2024_25_inputs(packaged, params):
+def test_baseline_holds_fy2025_26_inputs(packaged, params):
     """The packaged baseline: FY2024/25 outturn and FY2025/26 budget, then
     held; effective revenue rates, compliance and the foreign borrowing
     share flat; debt stabilizes at its measured ratio; remittances flat."""
-    expected = mp.history_anchored_params(params)
+    expected = mp.fiscal_params(params)
     for key in ("alpha_G", "alpha_T", "alpha_I", "alpha_FA"):
         path = np.array(packaged[key])
         assert np.allclose(path[: len(expected[key])], expected[key])
         # nothing moves after the enacted budget year
-        assert np.allclose(path[mp.HISTORY_KNOWN_YEARS - 1 :], path[-1])
-    prog = mp.program_spending_paths()
-    assert packaged["alpha_I"][1] == pytest.approx(prog["alpha_I"][1])
+        assert np.allclose(path[N - 1 :], path[-1])
     tau_c = np.asarray(packaged["tau_c"])
     assert np.allclose(tau_c, tau_c[0])
     cit = np.asarray(packaged["adjustment_factor_for_cit_receipts"])
@@ -135,7 +110,7 @@ def test_history_baseline_holds_fy2024_25_inputs(packaged, params):
     lab = np.array(packaged["labor_income_tax_noncompliance_rate"])
     assert np.allclose(lab, lab[0])
     assert np.allclose(packaged["zeta_D"], mp.MARKET_FOREIGN_DEBT_SHARE)
-    assert packaged["debt_ratio_ss"] == pytest.approx(mp.HISTORY_DEBT_RATIO_SS)
+    assert packaged["debt_ratio_ss"] == pytest.approx(mp.DEBT_RATIO_SS)
     # the long-run anchor is the FY2024/25 ratio of all debt, which is all
     # market debt once external debt has been repaid
     assert packaged["debt_ratio_ss"] == pytest.approx(
@@ -144,28 +119,8 @@ def test_history_baseline_holds_fy2024_25_inputs(packaged, params):
     assert packaged["alpha_D_ext"][-1] == 0.0
     assert packaged["alpha_RM_T"] == packaged["alpha_RM_1"]
     assert packaged["r_gov_DY"] == pytest.approx(
-        -2 * packaged["r_gov_DY2"] * mp.HISTORY_DEBT_RATIO_SS
+        -2 * packaged["r_gov_DY2"] * mp.DEBT_RATIO_SS
     )
-
-
-def test_formalization_path_broadens_the_base_over_the_program():
-    """Program scenario: group 6 goes from half to full compliance and group
-    5 from none to a fifth, linearly over the seven program years, then
-    holds; labor and capital rates move together (the SS diagnostic tiles
-    one from the other)."""
-    prog = mp.program_compliance_paths()
-    lab = np.array(prog["labor_income_tax_noncompliance_rate"])
-    cap = np.array(prog["capital_income_tax_noncompliance_rate"])
-    assert lab.shape[0] == N + 1 and np.allclose(lab, cap)
-    # the shape vectors give compliance relative to the top group; the
-    # calibrated scale sets the level (see taxes.md)
-    start = 1 - mp.COMPLIANCE_SCALE * (1 - np.array(mp.NONCOMPLIANCE_START))
-    end = 1 - mp.COMPLIANCE_SCALE * (1 - np.array(mp.NONCOMPLIANCE_END))
-    assert lab[0].tolist() == pytest.approx(start.tolist())
-    assert lab[N - 1].tolist() == pytest.approx(end.tolist())
-    assert lab[N].tolist() == pytest.approx(end.tolist())
-    assert 0 < mp.COMPLIANCE_SCALE < 1
-    assert (np.diff(lab, axis=0) <= 1e-6).all()  # compliance only improves
 
 
 def test_pensions_go_to_the_formal_groups_only(packaged):
@@ -193,34 +148,8 @@ def test_domestic_market_debt_matches_the_imf_domestic_debt():
     )
 
 
-def test_program_r_gov_targets_the_dsa_market_rate(params):
-    """Program scenario: along the program's debt path (market plus
-    external debt) the shift path puts r_gov (before OG-Core's floor)
-    on the DSA's real rate on domestic debt, -11.0 percent in FY2024/25
-    rising to 3.3 by FY2030/31, above the floor."""
-    prog = mp.fiscal_program_params(params)
-    shift = np.asarray(prog["r_gov_shift"])[:N]
-    scale = float(np.asarray(params.r_gov_scale).flatten()[0])
-    # OG-Core prices the premium on all government debt, market plus
-    # external: along the program, the IMF's general-government debt path
-    d = np.array(mp.to_model(np.array(mp.IMF_PUBLIC_DEBT) / 100))
-    r_gov = (
-        scale * mp.R_SS_FOR_R_GOV
-        - shift
-        + prog["r_gov_DY"] * d
-        + params.r_gov_DY2 * d**2
-    )
-    assert prog["debt_ratio_ss"] == pytest.approx(mp.PROGRAM_DEBT_RATIO_SS)
-    assert prog["alpha_RM_T"] == pytest.approx(
-        mp.to_model(mp.IMF_PRIVATE_TRANSFERS[-1] / 100), abs=1e-6
-    )
-    dsa = np.array(mp.DSA_DOMESTIC_REAL_RATE[:N]) / 100
-    assert np.allclose(r_gov, dsa, atol=1e-9)
-    assert (dsa > mp.R_GOV_FLOOR).all()
-
-
-def test_history_r_gov_targets_the_dsa_market_rate(params):
-    """History baseline: at the debt anchor (premium zero) r_gov follows the
+def test_r_gov_targets_the_dsa_market_rate(params):
+    """At the debt anchor (premium zero) r_gov follows the
     DSA's real rate on domestic debt year by year to 2036 (the legacy
     stock rolling over at market rates), then the long-run rate."""
     targets = mp.market_rate_targets()
@@ -236,7 +165,7 @@ def test_history_r_gov_targets_the_dsa_market_rate(params):
     )
     assert np.allclose(r_gov, targets, atol=1e-9)
     assert r_gov[0] == pytest.approx(-0.110)
-    assert r_gov[N - 1] == pytest.approx(0.033)
+    assert r_gov[6] == pytest.approx(0.033)  # FY2030/31
     assert r_gov[11] == pytest.approx(0.046)  # 2036
     assert (np.diff(r_gov) > 0).all()
 
@@ -261,7 +190,7 @@ def test_long_run_r_gov_is_the_dsa_rate_on_new_domestic_debt(params):
 
 def test_packaged_fiscal_paths_match_the_derivation(packaged, params):
     """A regeneration must rewrite the fiscal paths from the same tables."""
-    expected = mp.scenario_params(params)
+    expected = mp.baseline_params(params)
     assert np.allclose(packaged["g_RM"], expected["g_RM"])
     for key in ("alpha_G", "alpha_T", "alpha_I", "alpha_FA"):
         assert np.allclose(

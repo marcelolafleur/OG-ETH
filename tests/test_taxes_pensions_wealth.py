@@ -84,21 +84,18 @@ def test_defined_benefit_parameters():
 
 
 def test_compliance_paths_scale_compliance_not_noncompliance():
-    paths = mp.program_compliance_paths(compliance_scale=0.5)
-    start = np.array(paths["labor_income_tax_noncompliance_rate"][0])
-    end = np.array(paths["labor_income_tax_noncompliance_rate"][-1])
+    paths = mp.compliance_paths(compliance_scale=0.5)
+    rates = np.array(paths["labor_income_tax_noncompliance_rate"])
     formal = np.array(mp.formal_share_by_group(mp.INFORMAL_EMPLOYMENT_SHARE))
     assert formal.tolist() == pytest.approx([0, 0, 0, 0.235, 1, 1, 1])
-    assert start.tolist() == pytest.approx((1 - 0.5 * formal).tolist())
-    # the program scenario makes another 6.5 percent of households formal
-    assert end.tolist() == pytest.approx(
-        [1, 1, 1, 1 - 0.5 * 0.885, 0.5, 0.5, 0.5]
-    )
+    assert rates[0].tolist() == pytest.approx((1 - 0.5 * formal).tolist())
+    # held at the FY2024/25 calibration
+    assert np.allclose(rates, rates[0])
     cov = np.array(paths["replacement_rate_adjust"][0])
     assert cov.tolist() == pytest.approx(
         (np.array(mp.PENSION_COVERAGE) * mp.PENSION_COVERAGE_SCALE).tolist()
     )
-    scaled = mp.program_compliance_paths(pension_coverage_scale=0.2)
+    scaled = mp.compliance_paths(pension_coverage_scale=0.2)
     assert np.array(scaled["replacement_rate_adjust"][0])[-1] == pytest.approx(
         0.2
     )

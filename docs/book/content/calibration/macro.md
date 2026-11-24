@@ -169,7 +169,7 @@ Ethiopia is one of the world's largest aid recipients, and on-budget grants to t
 
 A calibration has to assume something about every fiscal and external input in every future year.  Measured history and the start year pin down only the starting values; for the years after, the baseline holds the latest official values rather than following anyone's projections.
 
-The packaged parameters (`ogeth_default_parameters.json`; `macro_params.history_anchored_params`) are the baseline OG-ETH proposes, and `examples/run_og_eth.py` runs it together with a corporate-tax-cut reform.  Every input takes an official outturn or enacted value and is held there: the FY2024/25 outturn for model period 0 and the enacted FY2025/26 budget for period 1 ({cite}`IMFCR26174:2026`, Table 2b, the budget-year column), then the budget-year value for the long run.  The income tax uses the statutory schedule in force, Proclamation 1395/2025 from FY2025/26, because it is law; nothing else that the program *projects* — revenue measures, base broadening, the decline of grants, the borrowing mix, the fall in remittances, the debt target — is imposed.  Debt, growth, the current account and the trade balance are model outcomes, compared with the IMF projections under {ref}`Sec_Validation` but not fitted to them.  Two inputs are forward-looking by necessity the real rate on market debt follows the DSA's average real rate on domestic debt, because it follows from the existing stock rolling over at market rates already in place rather than from future policy (*Interest rates on government debt* above); and the external-debt stock and its rate follow the DSA's external-debt path ({ref}`Sec_ExternalDebt`).
+The packaged parameters (`ogeth_default_parameters.json`; `macro_params.fiscal_params`) are the baseline OG-ETH proposes, and `examples/run_og_eth.py` runs it together with a corporate-tax-cut reform.  Every input takes an official outturn or enacted value and is held there: the FY2024/25 outturn for model period 0 and the enacted FY2025/26 budget for period 1 ({cite}`IMFCR26174:2026`, Table 2b, the budget-year column), then the budget-year value for the long run.  The income tax uses the statutory schedule in force, Proclamation 1395/2025 from FY2025/26, because it is law; nothing else that the program *projects* — revenue measures, base broadening, the decline of grants, the borrowing mix, the fall in remittances, the debt target — is imposed.  Debt, growth, the current account and the trade balance are model outcomes, compared with the IMF projections under {ref}`Sec_Validation` but not fitted to them.  Two inputs are forward-looking by necessity the real rate on market debt follows the DSA's average real rate on domestic debt, because it follows from the existing stock rolling over at market rates already in place rather than from future policy (*Interest rates on government debt* above); and the external-debt stock and its rate follow the DSA's external-debt path ({ref}`Sec_ExternalDebt`).
 
 | Input | Baseline (packaged) | Source |
 |:---|:---|:---|
@@ -185,26 +185,7 @@ The packaged parameters (`ogeth_default_parameters.json`; `macro_params.history_
 | `alpha_RM_1`, `alpha_RM_T` (% rebased GDP) | 3.5, 3.5 | IMF CR 26/174, Table 4a, rebased |
 | `tG1` | 7 | |
 
-`macro_params.scenario_params(p)` builds the set from the tables, `update_baseline.py` writes it, and `tests/test_fiscal_program.py` pins it.
-
-(Sec_ProgramPath)=
-#### An extra example: the IMF program
-
-`examples/eth_imf_program.py` is an extra example, not part of the calibration.  It replaces the inputs above with the paths of the IMF's fifth-review program for FY2024/25–FY2030/31, held thereafter: spending, grants, revenue measures (income-tax compliance broadening in the fourth lifetime-income group, the rest of the revenue gain split 60/40 between the consumption-tax rate and corporate-tax collections), remittances gliding to the program's FY2030/31 share, and a long-run debt ratio of 0.187, the program's medium-term objective of about 30 percent of old-base GDP ({cite}`IMFCR26174:2026`), built by `macro_params.scenario_params(p, "program")`.  It is the IMF's scenario, and this documentation does not report its results; the table lists the program path and the parameters the example maps it to.
-
-| Fiscal year (model period) | 24/25 (0) | 25/26 (1) | 26/27 (2) | 27/28 (3) | 28/29 (4) | 29/30 (5) | 30/31 (6) | long run |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| General-government debt, IMF (% rebased GDP) | 27.2 | 24.6 | 22.3 | 20.6 | 19.2 | 17.9 | 16.6 | 18.1 (target) |
-| Revenue excl. grants, IMF (% rebased GDP) | 5.8 | 6.5 | 6.9 | 7.1 | 7.3 | 7.4 | 7.4 | 7.4 |
-| Primary expenditure, IMF (% rebased GDP) | 7.0 | 7.7 | 7.4 | 7.4 | 7.7 | 7.6 | 7.5 | 7.5 |
-| `alpha_G` (% GDP) | 2.9 | 3.3 | 3.3 | 3.6 | 3.7 | 3.7 | 3.7 | 3.7 |
-| `alpha_T` (% GDP), cash transfers excl. old-age pensions | 1.0 | 0.8 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 | 0.6 |
-| `alpha_I` (% GDP) | 3.1 | 3.5 | 3.3 | 3.0 | 3.3 | 3.1 | 3.1 | 3.1 |
-| `alpha_FA` (% GDP) | 1.1 | 0.8 | 0.5 | 0.2 | 0.2 | 0.2 | 0.1 | 0.2 |
-| Non-compliance, group 4 | 0.987 | 0.981 | 0.975 | 0.968 | 0.962 | 0.956 | 0.950 | 0.950 |
-| `tau_c` | 0.040 | 0.045 | 0.047 | 0.048 | 0.048 | 0.048 | 0.047 | 0.047 |
-| CIT collections factor | 0.376 | 0.449 | 0.478 | 0.492 | 0.500 | 0.492 | 0.485 | 0.485 |
-| Real rate on market debt, DSA (%) | -11.0 | -9.8 | -5.1 | -0.6 | 1.0 | 2.6 | 3.3 | 4.7 |
+`macro_params.baseline_params(p)` builds the set from the tables, `update_baseline.py` writes it, and `tests/test_fiscal_program.py` pins it.
 
 (Sec_InitialWealth)=
 ### Initial household wealth

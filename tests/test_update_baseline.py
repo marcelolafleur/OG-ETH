@@ -42,7 +42,7 @@ class MockCalibration:
 def test_demographics_only_writes_just_those_keys(monkeypatch, tmp_path):
     """
     The demographics-only route rewrites the regenerated keys and the fiscal
-    program paths in place and leaves every other entry untouched.
+    paths in place and leaves every other entry untouched.
     """
     output_dir = tmp_path / "baseline_output"
     output_dir.mkdir()
@@ -108,7 +108,7 @@ def test_main_json_updates_specifications(monkeypatch, tmp_path):
     # unchanged. Guards against an accidental regen wiping the calibration.
     assert p.tax_func_type == "GS"
     assert np.asarray(p.etr_params).shape[-1] == 3
-    start = 1 - mp.COMPLIANCE_SCALE * (1 - np.array(mp.NONCOMPLIANCE_START))
+    start = 1 - mp.COMPLIANCE_SCALE * (1 - np.array(mp.NONCOMPLIANCE))
     assert np.asarray(p.labor_income_tax_noncompliance_rate)[
         0
     ].tolist() == pytest.approx(start.tolist())

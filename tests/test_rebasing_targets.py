@@ -28,12 +28,11 @@ def packaged():
 
 def test_rebase_factors_are_old_over_new_gdp():
     """FY2024/25: 15,094 (IMF CR 26/174, old base) over 24,031 billion birr
-    (Ministry of National Strategy, rebased); FY2025/26: 19,268 over 31,934;
-    later years hold the FY2025/26 factor."""
-    f = mp.rebase_factors(7)
+    (Ministry of National Strategy, rebased); FY2025/26: 19,268 over
+    31,934."""
+    f = mp.rebase_factors()
     assert f[0] == pytest.approx(15094 / 24031.07)
     assert f[1] == pytest.approx(19268 / 31934)
-    assert np.allclose(f[2:], f[1])
     # a published series keeps its numerator: debt in birr is unchanged
     assert mp.rebased([50.0])[0] == pytest.approx(
         50.0 * 15094 / 24031.07, 1e-4
@@ -280,15 +279,15 @@ def test_warm_start_seed_is_shipped_and_shaped():
         seed = pickle.load(fh)
     assert seed["b"].shape == (80, 7) and seed["n"].shape == (80, 7)
     assert seed["factor"] > 0
-    # the full solved outer state, so other scenarios start consistently
+    # the full solved outer state, so other runs start consistently
     assert seed["Y"] > 0 and seed["w"] > 0 and seed["p_m"].size == 1
 
 
 def test_warm_start_guesses_agree_under_other_transfer_shares():
     """
     The warm start takes output from the seed and transfers as the
-    scenario's own share of it, so a scenario with another long-run transfer
-    share (the IMF program) starts from consistent guesses.
+    run's own share of it, so a run with another long-run transfer share
+    starts from consistent guesses.
     """
     from ogcore import SS
 

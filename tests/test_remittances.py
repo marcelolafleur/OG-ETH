@@ -1,21 +1,16 @@
 """
 Tests of the remittance calibration in the packaged single-industry JSON.
 
-Remittances are calibrated as a share of GDP that follows the IMF program's
-private-transfers projection over the program years (5.6 to 4.1 percent of
-GDP) and then stays where the program leaves it. That takes two things:
-``alpha_RM_1`` at the measured level and ``alpha_RM_T`` at the program
-endpoint, and a ``g_RM`` path built on ``g_n`` so ``aggregates.get_RM`` moves
-detrended remittances along the program instead of eroding them (along the
-actual path RM/Y then also moves with output's deviation from trend). These
-tests pin the level against its source and assert the share follows the
-program exactly -- the second is the one that catches a stale ``g_RM`` after
-a demographics regeneration.
+Remittances are held at their measured FY2024/25 share of GDP (IMF CR
+26/174, Table 4a, rebased). That takes two things: ``alpha_RM_1`` and
+``alpha_RM_T`` at the measured level, and a ``g_RM`` path built on ``g_n`` so
+``aggregates.get_RM`` keeps detrended remittances on trend instead of eroding
+them. These tests pin the level against its source and catch a stale
+``g_RM`` after a demographics regeneration.
 
 No model solve is involved.
 """
 
-import copy
 import json
 from importlib.resources import files
 
@@ -67,23 +62,12 @@ def test_alpha_rm_matches_imf_private_transfers(packaged):
 
 
 def test_packaged_long_run_share_is_the_measured_level(packaged):
-    """History baseline: no level shift between the first period and the
+    """No level shift between the first period and the
     steady state."""
     expected = remittances.remittance_level_params()
     assert packaged["alpha_RM_1"] == expected["alpha_RM_1"]
     assert packaged["alpha_RM_T"] == expected["alpha_RM_T"]
     assert packaged["alpha_RM_T"] == packaged["alpha_RM_1"]
-
-
-def test_program_long_run_share_is_the_program_endpoint():
-    """Program scenario: the long-run share is the last program-year
-    projection, held like the other program series (4.1 percent of GDP)."""
-    expected = remittances.remittance_level_params(scenario="program")
-    assert expected["alpha_RM_1"] == pytest.approx(EXPECTED_ALPHA_RM, abs=1e-5)
-    assert expected["alpha_RM_T"] == pytest.approx(
-        remittances.to_model(remittances.IMF_PRIVATE_TRANSFERS[-1] / 100),
-        abs=1e-6,
-    )
 
 
 def test_packaged_g_rm_keeps_remittances_on_trend(params):
@@ -99,40 +83,6 @@ def test_packaged_g_rm_keeps_remittances_on_trend(params):
     Y = np.ones(params.T + params.S)
     ratio = aggr.get_RM(Y, params, "TPI")[: params.T] / Y[: params.T]
     assert np.allclose(ratio, params.alpha_RM_T, atol=1e-12)
-
-
-def test_program_g_rm_moves_remittances_along_the_program_then_holds(
-    params,
-):
-    """Program scenario: on trend the share comes out exactly at the glide
-    in each program year and stays at the endpoint afterwards."""
-    p = copy.deepcopy(params)
-    p.update_specifications(
-        remittances.scenario_params(params, scenario="program")
-    )
-    Y = np.ones(params.T + params.S)
-    ratio = aggr.get_RM(Y, p, "TPI")[: params.T] / Y[: params.T]
-    # the glide is in market-price shares; alpha_RM in model units
-    program = np.array(
-        remittances.to_model(remittances.program_remittance_shares() / 100)
-    )
-    assert np.allclose(ratio[: program.size], program, atol=1e-6)
-    assert np.allclose(ratio[program.size :], p.alpha_RM_T, atol=1e-6)
-
-
-def test_program_shares_glide_between_the_anchors():
-    """The model follows the program's start and end values with an even
-    decline in between: the year-by-year projection has jumps that OG-Core's
-    bounds on g_RM do not admit."""
-    shares = remittances.program_remittance_shares()
-    imf = np.array(remittances.IMF_PRIVATE_TRANSFERS)
-    assert shares[0] == imf[0] and shares[-1] == pytest.approx(imf[-1])
-    assert np.all(np.diff(shares) < 0)
-    assert np.allclose(np.diff(np.log(shares)), np.diff(np.log(shares))[0])
-    p = Specifications()
-    lo, hi = -0.02, 0.15
-    g_RM = remittances.program_share_g_RM(p.g_y, np.full(p.T + p.S, 0.03))
-    assert g_RM.min() > lo and g_RM.max() < hi
 
 
 def test_packaged_g_rm_is_consistent_with_packaged_g_n(params, packaged):

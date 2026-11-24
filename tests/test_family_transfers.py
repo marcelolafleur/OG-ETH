@@ -33,7 +33,7 @@ def params(packaged):
 
 def test_packaged_phi_ft_is_the_rule(packaged, params):
     """A regeneration must rebuild phi_FT from the same rule and inputs."""
-    expected = mp.scenario_params(params)["phi_FT"]
+    expected = mp.baseline_params(params)["phi_FT"]
     assert np.allclose(packaged["phi_FT"], expected, rtol=1e-8, atol=1e-12)
 
 

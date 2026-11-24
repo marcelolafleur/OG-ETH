@@ -34,7 +34,6 @@ htmlcov/*
 *tax_func_loop_inputs_large.pkl
 */OUTPUT/*
 examples/OG-ETH-Example/
-examples/OG-ETH-IMF-Program/
 envs/
 *.egg-info/
 *dask-worker-space*

@@ -82,7 +82,7 @@ def scales_from(p):
         dict: compliance, pension and payroll scales
     """
     nc = np.asarray(p.labor_income_tax_noncompliance_rate)[0]
-    shape = 1 - np.array(mp.NONCOMPLIANCE_START)
+    shape = 1 - np.array(mp.NONCOMPLIANCE)
     j = int(np.argmax(shape))
     tau_p = np.asarray(p.tau_payroll)[0]
     return {
@@ -157,9 +157,9 @@ def next_overrides(p, ss, tm, tpi=None):
         sc["payroll"] *= _ratio(t["payroll/Y"], tm["payroll/Y"])
         cit = np.asarray(p.adjustment_factor_for_cit_receipts).flatten()
         out["adjustment_factor_for_cit_receipts"] = (
-            cit[: len(mp.PROGRAM_YEARS) + 1] * _ratio(t["CIT/Y"], tm["CIT/Y"])
+            cit[: mp.FISCAL_PATH_LENGTH] * _ratio(t["CIT/Y"], tm["CIT/Y"])
         ).tolist()
-        tau_c = np.asarray(p.tau_c)[: len(mp.PROGRAM_YEARS) + 1, 0]
+        tau_c = np.asarray(p.tau_c)[: mp.FISCAL_PATH_LENGTH, 0]
         out["tau_c"] = [
             [float(x)]
             for x in tau_c * _ratio(t["cons tax/Y"], tm["cons tax/Y"])
@@ -175,7 +175,7 @@ def next_overrides(p, ss, tm, tpi=None):
     out["r_gov_shift"] = mp.market_r_gov_shift_path(
         float(np.asarray(p.r_gov_scale).flatten()[0]),
         float(p.r_gov_DY2),
-        mp.HISTORY_DEBT_RATIO_SS,
+        mp.DEBT_RATIO_SS,
         float(np.squeeze(ss["r"])),
     )
     out["_r_ss"] = float(np.squeeze(ss["r"]))
@@ -183,11 +183,7 @@ def next_overrides(p, ss, tm, tpi=None):
     share = mp.model_income_share(ss, p)
     out["mean_income_data"] = mp.mean_income_data(share)
     sc["income_share"] = share
-    out.update(
-        mp.compliance_paths(
-            mp.DEFAULT_SCENARIO, sc["compliance"], sc["pension"]
-        )
-    )
+    out.update(mp.compliance_paths(sc["compliance"], sc["pension"]))
     out.update(mp.payroll_tax_params(sc["payroll"]))
     out["_scales"] = sc
     if tpi is not None:
