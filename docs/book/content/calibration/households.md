@@ -58,23 +58,23 @@ The target is hours worked per week per person by age from the 2021 Labour Force
 
 The survey's last band is open (65 and over), so the shape within it comes from the 2021/22 Ethiopia Socioeconomic Panel Survey ({cite}`ESS:ESPS2024`): hours in the last seven days on the household's farm, in its own or household business, and in casual and paid work, with non-workers at zero, household weights, 815 people aged 65 and over.  Hours per person are 14.0 at 65–69, 9.6 at 70–79 and 4.4 at 80 and over, at mean ages of 66.6, 73.0 and 86.1.  From 65 the target is an exponential decline fitted to those three bands (weighted least squares of log hours on each band's mean age, weights its sample size) at the labour-force survey's level, so that survey sets the level and the panel survey only the decline with age: 16.4 hours a week at 65, falling 5.9 percent a year of age, within half a percent of each band, and 2.2 hours at 100 (`ogeth.labor.older_hours_decline`).  Between the 60–64 band's midpoint and 65 the target is linear, and it never goes below two percent of the time endowment.  An earlier version extrapolated beyond 67 with the National Transfer Accounts labor-income profile, which falls much faster than measured hours because it also carries the fall in pay with age.
 
-`examples/tune.py` sets $\chi^n_s$ with the other dials.  Between steady-state solves each $\chi^n_s$ is rescaled by the ratio of the marginal disutility of labor at the model's average labor supply to that at the target, which is the exact adjustment to the household's labor first-order condition when consumption and prices are held fixed.  The fit is on target at every age through 69.  From 70 $\chi^n_s$ sits at OG-Core's cap of 10,000, and older households work more than the target.  The excess is concentrated in the poorest group: its consumption is close to the subsistence floor, where the marginal utility of consumption is high, so as pay falls with age it works more rather than less, and its hours barely respond to the disutility weight (with a cap ten times higher, people over 90 still worked 11.8 hours a week against a target of 2.8 in steady-state probes).  The Frisch elasticity is not moved to close the gap, since its value is set by the evidence above.  Net family transfers ({ref}`SecHH_FamilyTransfers`) narrow it by about half; the remainder is documented here rather than fitted.
+`examples/tune.py` sets $\chi^n_s$ with the other dials.  Between steady-state solves each $\chi^n_s$ is rescaled by the ratio of the marginal disutility of labor at the model's average labor supply to that at the target, which is the exact adjustment to the household's labor first-order condition when consumption and prices are held fixed.  The fit is on target at every age through 68.  From 69 $\chi^n_s$ sits at OG-Core's cap of 10,000, and older households work more than the target.  The excess is concentrated in the poorest group: its consumption is close to the subsistence floor, where the marginal utility of consumption is high, so as pay falls with age it works more rather than less, and its hours barely respond to the disutility weight (with a cap ten times higher, people over 90 still worked 11.8 hours a week against a target of 2.8 in steady-state probes).  The Frisch elasticity is not moved to close the gap, since its value is set by the evidence above.  Net family transfers ({ref}`SecHH_FamilyTransfers`) halve it in the seventies and narrow it by 40 percent in the eighties; the remainder is documented here rather than fitted.
 
 | Age | Target: hours per person per week (LFMS 2021; ESS 2021/22 shape from 65) | Model steady state |
 |---|---|---|
-| 20–24 | 18.6 | MODEL_20 |
-| 25–29 | 23.2 | MODEL_25 |
-| 30–34 | 24.9 | MODEL_30 |
-| 35–39 | 24.9 | MODEL_35 |
-| 40–44 | 24.4 | MODEL_40 |
-| 45–49 | 23.3 | MODEL_45 |
-| 50–54 | 20.3 | MODEL_50 |
-| 55–59 | 19.1 | MODEL_55 |
-| 60–64 | 16.9 | MODEL_60 |
-| 65–69 | 14.2 | MODEL_65 |
-| 70–79 ($\chi^n$ at its cap) | 9.3 | MODEL_70 |
-| 80–89 | 5.3 | MODEL_80 |
-| 90–99 | 3.1 | MODEL_90 |
+| 20–24 | 18.6 | 18.6 |
+| 25–29 | 23.2 | 23.2 |
+| 30–34 | 24.9 | 24.9 |
+| 35–39 | 24.9 | 24.9 |
+| 40–44 | 24.4 | 24.4 |
+| 45–49 | 23.3 | 23.3 |
+| 50–54 | 20.3 | 20.3 |
+| 55–59 | 19.1 | 19.1 |
+| 60–64 | 16.9 | 16.9 |
+| 65–69 | 14.2 | 14.3 |
+| 70–79 ($\chi^n$ at its cap) | 9.3 | 12.7 |
+| 80–89 | 5.3 | 12.1 |
+| 90–99 | 3.1 | 11.5 |
 
 ```{figure} ./images/labor_supply_vs_data.png
 ---
@@ -84,7 +84,7 @@ name: FigLaborVsData
 Steady-state average labor supply by age against LFMS 2021 hours per person, and the calibrated $\chi^n_s$ against the OG-USA profile.
 ```
 
-The calibrated profile is far from the US one, in level and in shape. With the US values Ethiopian households in the model worked about 46 percent of their time endowment at every age from 20 to 64, twice the survey's hours; the disutility weights that bring them to the data are CHI_PRIME in the prime ages against 20–25 in OG-USA and CHI_20 at age 20, and they climb steeply after 50 to OG-Core's upper bound of 10,000 at age 70. The level of labor supply halves, which the model absorbs through the `factor` that converts model units to birr; the calibrated ratios in {ref}`Chap_MacroCalib` are not affected by it, and the steady-state return on capital is unchanged to the third decimal.
+The calibrated profile is far from the US one, in level and in shape. With the US values Ethiopian households in the model worked about 46 percent of their time endowment at every age from 20 to 64, twice the survey's hours; the disutility weights that bring them to the data are about 1,300 to 1,500 in the prime ages against 20–25 in OG-USA and about 9,700 at age 20, and they climb steeply after 50 to OG-Core's upper bound of 10,000 at age 69. The level of labor supply halves, which the model absorbs through the `factor` that converts model units to birr; the calibrated ratios in {ref}`Chap_MacroCalib` are not affected by it, and the steady-state return on capital is unchanged to the third decimal.
 
 Two limits. Hours per person mix the decision to work with hours conditional on working, and the elliptical disutility function governs both through one intensive margin, so the Frisch elasticity above should be read as applying to total hours per person. And $\chi^n_s$ has no lifetime-income dimension in OG-Core, so differences in hours between the formal and informal groups (OG-ZAF's #95 looks at the same limit) cannot be represented; the model's groups differ in hours only through their wealth and productivity.
 
@@ -108,7 +108,7 @@ OG-Core's net family transfers (`phi_FT`, PSLmodels/OG-Core#1298) add that chann
 - a group's elders receive from the family the group's share less the government cash transfers they already get (the safety net's direct support and the subsidies in `eta`); old-age pensions, about 0.075 percent of GDP, are not netted;
 - per elder, the transfer is held fixed relative to output per person, so the total grows with the elderly share of the population: net of the government transfers, {glue:text}`phi_ft_net_2025` percent of output in 2025 and {glue:text}`phi_ft_net_ss` percent in the steady state, when people aged 65 and over are 29.5 percent of adults (6.5 percent in 2025).
 
-The size is set to the NTA consumption profile: with family transfers at {glue:text}`phi_ft_ss` of the model's output (16.5 percent of GDP at market prices, {glue:text}`phi_ft_net_ss` net of the government transfers elders receive), steady-state consumption of people aged 65 and over relative to ages 30–49 is CONS_6569 at 65–69, CONS_7079 at 70–79 and CONS_8085 at 80–85, against NTA private consumption of 0.87, 0.84 and 0.80 (`ogeth/data/nta_consumption_by_age.csv`, `targets.nta_old_age_consumption`).  The transfers also lower old-age hours, since elders no longer have to work for their own consumption: hours per person fall from 16.2 to HRS_7079 a week at ages 70–79 and from 16.9 to HRS_8089 at 80–89 (targets 9.3 and 5.3).  The NTA profile is from 2005, the only Ethiopian account; the rule's age boundaries and the equal split among elders are assumptions, and the one size is the only calibrated value.
+The size is set to the NTA consumption profile: with family transfers at {glue:text}`phi_ft_ss` of the model's output (16.5 percent of GDP at market prices, {glue:text}`phi_ft_net_ss` net of the government transfers elders receive), steady-state consumption of people aged 65 and over relative to ages 30–49 is 0.87 at 65–69, 0.90 at 70–79 and 0.86 at 80–85, against NTA private consumption of 0.87, 0.84 and 0.80 (`ogeth/data/nta_consumption_by_age.csv`, `targets.nta_old_age_consumption`).  The transfers also lower old-age hours, since elders no longer have to work for their own consumption: hours per person fall from 16.2 to 12.7 a week at ages 70–79 and from 16.9 to 12.1 at 80–89 (targets 9.3 and 5.3).  The NTA profile is from 2005, the only Ethiopian account; the rule's age boundaries and the equal split among elders are assumptions, and the one size is the only calibrated value.
 
 ### Discount factor
 

@@ -44,6 +44,7 @@ glue("us_inflation", f"{100 * mp.US_INFLATION:.0f}", display=False)
 glue("pwt_ky", f"{mp.PWT_CAPITAL_OUTPUT_RATIO:.2f}", display=False)
 glue("kg_old", f"{mp.PUBLIC_CAPITAL_OUTPUT_RATIO_OLD_BASE:.3f}", display=False)
 glue("fdi_usd", f"{mp.FDI_STOCK_USD_BN:.1f}", display=False)
+glue("beta_annual", f"{float(params['beta_annual'][0]):.3f}", display=False)
 ```
 
 ## Calibration vintage and refresh policy
@@ -149,7 +150,7 @@ The IMF's *poverty-reducing expenditure* line (2.3 rising to 3.5 percent of GDP)
 
 $\alpha_G$ is government consumption of goods and services relative to GDP. Figures in this section are percent of *old-base* GDP as the IMF publishes them; the calibration converts them to rebased GDP (times 0.628 for FY2024/25 and 0.603 for FY2025/26, {ref}`Sec_Rebasing`) and to the model's output units (times 1.031).  We take it from the same general-government cash accounts as the rest of the fiscal block, so that the government budget identity the debt path obeys is the one the data describe: recurrent expenditure net of interest (which the model pays through $r_{gov}$) and net of the cash transfers in $\alpha_T$.  From {cite}`IMFCR26174:2026`, Table 2b, this gives 4.6 percent of old-base GDP in FY2024/25 and 5.4 percent in the FY2025/26 budget, which restores real public-sector wages; the baseline holds the budget value.  On the rebased national accounts government consumption is 4.7 percent of GDP in FY2024/25 ({cite}`MoNS:2026`, Table 4), against 2.9 for $\alpha_G$: the national-accounts figure also counts the consumption of fixed capital on public capital, which the dashboard adds to the model's $G$, and spending that the cash accounts record elsewhere.  Public investment is calibrated separately via $\alpha_I$, the general-government capital expenditure, 5.0 percent of old-base GDP in FY2024/25 and 5.8 in the FY2025/26 budget, held (see {ref}`Chap_FirmCalib` for the public-capital block).
 
-Built along the IMF program's years, the three spending paths reproduce the program's primary expenditure (total expenditure less interest) to within a tenth of a percent of GDP in every year, which `tests/test_fiscal_program.py` checks; it confirms the mapping from the IMF tables to the model's instruments.
+The three spending paths reproduce the IMF's primary expenditure (total expenditure less interest) to within a tenth of a percent of GDP in both years.
 
 
 > **A note on federal versus general government.**  Ethiopia is a federation, and the regional states execute much of the pro-poor spending and most of the education and health wage bill, financed largely by a federal block grant (about ETB 214 billion in FY2023/24, 1.8 percent of old-base GDP — an *intergovernmental* transfer, not a household transfer, and correctly excluded from $\alpha_T$).  Every fiscal figure used here is **general government**, which consolidates federal and regional accounts and nets the block grant out: revenue by line from the NBE's general-government table (rural and urban land-use fees, for instance, are regional), spending from the IMF's general-government tables, and debt on the general-government perimeter.  Separately, much of Ethiopia's public investment runs *off-budget through state-owned enterprises*, federal and regional, so general-government spending (12 percent of old-base GDP, 7.5 percent of rebased GDP, in FY2024/25) understates the broader public sector — which is why the wide public-sector debt (31.7 percent of rebased GDP, including the National Bank and Ethio Telecom) exceeds general-government debt (27.2).  The rebasing's large upward revision to investment is, by the Ministry's account, mostly investment by regional state-owned enterprises that the old accounts missed; the model counts it in private capital $K$, since those enterprises sit outside general government, and keeps $\alpha_I$ and public capital $K_g$ on the on-budget general-government figures.
@@ -210,56 +211,39 @@ The quintile shares are mapped onto the model's seven lifetime-income groups by 
 (Sec_Validation)=
 ## Validation
 
-Every target is a measured FY2024/25 value on the rebased national accounts at market prices (`ogeth/targets.py`), and the fiscal and foreign-capital dials are scored in the **first model year**, where the data are: Ethiopia's population is far from stationary and its initial wealth is anchored to the data, so a steady-state moment would describe a different economy.  The steady state is matched to hours by age and to the long-run return.  The tables compare the solved transitions and steady states of both scenarios (`examples/run_og_eth.py` and `--scenario program`, from an installer copy of this branch, offline) with the data; each scenario, baseline and reform together, took 10 to 18 minutes.  Revenue lines are the mapped instruments of {ref}`Chap_Tax`.
+Every target is a measured FY2024/25 value on the rebased national accounts at market prices (`ogeth/targets.py`).  The fiscal and foreign-capital dials are scored in the **first model year**, where the data are: Ethiopia's population is far from stationary and its initial wealth is anchored to the data, so a steady-state moment would describe a different economy.  The steady state is matched to hours by age and to the long-run return.  The numbers below are from `examples/run_og_eth.py`, run unchanged and offline from an installer copy of this version (baseline and reform together took about 16 minutes).  Revenue lines are the mapped instruments of {ref}`Chap_Tax`.
 
-```{figure} ./images/calibration_vs_program.png
----
-scale: 60%
-align: center
-name: CalibVsProgram
----
-OG-ETH baseline (the observed economy, current policy) against the IMF fifth-review program path, both on rebased GDP.  Shaded years are the program horizon; the baseline imposes nothing from the program after the FY2025/26 budget.  The investment panel shows the one rebased observation (FY2024/25).
-```
+| Ratio to GDP, FY2024/25 (percent) | Model | Data | How it is used |
+|:---|:---:|:---:|:---|
+| Personal income tax | 0.81 | 0.81 | tuned (compliance scale) |
+| Corporate and capital-income taxes | 1.26 | 1.26 | tuned (CIT collections factor) |
+| Consumption taxes, fees and sales | 3.02 | 3.01 | tuned (`tau_c`) |
+| Land-use fees | 0.18 | 0.18 | tuned (`p_wealth`) |
+| Pension contributions | 0.29 | 0.29 | tuned (payroll coverage scale) |
+| Old-age pensions | 0.08 | 0.08 | tuned (pension coverage scale) |
+| Foreign-owned share of private capital | 10.2 | 10.2 | tuned (`zeta_K`) |
+| Household wealth | 160.7 | 160.7 | imposed |
+| General-government debt | 27.2 | 27.2 | imposed |
+| Remittances | 3.5 | 3.5 | imposed |
+| Gross capital formation (private and public) | 24.3 | 35.3 | check |
+| Private consumption | 71.9 | 64.4 | check |
+| Government consumption | 3.95 | 4.73 | check |
+| Net exports | 1.0 | −4.4 | check |
+| Payments abroad on capital and debt | 1.16 | 0.37 | check |
 
-| Ratio to GDP, FY2024/25 (percent) | Baseline | IMF program scenario | Data | How it is used |
-|:---|:---:|:---:|:---:|:---|
-| Personal income tax | 0.81 | 0.81 | 0.81 | tuned (compliance scale) |
-| Corporate and capital-income taxes | 1.26 | 1.26 | 1.26 | tuned (CIT collections factor) |
-| Consumption taxes, fees and sales | 3.01 | 2.99 | 3.01 | tuned (`tau_c`) |
-| Land-use fees | 0.18 | 0.18 | 0.18 | tuned (`p_wealth`) |
-| Pension contributions | 0.29 | 0.29 | 0.29 | tuned (payroll coverage scale) |
-| Old-age pensions | 0.08 | 0.08 | 0.08 | tuned (pension coverage scale) |
-| Foreign-owned share of private capital | 10.2 | 10.2 | 10.2 | tuned (`zeta_K`) |
-| Household wealth | 160.7 | 160.8 | 160.7 | imposed |
-| General-government debt | 27.2 | 27.2 | 27.2 | imposed |
-| Remittances | 3.5 | 3.5 | 3.5 | imposed |
-| Gross capital formation (private and public) | 27.5 | 27.3 | 35.3 | check |
-| Private consumption | 68.2 | 67.7 | 64.4 | check |
-| Government consumption | 3.95 | 3.95 | 3.67 | check |
-| Net exports | 1.5 | 2.1 | -4.5 | check |
-| Payments abroad on capital and debt | 1.16 | 1.16 | 0.37 | check |
+| Long run (steady state) | Model | Target |
+|:---|:---:|:---:|
+| Return on capital (real, percent a year) | 4.00 | 4.00 (world rate) |
+| Rate on market debt (real, percent a year) | 4.70 | 4.70 |
+| Private capital / GDP | 1.85 | outcome (1.66 in FY2024/25) |
+| Foreign-owned share of capital | 6.0 | outcome |
+| Private consumption / GDP | 75.4 | outcome |
 
-| Fiscal accounts, FY2024/25 (percent of GDP) | Baseline | IMF program scenario | Data |
-|:---|:---:|:---:|:---:|
-| Revenue excluding grants | 5.54 | 5.53 | 5.78 |
-| Primary spending | 7.10 | 7.10 | 7.04 |
-| Interest | -1.46 | -1.46 | 0.50 (nominal) |
-| Debt | 27.2 | 27.2 | 27.2 |
+**What the calibration matches.**  Every dial lands on its own moment in FY2024/25: the five revenue instruments, pensions and the foreign-owned share of private capital.  Debt, household wealth and remittances are imposed at their measured values, and the one discount factor, {glue:text}`beta_annual`, puts the long-run return at the world rate.  Hours per person match the surveys at every age through 68 ({ref}`Chap_HouseholdCalib`), and the consumption of people over 65 relative to prime-age adults is close to the National Transfer Accounts' (0.87, 0.90 and 0.86 at 65–69, 70–79 and 80–85, against 0.87, 0.84 and 0.80).
 
-| Long run (steady state) | Baseline | IMF program scenario | Target |
-|:---|:---:|:---:|:---:|
-| Return on capital (real, percent a year) | 4.00 | 3.82 | 4.00 (world rate) |
-| Private capital / GDP | 1.85 | 1.85 | outcome (1.66 in FY2024/25) |
-| Foreign-owned share of capital | 6.0 | 5.7 | outcome |
-| Household consumption / GDP | 74.9 | 72.8 | outcome |
+**What the model does not match, and why.**  *Investment* is 11 points of GDP below the rebased accounts.  Households alone finance the model's capital, while in Ethiopia much of it is financed by the state and state enterprises (through state banks and retained earnings) and from abroad; the measurable state channels close less than a point (state-enterprise retained earnings about 0.7 percent of GDP, repression beyond the government's below-market rate about 0.2), and the rest needs a state-enterprise sector the single-industry model does not have.  It was 27.5 percent before this version's transfer changes (allocations built year by year, the safety net by its design and net family transfers).  Foreign loans to state enterprises (about 5 percent of rebased GDP, mostly guaranteed by the government) are not counted in foreign-owned capital, which follows the usual practice of the FDI stock.  *Private consumption* is 7.5 points above the data and *net exports* have the wrong sign, the mirror image of the investment shortfall: output exceeds domestic demand and the model runs a surplus of 1.0 percent of GDP against a deficit of 4.4.  *Government consumption* is below the national accounts because the national-accounts figure also counts spending the cash accounts record elsewhere ({ref}`Sec_Scenarios`).  *Payments abroad* are three times net primary income because OG-Core pays foreign-owned capital the household portfolio return, which includes the rent on public capital (`aggregates.get_r_p`), while most of Ethiopia's foreign liabilities pay concessional or FDI returns.  *The capital-output ratio* is not targeted: the rebuilt stock is provisional.
 
-**What the calibration matches.**  Every dial lands on its own moment in FY2024/25: the five revenue instruments, pensions and the foreign-owned share of private capital.  Debt, household wealth and remittances are imposed at their measured values, and the one discount factor puts the long-run return at the world rate.  Hours per person match the 2021 Labour Force and Migration Survey at every fitted age below 75.  Interest is negative in the model because it is real: domestic debt pays about $-11$ percent under financial repression, and the data's 0.50 percent is nominal.
-
-**What the subsistence floor and the lower curvature changed.**  With $\sigma = 3$ and no floor ({ref}`Chap_HouseholdCalib`), patience sat at its upper bound and the long-run return stayed at 4.75 percent, above the world rate; first-year investment was 23.2 percent of GDP and private consumption 79.7.  With $\sigma = 1.5$ above a subsistence floor, patience is 0.903, the return reaches the world rate, investment rises to 27.5 percent and consumption falls to 68.2.
-
-**What neither scenario matches, and why.**  *Investment* is 8 points of GDP below the rebased accounts.  Households alone finance the model's capital, while in Ethiopia much of it is financed by the state and state enterprises (through state banks and retained earnings) and from abroad; the measurable state channels close less than a point (state-enterprise retained earnings about 0.7 percent of GDP, repression beyond the government's below-market rate about 0.2), and the rest needs a state-enterprise sector the single-industry model does not have.  Foreign loans to state enterprises (about 5 percent of rebased GDP, mostly guaranteed by the government) are not counted in foreign-owned capital, which follows the usual practice of the FDI stock.  *Net exports* have the wrong sign: with investment short and consumption close to the data, output exceeds domestic demand and the model runs a surplus of 1.5 percent of GDP against a deficit of 4.5 financed from abroad.  *Payments abroad* are three times net primary income because OG-Core pays foreign-owned capital the household portfolio return, which includes the rent on public capital (`aggregates.get_r_p`), while most of Ethiopia's foreign liabilities pay concessional or FDI returns.  *The capital-output ratio* is not targeted: the rebuilt stock is provisional.
-
-**Resource constraint.**  The transition's resource-constraint error is at most $2.3 \times 10^{-7}$ in every period except period 120, where OG-Core switches to the fixed steady-state population (`fixper`) and the error is about $1.9 \times 10^{-3}$, a known OG-Core bookkeeping break ({ref}`Chap_Demog`).  `RC_TPI` is set to $2 \times 10^{-3}$ to accommodate that single period.
+**Resource constraint.**  The steady state's resource-constraint error is about $3 \times 10^{-16}$.  On the transition it is at most $1.4 \times 10^{-7}$ in every period except period 120, where OG-Core switches to the fixed steady-state population (`fixper`) and the error is about $1.8 \times 10^{-3}$, a known OG-Core bookkeeping break ({ref}`Chap_Demog`).  `RC_TPI` is set to $2 \times 10^{-3}$ to accommodate that single period.
 
 (SecMacro_footnotes)=
 ## Footnotes
