@@ -960,7 +960,7 @@ def family_transfer_path(p, eta, alpha_T, tol=1e-12):
                 omega[t],
                 e,
                 eta[t],
-                alpha_T[min(t, alpha_T.size - 1)],
+                alpha_T[t],
                 FAMILY_TRANSFER_SHARE_SS * elder_share(omega[t]) / share_SS,
                 first_age,
             )
