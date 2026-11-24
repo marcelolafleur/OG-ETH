@@ -29,7 +29,8 @@ LFMS_YEAR = 2021
 # OG-USA's convention: labor supply is the share of a 16-hour waking day,
 # seven days a week
 WEEKLY_TIME_ENDOWMENT = (24 - 8) * 7
-# LFMS five-year bands placed at their midpoint; the open 65+ band at 67
+# LFMS five-year bands placed at their midpoint; the open 65+ band is not
+# used as a point (from 65 the target follows older_hours_decline)
 HOURS_BAND_MIDPOINTS = {
     "10-14": 12,
     "15-19": 17,

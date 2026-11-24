@@ -1,25 +1,23 @@
 """
-Tests that the packaged default parameters carry the informality calibration.
+Tests that the packaged default parameters carry the tax and informality
+calibration.
 
-Informality is modeled as graded income-tax NON-compliance by lifetime-income
-group (OG-Core by-(t, j) noncompliance parameters, PR #816): the bottom five of
-seven groups (90% of households by population weight, close to ILO's 85%
-informal-employment figure) pay none of the income tax owed, group 6 pays half,
-and the top group complies fully. The compliant-group effective rate
-(etr 0.0871) is solved from a revenue identity to hit the PIT anchor in the
-first model period, and re-solved whenever the earnings profiles change; the
-marginal rate (0.35) is Ethiopia's statutory top PIT rate; the CIT collections
-factor (0.327) is re-anchored so corporate-tax revenue matches actual
-collections. income_tax_filer stays all-ones on purpose: informality is carried
-by non-compliance, not by non-filing.
+The income-tax functions are Ethiopia's statutory schedules in
+Gouveia-Strauss form (Proclamation 979/2016 in FY2024/25, 1395/2025 from
+FY2025/26). Informality is graded income-tax non-compliance by
+lifetime-income group (OG-Core's by-(t, j) noncompliance parameters, PR
+#816), with lifetime income as the proxy for formality: the formal 22.35
+percent of the employed (ILOSTAT, 2021 Labour Force and Migration Survey)
+are the richest households. The compliance vector gives the shape of the
+formal tax boundary and COMPLIANCE_SCALE its level, tuned so personal income
+tax collects 0.81 percent of rebased GDP in FY2024/25; the CIT collections
+factor is tuned so corporate income tax and the other capital-income lines
+collect 1.26 percent (examples/tune.py). income_tax_filer stays all-ones on
+purpose: informality is carried by non-compliance, not by non-filing.
 
-Anchors: IMF SIP 2025/108 (= Country Report 25/189) para 9 (PIT 1.4%, CIT 1.7%
-of GDP); IMF Country Report 26/20 Table 2b (direct taxes 3.1% of GDP); ILO 2021
-(informal employment 85% of total).
-
-These are fast, structural pins on the shipped JSON. The revenue split this
-calibration produces (PIT 1.4% and CIT 1.9% of GDP in the first period)
-requires a model solve and is therefore intentionally NOT asserted here.
+These are fast, structural pins on the shipped JSON. The revenue the
+calibration collects requires a model solve and is therefore not asserted
+here.
 """
 
 import json
@@ -105,7 +103,8 @@ def test_statutory_tax_functions(p):
 
 
 def test_informality_noncompliance_by_group(p):
-    """Bottom 5 groups fully non-compliant, group 6 half, top compliant."""
+    """Compliance rises with lifetime income: the bottom three groups are
+    fully informal, groups 5-7 formal, scaled by COMPLIANCE_SCALE."""
     # period 0 (FY2024/25) carries the informality calibration and the
     # history baseline holds it; the program scenario broadens the base
     # (tests/test_fiscal_program.py)

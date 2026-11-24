@@ -4,8 +4,9 @@ Warm-started steady-state solves.
 OG-Core seeds the baseline steady state from flat guesses: the same savings
 and labor supply at every age and lifetime-income group, with bequests and
 output derived from them and from the scalar guesses for r and TR. With
-discount factors that differ widely by lifetime-income group (0.5 to 0.97)
-the flat start is far from the solution, and a moderate parameter change
+lifetime-income groups as different as Ethiopia's (earnings, the
+subsistence floor, the safety net and family transfers) the flat start is
+far from the solution, and a moderate parameter change
 can leave no rung of OG-Core's ladder of rescaled guesses that solves.
 Starting instead from a solved state, with the household matrices and
 every outer unknown taken together so they are consistent, is the fix

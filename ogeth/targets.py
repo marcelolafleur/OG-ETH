@@ -20,7 +20,7 @@ Two sets of targets:
 * ``SS_TARGETS`` are long-run anchors and the survey distributions that the
   steady state is matched to (hours by age and wealth shares are scored by
   ``examples/tune.py``), plus moments reported as outcomes. The level of
-  the discount factors is set so that the long-run return equals the world
+  the discount factor is set so that the long-run return equals the world
   rate: a small open economy's domestic return converges to the return
   foreign investors earn as capital controls and financial repression are
   unwound (IMF CR 26/174). Tuning patience to first-year investment
@@ -34,7 +34,10 @@ Two sets of targets:
   gap, so first-year investment is left as a scored miss (macro.md).
 """
 
+import os
+
 import numpy as np
+import pandas as pd
 
 from ogeth import macro_params as mp
 
@@ -154,6 +157,38 @@ SS_TARGETS = {
     "r": (mp.WORLD_INT_RATE_ANNUAL, "discount factor level"),
     "K/Y": (mp.PRIVATE_CAPITAL_OUTPUT_RATIO, "outcome (provisional anchor)"),
 }
+
+
+# Consumption of older people relative to ages 30-49, the profile net family
+# transfers (phi_FT) are sized to: Ethiopia's National Transfer Accounts,
+# 2005, private consumption per person (data/nta_consumption_by_age.csv),
+# simple means over single ages; the model moment is the steady state's
+# consumption per person, population weighted over lifetime-income groups.
+NTA_CONSUMPTION_BASE_AGES = (30, 50)
+NTA_CONSUMPTION_OLD_AGE_BANDS = ((65, 70), (70, 80), (80, 86))
+
+
+def nta_old_age_consumption():
+    """
+    NTA private consumption per person in each old-age band relative to ages
+    30-49.
+
+    Returns:
+        dict: {(first age, last age + 1): ratio}
+    """
+    path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "data",
+        "nta_consumption_by_age.csv",
+    )
+    df = pd.read_csv(path, comment="#").set_index("age")
+    c = df["private_consumption"]
+    lo, hi = NTA_CONSUMPTION_BASE_AGES
+    base = c.loc[lo : hi - 1].mean()
+    return {
+        (a, b): float(c.loc[a : b - 1].mean() / base)
+        for a, b in NTA_CONSUMPTION_OLD_AGE_BANDS
+    }
 
 
 def _cfc_g(k_g):

@@ -264,18 +264,11 @@ def demographic_rates(E, S, T, start_year, download_path=None):
     }
 
 
-# Discount-factor step used by examples/tune.py, which calibrates chi_n to
-# hours by age and the relative discount factors to WID wealth shares in the
-# steady state, and the remaining dials to first-year (FY2024/25) moments:
-# a group's steady-state wealth is very elastic to its beta, so the update is
-# damped and each step bounded.
-BETA_DAMPING = 0.3
-BETA_STEP = 1.03
-# Bounds on the common discount factor: below one (no patience above
-# one), and no lower than Ethiopia's measured discount rates allow
+# Bounds on the common discount factor, which examples/tune.py sets so that
+# the steady-state return on capital equals the world rate: below one (no
+# patience above one), and no lower than Ethiopia's measured discount rates
+# allow
 BETA_BOUNDS = (0.5, 0.995)
-# OG-USA's bequest weight, kept for every group
-CHI_B_DEFAULT = 80.0
 
 
 class Calibration:
@@ -427,9 +420,9 @@ class Calibration:
                 omega=self.demographic_params["omega"],
             )
         )
-        # so is the transfer allocation matrix (per capita within the
-        # targeted groups, pensions to the retired), built for each year
-        # from that year's population
+        # so is the transfer allocation matrix (the safety net by its
+        # design, direct support twice public works per person, pensions to
+        # the retired), built for each year from that year's population
         retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
         self.demographic_params["eta"] = macro_params.transfer_eta_path(
             self.demographic_params["omega"],

@@ -1831,16 +1831,21 @@ def derived_transfer_eta(p):
 #   share of the total is its share of givers' earnings capacity;
 # * a group's elders get, from the family, the group's share less the
 #   government cash transfers they already receive (PSNP direct support
-#   and the subsidies in eta); old-age pensions, about 0.1 percent of GDP,
+#   and the subsidies in eta); old-age pensions, about 0.075 percent of GDP,
 #   are not netted;
 # * per elder, the transfer is held fixed relative to GDP per person, so
 #   the total grows with the elderly share of the population and is
-#   FAMILY_TRANSFER_SHARE_SS of GDP in the steady state.
-# At 17 percent of GDP the steady state's consumption of people aged 65 and
-# over, relative to ages 30-49, matches NTA: 0.87 at 65-69, 0.84 at 70-79,
-# 0.81 at 80-85 (steady-state probes of 23 November 2026; 0.45 at 70-79
-# without family transfers). People aged 65 and over are 28 percent of
-# adults in the steady state, 7 percent in 2025.
+#   FAMILY_TRANSFER_SHARE_SS of the model's output in the steady state.
+# Like OG-Core's other shares (alpha_T, alpha_RM), phi_FT multiplies the
+# model's output Y, which excludes the consumption tax: 0.17 of Y is 16.5
+# percent of GDP at market prices (MODEL_PER_MARKET_GDP). At that size the
+# steady state's consumption of people aged 65 and over, relative to ages
+# 30-49, is close to NTA's private consumption
+# (data/nta_consumption_by_age.csv, targets.nta_old_age_consumption): 0.88
+# against 0.87 at 65-69, 0.90 against 0.84 at 70-79 and 0.86 against 0.80
+# at 80-85 in the calibrated baseline (0.45 at 70-79 without family
+# transfers). People aged 65 and over are 29.5 percent of adults in the
+# steady state, 6.5 percent in 2025.
 FAMILY_GIVER_AGES = (25, 65)
 FAMILY_RECEIVER_AGE = 65
 FAMILY_TRANSFER_SHARE_SS = 0.17
