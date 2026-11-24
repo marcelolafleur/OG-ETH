@@ -11,9 +11,7 @@ from ogcore.utils import params_to_json
 
 
 def _jsonable(value):
-    """
-    Turn a parameter value into something json.dump accepts.
-    """
+    """Turn a parameter value into something json.dump accepts."""
     if isinstance(value, np.ndarray):
         return value.tolist()
     if isinstance(value, (np.floating, np.integer)):
@@ -26,16 +24,13 @@ def main(demographics_only=False):
     Regenerate the packaged default parameters.
 
     Args:
-        demographics_only (bool): rebuild only the demographics (with the
-            income gradients), the earnings matrix and the parameters
-            derived from them, writing them into the packaged JSON without
-            touching anything else; the default also refreshes the macro
-            parameters from the World Bank and IMF APIs and rewrites the
-            whole file
+        demographics_only (bool): rebuild only the demographics, e and
+            the parameters derived from them, leaving the rest of the JSON;
+            False rebuilds via Calibration(update_from_api=True) and
+            rewrites the whole file
 
     Returns:
         None
-
     """
     # Directories to save data
     CUR_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -57,9 +52,7 @@ def main(demographics_only=False):
         d = dict(c.demographic_params)
         d["e"] = c.e
         p.update_specifications({k: _jsonable(v) for k, v in d.items()})
-        # the baseline's fiscal paths and remittance path depend on the
-        # regenerated g_n (through the implied real rate on debt and the
-        # on-trend remittance growth), so they are rebuilt with it
+        # fiscal and remittance paths depend on g_n, so rebuild them
         d.update(baseline_params(p))
         write_json_parameters(
             json_path, {k: _jsonable(v) for k, v in d.items()}
@@ -72,9 +65,7 @@ def main(demographics_only=False):
     d = c.get_dict()
     # update parameters
     p.update_specifications(d)
-    # the baseline's fiscal paths and the remittance objects are derived
-    # from the demographics just regenerated, so they are rebuilt here
-    # rather than left stale
+    # fiscal and remittance paths depend on the demographics
     p.update_specifications(baseline_params(p))
     # save to json file
     params_to_json(p, json_path)

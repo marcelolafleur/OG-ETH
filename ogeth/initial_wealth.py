@@ -1,28 +1,7 @@
 """
-The initial distribution of household wealth across ages and lifetime-income
-groups, OG-Core's ``initial_hhwealth_dist``.
-
-OG-Core sets the *level* of initial household wealth from
-``initial_wealth_ratio`` (a ratio to first-period GDP) by scaling a fixed
-*shape* uniformly inside the time-path solution. The shape is
-``initial_hhwealth_dist``, an S x J matrix of shares of aggregate wealth;
-OG-Core divides it by the first-period population to get wealth per person
-and then rescales. Left unset, the shape is the steady state's wealth per
-person, which describes households that have lived under the long-run
-demographics and policy, not today's.
-
-Ethiopia has no published wealth-by-age profile (its National Transfer
-Accounts have labor income only; the ESS asset modules are not yet used),
-so the shape is imputed from the model itself by a burn-in: the shape that
-households choose in the first period of the transition is fed back as the
-starting shape, and the step is repeated until the two agree. At the fixed
-point the starting distribution is one the model's own households would
-hold, so the first years carry no jump from an inconsistent start. The
-shape is passed as wealth per person times the first-period population, so
-OG-Core's division by that population returns exactly the per-person shape
-(OG-Core aggregates with the pre-period population, which differs from the
-first-period one by a few percent by age; the subsequent rescaling absorbs
-that). The level stays with ``initial_wealth_ratio``.
+The initial wealth shape ``initial_hhwealth_dist`` (S x J), imputed by a
+damped burn-in to the shape households choose in period 0; the level is
+``initial_wealth_ratio`` (macro.md, Initial household wealth).
 """
 
 import numpy as np
@@ -36,17 +15,10 @@ def per_person(b, omega):
     return b / mean
 
 
-# Share of the way the starting shape moves toward the period-0 choice in
-# one burn-in step. A full step overshoots: the oldest cohorts' period-0
-# savings (mostly bequests) are several times their starting wealth, and
-# feeding them back whole left the poorest group's oldest households so rich
-# that the transition stalled (75 iterations, against 17).
+# Damping of one burn-in step (a full step overshoots)
 BURN_IN_STEP = 0.3
-# The burn-in applies to life-cycle wealth only. From this age on, the
-# savings chosen in period 0 are mostly bequests (several times the
-# starting wealth at ages 98-100), and feeding them back raised the period-0
-# bequests the same group's young receive enough that a start cohort of the
-# poorest group failed to solve; the oldest ages keep the starting shape.
+# From this age the period-0 savings are mostly bequests, so the oldest
+# ages keep the starting shape
 BURN_IN_MAX_AGE = 80
 
 
@@ -54,18 +26,15 @@ def burn_in_dist(
     tpi, omega0, step=BURN_IN_STEP, E=20, max_age=BURN_IN_MAX_AGE
 ):
     """
-    One damped burn-in step for the starting shape: the shape that started
-    the solved transition moved ``step`` of the way toward the savings
-    households chose in period 0, as shares of aggregate wealth weighted by
-    the first-period population.
+    One damped burn-in step: the starting shape moved ``step`` of the way
+    toward period-0 savings, as shares of wealth.
 
     Args:
         tpi (dict): a solved ``TPI_vars.pkl`` (needs ``b_sp1_preTP`` and
             ``b_sp1``)
         omega0 (array_like): first-period population, (S, J)
         step (float): share of the way toward the period-0 choice
-        E (int): age at which households enter the model (row s is age
-            E + s + 1)
+        E (int): entry age (row s is age E + s + 1)
         max_age (int): ages from this one keep the starting shape
 
     Returns:
@@ -81,12 +50,9 @@ def burn_in_dist(
     chosen = shares(np.asarray(tpi["b_sp1"])[0])
     ages = E + 1 + np.arange(omega0.shape[0])
     young = (ages < max_age).reshape(-1, 1)
-    # move the life-cycle cells and keep the oldest ages' starting wealth
-    # per person: the rescaling below then only spreads the change in the
-    # young cells' total
+    # move only the life-cycle cells
     dist = np.where(young, (1 - step) * start + step * chosen, start)
-    # hold the life-cycle cells' total share at its start value, so the
-    # oldest ages' shares are unchanged
+    # keep their total share, so the oldest ages' shares are unchanged
     life = young.ravel()
     dist[life] *= start[life].sum() / dist[life].sum()
     return dist / dist.sum()
@@ -94,9 +60,8 @@ def burn_in_dist(
 
 def shape_gap(tpi, omega0, min_share=1e-3):
     """
-    How far the starting shape is from the shape chosen in the first
-    period: the largest relative difference in wealth per person across
-    the (age, group) cells that hold at least ``min_share`` of wealth.
+    Largest relative gap in wealth per person between the starting and
+    period-0 shapes, over cells holding at least ``min_share`` of wealth.
 
     Args:
         tpi (dict): a solved ``TPI_vars.pkl`` (needs ``b_sp1_preTP`` and

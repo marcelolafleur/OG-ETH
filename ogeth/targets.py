@@ -1,37 +1,7 @@
 """
-Data targets for the OG-ETH calibration dashboard, and the functions that
-compute the matching model moments from a solved ``SS_vars.pkl`` or
-``TPI_vars.pkl``.
-
-Every ratio is to Ethiopia's rebased GDP (base year FY2024/25, Ministry of
-National Strategy, November 2026) at market prices. OG-Core's output Y is
-GDP before consumption taxes, so model moments are divided by Y plus the
-consumption tax (see ``ogeth.macro_params.MODEL_PER_MARKET_GDP``).
-
-Two sets of targets:
-
-* ``TRANSITION_TARGETS`` are moments of the first model period, FY2024/25,
-  the year the data describe. The dials tuned to them are the tax rates and
-  scales (revenue by instrument), the pension and payroll coverage scales
-  and the foreign-capital fill share zeta_K (first-year foreign share of
-  private capital). Ethiopia's population is far from stationary, so these
-  are scored where the data are, not in the steady state. First-year
-  investment is scored, not tuned (see ``SS_TARGETS``).
-* ``SS_TARGETS`` are long-run anchors and the survey distributions that the
-  steady state is matched to (hours by age and wealth shares are scored by
-  ``examples/tune.py``), plus moments reported as outcomes. The level of
-  the discount factor is set so that the long-run return equals the world
-  rate: a small open economy's domestic return converges to the return
-  foreign investors earn as capital controls and financial repression are
-  unwound (IMF CR 26/174). Tuning patience to first-year investment
-  instead would make households finance all of the 35.3 percent of GDP the
-  rebased accounts record, including state-enterprise investment financed
-  through state banks; that requires a long-run return of about 2 percent,
-  below the world rate, with foreign-owned capital leaving. The measurable
-  state channels (state-enterprise retained earnings about 0.7 percent of
-  GDP; repression beyond the below-market government borrowing rate the
-  model already carries about 0.2 percent) close less than a point of the
-  gap, so first-year investment is left as a scored miss (macro.md).
+Data targets for the OG-ETH calibration, and the model moments computed
+from a solved ``SS_vars.pkl`` or ``TPI_vars.pkl``. Ratios are to rebased GDP
+(FY2024/25) at market prices: model Y plus the consumption tax (macro.md).
 """
 
 import os
@@ -41,7 +11,7 @@ import pandas as pd
 
 from ogeth import macro_params as mp
 
-# moment: (target, dial, source)
+# First-period (FY2024/25) moments; moment: (target, dial, source)
 TRANSITION_TARGETS = {
     "PIT/Y": (
         mp.PIT_REVENUE_SHARE,
@@ -159,19 +129,16 @@ SS_TARGETS = {
 }
 
 
-# Consumption of older people relative to ages 30-49, the profile net family
-# transfers (phi_FT) are sized to: Ethiopia's National Transfer Accounts,
-# 2005, private consumption per person (data/nta_consumption_by_age.csv),
-# simple means over single ages; the model moment is the steady state's
-# consumption per person, population weighted over lifetime-income groups.
+# Old-age consumption relative to ages 30-49, the target for family
+# transfers (phi_FT): NTA 2005 private consumption per person, simple means
+# over single ages (households.md, Net family transfers)
 NTA_CONSUMPTION_BASE_AGES = (30, 50)
 NTA_CONSUMPTION_OLD_AGE_BANDS = ((65, 70), (70, 80), (80, 86))
 
 
 def nta_old_age_consumption():
     """
-    NTA private consumption per person in each old-age band relative to ages
-    30-49.
+    NTA consumption per person in each old-age band relative to ages 30-49.
 
     Returns:
         dict: {(first age, last age + 1): ratio}
@@ -193,10 +160,7 @@ def nta_old_age_consumption():
 
 def _cfc_g(k_g):
     """
-    Consumption of fixed capital on public capital as the national accounts
-    record it: depreciation on the stock at cost. The model's K_g is in
-    efficiency units (netted by the PIMA efficiency gap), so the recorded
-    stock is K_g over the efficiency.
+    Depreciation of public capital at cost (K_g over PIMA efficiency).
     """
     return mp.DELTA_G_ANNUAL * k_g / (1 - mp.PUBLIC_INVESTMENT_EFFICIENCY_GAP)
 

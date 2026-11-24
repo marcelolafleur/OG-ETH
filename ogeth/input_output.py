@@ -134,11 +134,10 @@ def read_SAM():
             thousands=",",
         ).dropna(how="all")
 
-        # First column is descriptive text, not SAM values
+        # first column is labels; the rest are values
         label_col = sam.columns[0]
         value_cols = sam.columns.drop(label_col)
 
-        # Convert only SAM value columns to numeric
         sam[value_cols] = (
             sam[value_cols]
             .apply(lambda s: pd.to_numeric(s, errors="coerce"))
@@ -153,15 +152,14 @@ def read_SAM():
 
 def get_alpha_c(sam=None, cons_dict=CONS_DICT):
     """
-    Calibrate the alpha_c vector, showing the shares of household
-    expenditures for each consumption category
+    Household expenditure share of each consumption good (alpha_c).
 
     Args:
-        sam (pd.DataFrame): SAM file
-        cons_dict (dict): Dictionary of consumption categories
+        sam (pd.DataFrame): SAM table
+        cons_dict (dict): consumption goods to SAM accounts
 
     Returns:
-        alpha_c (dict): Dictionary of shares of household expenditures
+        alpha_c (dict): expenditure share by good
     """
     if sam is None:
         sam = read_SAM()
@@ -196,16 +194,15 @@ def get_alpha_c(sam=None, cons_dict=CONS_DICT):
 
 def get_io_matrix(sam=None, cons_dict=CONS_DICT, prod_dict=PROD_DICT):
     """
-    Calibrate the io_matrix array.  This array relates the share of each
-    production category in each consumption category
+    Share of each industry in each consumption good (io_matrix; firms.md).
 
     Args:
-        sam (pd.DataFrame): SAM file
-        cons_dict (dict): Dictionary of consumption categories
-        prod_dict (dict): Dictionary of production categories
+        sam (pd.DataFrame): SAM table
+        cons_dict (dict): consumption goods to SAM accounts
+        prod_dict (dict): industries to SAM accounts
 
     Returns:
-        io_df (pd.DataFrame): Dataframe of io_matrix
+        io_df (pd.DataFrame): goods by industries, rows sum to one
     """
     if sam is None:
         sam = read_SAM()
@@ -213,22 +210,19 @@ def get_io_matrix(sam=None, cons_dict=CONS_DICT, prod_dict=PROD_DICT):
         raise RuntimeError(
             "SAM data is unavailable. Cannot compute io_matrix."
         )
-    # Create initial matrix as dataframe of 0's to fill in
+    # goods x industries, filled below
     io_dict = {}
     for key in prod_dict.keys():
         io_dict[key] = np.zeros(len(cons_dict.keys()))
     io_df = pd.DataFrame(io_dict, index=cons_dict.keys())
-    # Fill in the matrix
-    # Note, each cell in the SAM represents a payment from the columns
-    # account to the row account
-    # We are thus going to take the consumption categories from rows and
-    # the production categories from columns
+    # a SAM cell is a payment from the column account to the row account:
+    # goods from rows, industries from columns
     for ck, cv in cons_dict.items():
         for pk, pv in prod_dict.items():
             io_df.loc[io_df.index == ck, pk] = sam.loc[
                 sam.index.isin(cv), pv
             ].values.sum()
-    # change from levels to share (where each row sums to one)
+    # levels to shares (rows sum to one)
     io_df = io_df.div(io_df.sum(axis=1), axis=0)
 
     return io_df

@@ -1,30 +1,7 @@
 """
-Warm-started steady-state solves.
-
-OG-Core seeds the baseline steady state from flat guesses: the same savings
-and labor supply at every age and lifetime-income group, with bequests and
-output derived from them and from the scalar guesses for r and TR. With
-lifetime-income groups as different as Ethiopia's (earnings, the
-subsistence floor, the safety net and family transfers) the flat start is
-far from the solution, and a moderate parameter change
-can leave no rung of OG-Core's ladder of rescaled guesses that solves.
-Starting instead from a solved state, with the household matrices and
-every outer unknown taken together so they are consistent, is the fix
-OG-Core itself uses for reform runs (``reform_use_baseline_solution``).
-
-Two ways in:
-
-* ``enable()`` seeds every steady-state solve, the shipped example's
-  included, from the solved state stored in ``data/ss_warm_start.pkl``
-  (ported from OG-ZAF's ogzaf/warm_start.py, itself from OG-KOR and
-  OG-JPN). Regenerate the seed with ``python examples/save_warm_start.py``
-  after any large recalibration.
-* ``solve_ss_from()`` solves from any solved state in memory, for
-  calibration loops that move parameters between solves (ogeth/labor.py,
-  examples/tune.py --warm).
-
-``b`` and ``n`` are in model units, so a seed stays valid across modest
-parameter moves.
+Warm-started steady-state solves. ``enable()`` seeds every solve from
+``data/ss_warm_start.pkl`` (regenerate with examples/save_warm_start.py);
+``solve_ss_from()`` solves from a solved state in memory (examples/tune.py).
 """
 
 import os
@@ -61,9 +38,7 @@ def save_seed(ss_vars, path=SEED_PATH):
         "TR": scalar(ss_vars["TR"]),
         "factor": scalar(ss_vars["factor"]),
         "BQ": np.asarray(ss_vars["BQ"], dtype=float).ravel(),
-        # the rest of the solved outer state, so a run with other
-        # spending shares starts from the solved output and wage rather
-        # than ones rebuilt from its own transfer share and from r alone
+        # solved output, wage and prices
         "w": scalar(ss_vars["w"]),
         "Y": scalar(ss_vars["Y"]),
         "p_m": np.atleast_1d(np.asarray(ss_vars["p_m"], dtype=float)).ravel(),
@@ -76,10 +51,8 @@ def save_seed(ss_vars, path=SEED_PATH):
 
 def enable(path=SEED_PATH):
     """
-    Patch ``SS.SS_initial_guesses`` to start from the stored seed.
-
-    Call once before solving. Does nothing if no seed is stored, so a fresh
-    checkout still runs (it cold-starts) rather than failing.
+    Patch ``SS.SS_initial_guesses`` to start from the stored seed; no-op
+    (cold start) if no seed is stored.
 
     Args:
         path (str): seed written by :func:`save_seed`
@@ -96,21 +69,17 @@ def enable(path=SEED_PATH):
 
     def warm(p, b_val=None, n_val=None, r_tr_scalars=[1.0, 1.0]):
         if seed["b"].shape != (p.S, p.J) or seed["BQ"].size != p.J:
-            # Seed built for different model dimensions; fall back rather
-            # than hand the solver a wrongly-shaped guess.
+            # seed built for other model dimensions: cold start
             return original(p, b_val, n_val, r_tr_scalars)
 
-        # Scale by the retry-ladder factors so ogcore's DEV_FACTOR_LIST can
-        # still explore around the warm point if the first attempt fails.
+        # scale by ogcore's retry-ladder factors (DEV_FACTOR_LIST)
         r_g = r_tr_scalars[0] * seed["r"]
         r_p_g = r_tr_scalars[0] * seed["r_p"]
         BQ_g = seed["BQ"] * r_tr_scalars[1]
         BQ_items = [BQ_g.sum()] if p.use_zeta else list(BQ_g)
         if "Y" in seed and seed["p_m"].size == p.M:
-            # Start from the solved output, wage and prices. Transfers are
-            # the run's own share of that output, so the guesses agree
-            # with each other under any spending shares; the wage moves with
-            # r along the retry ladder as the firms' condition implies.
+            # solved Y, w and p_m; TR is the run's own share of Y, and w
+            # moves with r as the firms' condition implies
             Y_g = seed["Y"]
             TR_g = r_tr_scalars[1] * p.alpha_T[-1] * Y_g
             w_g = (
@@ -128,7 +97,7 @@ def enable(path=SEED_PATH):
 
         guesses = [r_p_g, r_g, w_g] + p_m_g + [Y_g] + BQ_items + [TR_g]
         if p.baseline:
-            # Passed directly: as a parameter it can exceed the 500,000 cap.
+            # passed directly: as a parameter it is capped at 500,000
             guesses = guesses + [seed["factor"]]
         return guesses, seed["b"].copy(), seed["n"].copy()
 
@@ -147,10 +116,7 @@ def solve_ss_from(p, prev, client=None):
         client (Dask client object): client for parallel computation
 
     Returns:
-        output (dict): the steady-state solution, as ``SS.run_SS``; if the
-            warm start does not converge, the result of ``SS.run_SS``'s own
-            cold start
-
+        output (dict): as ``SS.run_SS``; a cold start if this fails
     """
     assert p.baseline, "warm start is for baseline solves"
     BQ = np.atleast_1d(np.squeeze(prev["BQ"]))

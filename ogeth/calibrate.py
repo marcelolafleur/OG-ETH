@@ -8,56 +8,34 @@ import warnings
 CUR_PATH = os.path.abspath(os.path.dirname(__file__))
 # UN M49 code for Ethiopia, used for the UN population data
 UN_COUNTRY_CODE = "231"
-# Last year of UN data the demographics read. ogcore holds fertility,
-# mortality and immigration at final_data_year forever after, so the window
-# sets the long-run population growth rate: with start_year + 1 the model
-# froze Ethiopia's current growth (2.6 percent a year) as its steady state.
-# Reading the UN projection to its end lets growth fall as the projection
-# says. get_pop reads final_data_year + 1, and the Population-Data archive
-# (used when no UN API token is registered) ends in 2099, so 2098 is the
-# last usable year; ogcore also caps it at start_year + 74.
+# Last year of UN data read; rates are held from it on, so it sets
+# long-run population growth. get_pop reads one year past it and the
+# offline archive ends in 2099 (demographics.md, The data window).
 DEMOG_FINAL_DATA_YEAR = 2098
-# Ethiopia's rows of the EAPD-DRB/Demographic-Gradients library (commit
-# ccf53a0, 2026-11-16): DHS 2024 wealth-quintile gradients in fertility
-# (TFR), infant mortality (IMR) and child mortality at ages 1-4 (CMR), and
-# the 2007 census household-deaths gradients in adult mortality (45q15 and
-# age bands, four wealth groups). A gradient is the slope of the log rate on
-# household wealth rank (0 to 1).
+# Ethiopia's rows of EAPD-DRB/Demographic-Gradients (commit ccf53a0):
+# slopes of the log rate on wealth rank (0 to 1) for TFR, IMR, CMR (DHS
+# 2024) and adult mortality (2007 census; demographics.md).
 GRADIENT_FILE = os.path.join(CUR_PATH, "data", "demographic_gradients_ETH.csv")
-# The library's pooled fertility offsets by age of mother (added to the TFR
-# gradient so that the timing of births differs across groups, not only
-# their number) and its general-gradient file: the income rule for the
-# 45q15 gradient and the offsets by age band added to it
+# The library's fertility offsets by age of mother, and its income rule and
+# age-band offsets for the 45q15 gradient
 FERTILITY_OFFSET_FILE = os.path.join(
     CUR_PATH, "data", "demographic_fertility_age_offsets.csv"
 )
 GENERAL_GRADIENT_FILE = os.path.join(
     CUR_PATH, "data", "demographic_general_gradient.csv"
 )
-# OG-Core reads a log-odds slope per centered percentile point, so a
-# library gradient g at a rate p is passed as g / (100 (1 - p)), p being
-# OG-Core's own rate at that age and year (births per person per year for
-# fertility, the annual probability of death for mortality); see the
-# library's calibration guide, "Converting a gradient to OG-Core's units"
+# OG-Core takes a log-odds slope per percentile point: a gradient g at
+# OG-Core's own rate p is passed as g / (100 (1 - p))
 PERCENT = 100.0
 # ages 1-4 take the child-mortality gradient; age 0 is infmort_gradient
 CHILD_AGES = (1, 5)
-# the 45q15 gradient plus the band offsets sets ages 5-59 (5-14 take the
-# 15-29 value); from 60 the 45-59 value falls in a straight line to 0 at 75,
-# and it is 0 from 75 on (the library's recipe; the measured 60-74 band is
-# not used)
+# 45q15 gradient plus band offsets at ages 5-59 (5-14 take 15-29); linear
+# fall from the 45-59 value at 60 to 0 at 75
 ADULT_BANDS = ((5, 30, "15-29"), (30, 45, "30-44"), (45, 60, "45-59"))
 TAPER_AGES = (60, 75)
-# The adult-mortality gradient steepens as a country gets richer: the
-# library's income rule is
-#     gradient(45q15) = intercept + slope ln(GDP per capita, PPP, constant
-#                       2021 international $; World Bank NY.GDP.PCAP.PP.KD),
-# fitted on GDP per capita between about $1,100 and $18,000 and not
-# extrapolated beyond. Ethiopia's measurement is from the 2007 census, so
-# the measured gradient is shifted by the rule's change since 2007 and keeps
-# shifting along the model's growth path, held where the rule's range ends.
-# (The library also allows holding it fixed; its ruling on the choice is
-# pending, and the two bracket the treatment.)
+# Income rule: the 45q15 gradient moves with ln GDP per capita (PPP,
+# constant 2021 $, World Bank NY.GDP.PCAP.PP.KD) from the 2007 census along
+# the growth path, held above $18,000 (demographics.md)
 CENSUS_YEAR = 2007
 GDP_PPP_PER_CAPITA = {2007: 1109.14, 2025: 3094.87}
 GDP_LATEST_YEAR = 2025
@@ -82,9 +60,7 @@ def _gradient(df, indicator, path):
 
 def fertility_gradient_by_age(E, S, df, offsets, path=GRADIENT_FILE):
     """
-    The library's fertility gradient by single age: the TFR gradient plus
-    the pooled offset of the age group (ages below 15 take the 15-19
-    offset, ages 50 and above the 45-49 offset), in the library's units.
+    Fertility gradient by single age: TFR gradient plus age offset.
 
     Returns:
         Numpy array: length E+S
@@ -99,11 +75,8 @@ def fertility_gradient_by_age(E, S, df, offsets, path=GRADIENT_FILE):
 
 def mortality_gradient_by_age(E, S, df, band, shift=0.0, path=GRADIENT_FILE):
     """
-    The library's mortality gradient by single age, in the library's units:
-    0 at age 0 (infant mortality is separate), the child-mortality gradient
-    at ages 1-4, the 45q15 gradient (plus ``shift``) plus the band offsets
-    at ages 5-59, a straight-line fall from the 45-59 value at 60 to 0 at
-    75, and 0 from 75 on.
+    Mortality gradient by single age: 0 at age 0, CMR at 1-4, 45q15 plus
+    ``shift`` and band offsets at 5-59, tapering to 0 at 75.
 
     Returns:
         Numpy array: length E+S
@@ -129,9 +102,7 @@ def mortality_gradient_by_age(E, S, df, band, shift=0.0, path=GRADIENT_FILE):
 
 def income_rule_shift(years, g_y_annual, rule):
     """
-    Change in the 45q15 gradient since the census year along the income
-    rule, with GDP per head growing at g_y_annual from its latest value and
-    held at the top of the rule's range.
+    Change in the 45q15 gradient since the census year by the income rule.
     """
     years = np.asarray(years, dtype=float)
     gdp = GDP_PPP_PER_CAPITA[GDP_LATEST_YEAR] * (1 + g_y_annual) ** (
@@ -168,9 +139,7 @@ def demographic_gradients(
     general_path=GENERAL_GRADIENT_FILE,
 ):
     """
-    Income gradients in fertility and mortality for OG-Core's demographics,
-    from the Demographic-Gradients library's values for Ethiopia, by age
-    and year, in OG-Core's units.
+    Income gradients in fertility and mortality, in OG-Core's units.
 
     Args:
         E (int): age at which agents become economically active
@@ -178,17 +147,13 @@ def demographic_gradients(
         T (int): number of periods in the transition path
         start_year (int): calendar year of the first model period
         g_y_annual (float): annual growth of income per head
-        rates (dict): OG-Core's own rates on the rows of its rate paths
-            (``demographic_rates``): ``fert`` and ``mort`` (n, E+S),
-            ``infmort`` (n,), and ``first_year`` of the first row. Without
-            them the conversion takes p = 0 (division by 100 only) and the
-            gradients are those of the census year.
+        rates (dict): output of ``demographic_rates``; None takes p = 0
+            and the census-year gradients
         path, offset_path, general_path (str): the library's tables
 
     Returns:
-        gradients (dict): fert_gradient, mort_gradient (period by age, or
-            by age without rates) and infmort_gradient (by period, or a
-            scalar without rates), ready for get_pop_objs
+        gradients (dict): fert_gradient, mort_gradient, infmort_gradient
+            for get_pop_objs
     """
     df, offsets, rule, band = _library_tables(path, offset_path, general_path)
     fert = fertility_gradient_by_age(E, S, df, offsets, path)
@@ -220,11 +185,8 @@ def demographic_gradients(
 
 def demographic_rates(E, S, T, start_year, download_path=None):
     """
-    OG-Core's own fertility and mortality rates on the rows of the rate
-    paths get_pop_objs builds (from start_year - 2, the year before the
-    initial data year, to DEMOG_FINAL_DATA_YEAR, then the last year held to
-    T + S rows), so that each gradient is converted at the rate it is
-    applied to.
+    OG-Core's fertility and mortality rates on get_pop_objs' rows (from
+    start_year - 2, held to T + S rows), to convert the gradients.
     """
     from ogcore import demographics
 
@@ -263,10 +225,7 @@ def demographic_rates(E, S, T, start_year, download_path=None):
     }
 
 
-# Bounds on the common discount factor, which examples/tune.py sets so that
-# the steady-state return on capital equals the world rate: below one (no
-# patience above one), and no lower than Ethiopia's measured discount rates
-# allow
+# Bounds on the discount factor that examples/tune.py sets (households.md)
 BETA_BOUNDS = (0.5, 0.995)
 
 
@@ -278,13 +237,10 @@ class Calibration:
         p,
         demographic_data_path=None,
         output_path=None,
-        # Set True to rebuild demographics and earnings (UN data) and the
-        # input-output data
+        # True rebuilds demographics, earnings and input-output data
         update_from_api=False,
     ):
         """
-        Constructor for the Calibration class.
-
         Args:
             p (OG-Core Specifications object): model parameters
             demographic_data_path (str): path to save demographic data
@@ -294,7 +250,6 @@ class Calibration:
 
         Returns:
             None
-
         """
         # Create output_path if it doesn't exist
         if output_path is not None:
@@ -342,10 +297,8 @@ class Calibration:
         self, p, demographic_data_path=None, output_path=None
     ):
         """
-        Rebuild the demographics from the UN data, with Ethiopia's income
-        gradients in fertility and mortality, and everything derived from
-        them: the earnings matrix, the remittance growth path and
-        allocation, and the transfer allocation.
+        Rebuild the demographics (UN data, income gradients) and what
+        derives from them: e, remittance and transfer allocations.
 
         Args:
             p (OG-Core Specifications object): model parameters
@@ -354,7 +307,6 @@ class Calibration:
 
         Returns:
             None
-
         """
         from ogcore import demographics
 
@@ -382,8 +334,7 @@ class Calibration:
             ),
         )
 
-        # earnings profiles, reshaped with Ethiopian data and scaled on
-        # the model's own joint age-by-group population distribution
+        # earnings profiles, scaled on the joint population distribution
         self.e = (
             income.get_e_interp(
                 p.E,
@@ -396,8 +347,7 @@ class Calibration:
             * macro_params.EARNINGS_SCALE
         )
 
-        # the remittance growth path and allocation matrix are derived
-        # from these demographics, so they travel with them
+        # remittance growth path and allocation, from these demographics
         self.demographic_params.update(
             macro_params.derive_remittance_params(
                 p.g_y,
@@ -407,9 +357,7 @@ class Calibration:
                 omega=self.demographic_params["omega"],
             )
         )
-        # so is the transfer allocation matrix (the safety net by its
-        # design, direct support twice public works per person, pensions to
-        # the retired), built for each year from that year's population
+        # transfer allocation by year from that year's population (macro.md)
         retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
         self.demographic_params["eta"] = macro_params.transfer_eta_path(
             self.demographic_params["omega"],
