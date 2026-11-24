@@ -6,7 +6,7 @@ The public-use microdata (Stata files) come from the World Bank Microdata
 Library, catalog 6161, after registration; they may not be redistributed, so
 they are not in this repository. Unzip them anywhere and run
 
-    python examples/ess_credit_saving.py <unzipped folder> <output folder>
+    python scripts/ess_credit_saving.py <unzipped folder> <output folder>
 
 """
 
