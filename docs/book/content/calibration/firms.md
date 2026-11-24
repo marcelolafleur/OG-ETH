@@ -130,7 +130,7 @@ The steady state implied by the stationarized law of motion, at the long-run $\a
 \bar{K}_g / \bar{Y} = \frac{(1-\phi_g)\,\alpha_I}{e^{g_y}(1+\bar{g}_n) - (1-\delta_g)},
 ```
 
-is {glue:text}`kg_ss`, close to the starting stock, so productive public capital stays roughly flat over the transition rather than running down.  The large measured stock, built by the state-led and largely SOE-financed investment of the 2010s, enters at its productive share; the rest is the inefficiency the PIMA measures.
+is {glue:text}`kg_ss`, close to the starting stock; along the way it falls to about 0.18 of output in the first decades, because output grows faster than the public investment that adds to the stock, and recovers over the following century.  The large measured stock, built by the state-led and largely SOE-financed investment of the 2010s, enters at its productive share; the rest is the inefficiency the PIMA measures.
 
 ### Depreciation
 

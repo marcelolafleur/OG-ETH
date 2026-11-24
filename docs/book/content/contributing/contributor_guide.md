@@ -139,7 +139,7 @@ situations, in which case other contributors are here to help.
       OG-ETH$ git fetch upstream
       OG-ETH$ git merge upstream/main
     ```
-   You may need to resolve conflicts that arise when another contributor changed the same section of code that you are changing. Feel free to ask other contributors for guidance if this happens to you. If you do need to fix a merge conflict, re-run the test suite afterwards (step 4.)
+   You may need to resolve conflicts that arise when another contributor changed the same section of code that you are changing. Feel free to ask other contributors for guidance if this happens to you. If you do need to fix a merge conflict, re-run the test suite afterwards (step 3)
 
 6. When you are ready for other team members to review your code, make your final commit and push your local branch to your remote repo:
     ```
@@ -153,7 +153,7 @@ situations, in which case other contributors are here to help.
 (Sec_SimpleUsage)=
 ## Simple Usage
 
-Load the calibration, change a parameter for a reform and run the model as in `examples/run_og_eth.py`:
+Load the calibration and change a parameter for a reform; `examples/run_og_eth.py` shows how to run the model with it:
 
 ```python
 import json

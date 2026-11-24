@@ -11,7 +11,7 @@ OG-ETH is an overlapping-generations (OG) model that allows for dynamic general 
 
 ## Using and contributing to OG-ETH
 
-Install and run OG-ETH by cloning this GitHub repository and installing the `ogeth` package with its dependencies using [`uv`](https://docs.astral.sh/uv/), as detailed below. (Installing the `ogeth` package from [PyPI](https://pypi.org/project/ogeth/) with `pip` is no longer the recommended path: on the Python versions many machines ship, `pip` either refuses the current release outright — as on the Python 3.9 built into macOS — or silently pairs it with an older `ogcore` than the model is tested against, and even on a supported Python the PyPI route does not pin the `ogcore` version the repository is tested against. The `uv` workflow installs the exact tested versions of every dependency, including a compatible Python interpreter.)
+Install and run OG-ETH by cloning this GitHub repository and installing the `ogeth` package with its dependencies using [`uv`](https://docs.astral.sh/uv/), as detailed below. (Installing the `ogeth` package from [PyPI](https://pypi.org/project/ogeth/) with `pip` is no longer the recommended path: on the Python versions many machines ship, `pip` either refuses the current release outright — as on the Python 3.9 built into macOS — or installs a released `ogcore` that does not yet have the changes this version needs. The `uv` workflow installs the exact tested versions of every dependency, including a compatible Python interpreter.)
 
 ### Installation
 
