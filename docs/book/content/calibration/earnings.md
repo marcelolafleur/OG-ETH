@@ -52,13 +52,13 @@ The National Transfer Accounts project {cite}`NTA:2022` publishes smoothed mean 
 
 Beyond 65 the employment ratio and hours are a single open band in both countries, so per-hour earnings cannot be measured by age there; from 65 the factor is held at its mean over ages 60–64, and the shape of the profiles at older ages is the US shape (itself an arctan extrapolation for ages 80–100 in {cite}`DeBackerEtAl:2017`). Little labor is supplied at those ages, so this matters little for the results.
 
-Ethiopian pay per hour peaks earlier and falls faster after 50 than US pay. The factor is about 1.20 at age 20, 1.20 at 25, 1.16 at 30, 1.22 at 35, 1.08 at 45, 0.86 at 55 and 0.61 from 60. Ethiopian workers in their fifties work fewer hours than in their thirties (27 against 32 a week among the employed), so per hour their pay holds up better than per worker: the population-weighted age profile of $e$ relative to the thirties is 0.58 in the twenties, 1.33 in the forties, 1.28 in the fifties and 0.86 in the sixties. This is the difference between an economy of long formal careers with returns to seniority and one where most work is physical and self-employed. Switching from per-worker to per-hour pay (OG-PHL's correction, adopted here in November 2026) puts the implied earnings Gini at 0.53.
+Ethiopian pay per hour peaks earlier and falls faster after 50 than US pay. The factor is about 1.20 at age 20, 1.20 at 25, 1.16 at 30, 1.22 at 35, 1.08 at 45, 0.86 at 55 and 0.60 from 61. Ethiopian workers in their fifties work fewer hours than in their thirties (27 against 32 a week among the employed), so per hour their pay holds up better than per worker: the population-weighted age profile of $e$ relative to the thirties is 0.58 in the twenties, 1.33 in the forties, 1.28 in the fifties and 0.86 in the sixties. This is the difference between an economy of long formal careers with returns to seniority and one where most work is physical and self-employed. Switching from per-worker to per-hour pay (OG-PHL's correction, adopted here in November 2026) puts the implied earnings Gini at 0.53.
 
 ### Group levels from the World Inequality Database
 
 The World Inequality Database (WID) {cite}`WID:2024` publishes pre-tax national income shares by percentile group for equal-split adults; Ethiopia's series (2021 is the latest estimate) is built from the household consumption surveys with a correction for top incomes. We read off the shares of the seven lifetime-income groups directly from the cumulative shares WID reports at the 25th, 50th, 70th, 80th, 90th and 99th percentiles, and choose $G_j$ so that the share of total ability-weighted labor accruing to each group in the model, $\sum_s e_{j,s}\omega_{s,j} / \sum_{s,j} e_{j,s}\omega_{s,j}$, equals the WID share. Because the shares are linear in $G_j$, this is a single rescaling, and the resulting matrix reproduces the seven shares exactly.
 
-| Lifetime-income group | $\lambda_j$ | WID share, Ethiopia 2021 | Lifetime mean of $e_{j,s}$ | For reference: WID share, United States 2021 |
+| Lifetime-income group | $\lambda_j$ | WID share, Ethiopia 2021 | Mean of $e_{j,s}$ relative to the average (share / $\lambda_j$) | For reference: WID share, United States 2021 |
 |---|---|---|---|---|
 | 1 (bottom 25%) | 0.25 | 4.4% | 0.18 | 3.4% |
 | 2 (25–50%) | 0.25 | 13.0% | 0.52 | 10.1% |
@@ -75,7 +75,7 @@ The World Inequality Database (WID) {cite}`WID:2024` publishes pre-tax national 
 height: 350px
 name: FigEarnVsData
 ---
-Left: the population-weighted age profile of $e$ against the unadjusted OG-USA profile and the two NTA per-worker profiles it is reshaped with (each relative to its mean at ages 30–39). Right: the income share of each lifetime-income group implied by $e$ against the WID shares for Ethiopia and the United States.
+Left: the population-weighted age profile of $e$ against the unadjusted OG-USA profile and the NTA labor-income profiles per worker for Ethiopia and the United States (each relative to its mean at ages 30–39); the reshaping uses the per-hour profiles described above. Right: the income share of each lifetime-income group implied by $e$ against the WID shares for Ethiopia and the United States.
 ```
 
 ```{figure} ./images/ability_profiles.png

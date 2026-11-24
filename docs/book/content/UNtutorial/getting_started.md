@@ -102,9 +102,9 @@ git version 2.37.2
 ```
 
 #### On Linux
-Open your terminal and type `git -version`. You should get output like `git version 2.37.2.
+Open your terminal and type `git --version`. You should get output like `git version 2.37.2.
 ```{code}
->>> git -version
+>>> git --version
 git version 2.37.2
 ```
 

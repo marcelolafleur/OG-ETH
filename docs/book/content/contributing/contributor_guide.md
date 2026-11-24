@@ -88,7 +88,7 @@ The following text describes a typical workflow for changing
 situations, in which case other contributors are here to help.
 
 1. Before you edit the `OG-ETH` source code on your machine,
-   make sure you have the latest version of the central OG-USA
+   make sure you have the latest version of the central OG-ETH
    repository by executing the following **four** Git commands:
 
    a. Tell Git to switch to the main branch in your local repo.
@@ -124,7 +124,7 @@ situations, in which case other contributors are here to help.
     ```
      OG-ETH$ uv run python -m pytest -m "not local" -q
     ```
-   This is the same fast test set that runs on each pull request; it completes in about a minute. Tests marked `local` run the full example end to end and take about 15 to 20 minutes — run those with plain `uv run python -m pytest` only when your change affects the model solution. If the tests do not pass, try to fix the issue by using the information provided by the error message. If this isn't possible or doesn't work, the core maintainers are here to help via a [GitHub Issue](https://github.com/EAPD-DRB/OG-ETH/issues).
+   This is the same fast test set that runs on each pull request; it completes in a few seconds. Tests marked `local` start the full example run and check that it is still running after five minutes — run those with plain `uv run python -m pytest` only when your change affects the model solution. If the tests do not pass, try to fix the issue by using the information provided by the error message. If this isn't possible or doesn't work, the core maintainers are here to help via a [GitHub Issue](https://github.com/EAPD-DRB/OG-ETH/issues).
 
 4. Now you're ready to [commit](https://help.github.com/articles/github-glossary/#commit) your changes to your local repo using the code below. The first line of code tells `Git` to track a file. Use "git status" to find all the files you've edited, and "git add" each of the files that you'd like `Git` to track. As a rule, do not add large files. If you'd like to add a file that is larger than 25 MB, please contact the other contributors and ask how to proceed. The second line of code commits your changes to your local repo and allows you to create a commit message; this should be a short description of your changes.
 
@@ -153,7 +153,21 @@ situations, in which case other contributors are here to help.
 (Sec_SimpleUsage)=
 ## Simple Usage
 
-[TODO: Include simple usage examples.]
+Load the calibration, change a parameter for a reform and run the model as in `examples/run_og_eth.py`:
+
+```python
+import json
+from importlib.resources import files
+from ogcore.parameters import Specifications
+
+p = Specifications()
+p.update_specifications(
+    json.loads(
+        files("ogeth").joinpath("ogeth_default_parameters.json").read_text()
+    )
+)
+p.update_specifications({"cit_rate": [[0.25]]})
+```
 
 
 (Sec_ContribFootnotes)=
