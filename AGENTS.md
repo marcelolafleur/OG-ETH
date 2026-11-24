@@ -26,7 +26,7 @@ OG-ETH is an Ethiopia country calibration of the OG-Core overlapping-generations
 
 - Default suite (matches CI, skips the long example run): `uv run python -m pytest -m 'not local' -q` (or `make test`).
 - Targeted (fast): `uv run python -m pytest tests/test_macro_params.py tests/test_calibrate.py tests/test_update_baseline.py -q`.
-- Full example run (baseline plus reform, about 10-20 min): `uv run python examples/run_og_eth.py` (add `--scenario program` for the IMF program scenario).
+- Full example run (the official baseline plus the corporate-tax reform, about 10-20 min): `uv run python examples/run_og_eth.py`. `examples/eth_imf_program.py` is an extra example with the IMF program as an alternative baseline; it is not part of the calibration.
 
 ## Repo conventions
 
