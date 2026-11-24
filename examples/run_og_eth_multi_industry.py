@@ -8,6 +8,7 @@ import copy
 from importlib.resources import files
 import matplotlib.pyplot as plt
 from ogeth import input_output as io
+from ogeth import warm_start
 from ogcore.parameters import Specifications
 from ogcore import output_tables as ot
 from ogcore import output_plots as op
@@ -71,6 +72,8 @@ def main():
         }
     )
 
+    # the steady state starts from the shipped single-industry seed
+    warm_start.enable()
     print("IO Matrix for baseline:", p.io_matrix)
     # Run model
     start_time = time.time()

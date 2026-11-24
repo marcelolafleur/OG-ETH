@@ -8,8 +8,8 @@ scripts/world_bank_values.py.
 # imports
 import numpy as np
 
-# Solver settings for the example scripts: outer-loop damping (nu) and
-# Anderson acceleration of the time-path loop.
+# Solver settings written into the packaged parameters: outer-loop damping
+# (nu) and Anderson acceleration of the time-path loop.
 NU = 0.2
 TPI_ANDERSON_M = 5
 TPI_ANDERSON_BETA = 1.0

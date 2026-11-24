@@ -299,6 +299,12 @@ class Calibration:
         )
         self.params.update(demog)
         self.params.update(macro_params.baseline_params(p_new))
+        # single-industry values; a multi-industry model keeps its own
+        if p.M > 1:
+            for key in ("gamma", "gamma_g"):
+                self.params.pop(key)
+        if p.I > 1:
+            self.params.pop("c_min")
         if p.I > 1:
             self.params["alpha_c"] = list(io.get_alpha_c().values())
         if p.M > 1:

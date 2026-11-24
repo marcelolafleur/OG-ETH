@@ -118,10 +118,10 @@ def fdi_stock_usd_bn(delta=None):
 
 
 def sovereign_rate_scale():
-    """r_gov_scale: invert the sovereign-corporate yield relationship of Li,
-    Magud, Werner and Witte (2021, Table 8 column 2) by OLS of the
-    sovereign yield on the fitted corporate yield, for sovereign yields of
-    2-12 percent."""
+    """r_gov_scale: invert the sovereign-corporate yield relationship of
+    Li, Magud and Werner (2023, Table 8 column 2) by OLS of the sovereign
+    yield on the fitted corporate yield, for sovereign yields of 2-12
+    percent."""
     sov = np.arange(20, 120) / 10
     corp = 8.199 - 2.975 * sov + 0.478 * sov**2
     slope, intercept = np.polyfit(corp, sov, 1)

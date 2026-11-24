@@ -8,7 +8,6 @@ other entries are left as they are.
 
 import json
 import os
-from importlib.resources import files
 
 import numpy as np
 from ogcore.parameters import Specifications
@@ -42,13 +41,8 @@ def main():
         "ogeth_default_parameters.json",
     )
     p = Specifications(baseline=True)
-    p.update_specifications(
-        json.loads(
-            files("ogeth")
-            .joinpath("ogeth_default_parameters.json")
-            .read_text(encoding="utf-8")
-        )
-    )
+    with open(json_path, encoding="utf-8") as f:
+        p.update_specifications(json.load(f))
     d = Calibration(p, update_from_api=True).get_dict()
     write_json_parameters(json_path, {k: _jsonable(v) for k, v in d.items()})
 
