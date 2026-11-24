@@ -3,7 +3,8 @@ Store a solved steady state as the warm-start seed.
 
     python examples/save_warm_start.py examples/OG-ETH-Example/OUTPUT_BASELINE
 
-See ogeth/warm_start.py for why the seed matters.
+The seed starts the steady-state solve near the solution, which the
+flat default guesses are far from (ogeth/warm_start.py).
 """
 
 import os

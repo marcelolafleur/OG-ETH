@@ -52,18 +52,12 @@ def test_conversion_to_ogcore_units():
 
 def test_calibration_passes_gradients_to_demographics():
     p = MagicMock()
-    p.I, p.M, p.E, p.S, p.T, p.J = 1, 1, 20, 80, 320, 7
+    p.E, p.S, p.T, p.J = 20, 80, 320, 7
     p.start_year = 2025
     p.g_y_annual = 0.047
     p.lambdas = np.array([0.25, 0.25, 0.2, 0.1, 0.1, 0.09, 0.01])
-    p.g_y = 0.04
-    p.retirement_age = np.array([65])
     omega = np.full((80, 7), 1 / 80) * p.lambdas.reshape(1, 7)
-    demog = {
-        "omega_SS": omega,
-        "omega": np.tile(omega, (400, 1, 1)),
-        "g_n": np.full(400, 0.02),
-    }
+    demog = {"omega_SS": omega}
     with patch("ogeth.calibrate.macro_params") as mock_macro:
         mock_macro.EARNINGS_SCALE = 1.0
         with patch("ogeth.calibrate.demographic_rates") as mock_rates:

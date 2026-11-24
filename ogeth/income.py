@@ -10,7 +10,6 @@ import os
 import numpy as np
 import pandas as pd
 import scipy.interpolate as si
-from ogcore import parameter_plots as pp
 
 CUR_PATH = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(CUR_PATH, "data")
@@ -394,7 +393,6 @@ def get_e_interp(
     J,
     lambdas,
     age_wgts,
-    plot_path=None,
 ):
     """
     Build the OG-ETH ability matrix from the OG-USA profiles (earnings.md).
@@ -404,8 +402,7 @@ def get_e_interp(
         S (int): number of model periods in a lifetime
         J (int): number of lifetime-income groups
         lambdas (Numpy array): population share of each group, length J
-        age_wgts (Numpy array): population distribution, (S, J) or (S,)
-        plot_path (str): directory to save a plot of the profiles to
+        age_wgts (Numpy array): population distribution, (S, J)
 
     Returns:
         emat_new_scaled (Numpy array): ability matrix with weighted mean
@@ -414,8 +411,6 @@ def get_e_interp(
     lambdas = np.asarray(lambdas, dtype=float).flatten()
     age_wgts = np.asarray(age_wgts, dtype=float)
     assert lambdas.shape[0] == J
-    if age_wgts.ndim == 1:
-        age_wgts = age_wgts.reshape(S, 1) * lambdas.reshape(1, J)
     assert age_wgts.shape == (S, J)
     e_usa, lambdas_usa = load_ogusa_e()
     e_base = interpolate_usa_e(e_usa, lambdas_usa, E, S, lambdas)
@@ -424,32 +419,4 @@ def get_e_interp(
     group_shares = wid_group_shares("ETH", lambdas)
     e_new = scale_groups_to_shares(e_age, age_wgts, group_shares)
     emat_new_scaled = e_new / (e_new * age_wgts).sum()
-    if plot_path is not None:
-        pp.plot_income_data(
-            ages,
-            group_midpoints(lambdas),
-            lambdas,
-            emat_new_scaled,
-            path=plot_path,
-            filesuffix="_eth",
-        )
     return emat_new_scaled
-
-
-def write_json_parameters(json_path, updates):
-    """
-    Replace parameters in a packaged JSON file, leaving the rest as is.
-
-    Args:
-        json_path (str): path to the JSON file
-        updates (dict): parameter name -> JSON-serializable value
-
-    Returns:
-        None
-    """
-    with open(json_path, encoding="utf-8") as f:
-        params = json.load(f)
-    params.update(updates)
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(params, f, indent=4)
-        f.write("\n")

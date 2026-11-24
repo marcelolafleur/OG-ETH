@@ -1533,7 +1533,6 @@ name = "ogeth"
 version = "0.4.0"
 source = { editable = "." }
 dependencies = [
-    { name = "dask" },
     { name = "distributed" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -1556,7 +1555,6 @@ dev = [
 docs = [
     { name = "jupyter-book" },
     { name = "sphinx" },
-    { name = "sphinx-argparse" },
     { name = "sphinx-book-theme" },
     { name = "sphinx-exercise" },
     { name = "sphinx-proof" },
@@ -1571,7 +1569,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "coverage", marker = "extra == 'dev'" },
-    { name = "dask", specifier = ">=2.30.0" },
     { name = "distributed", specifier = ">=2.30.1" },
     { name = "ipykernel", marker = "extra == 'dev'" },
     { name = "ipython", marker = "extra == 'dev'" },
@@ -1587,7 +1584,6 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scipy", specifier = ">=1.7.1" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=3.5.4" },
-    { name = "sphinx-argparse", marker = "extra == 'docs'" },
     { name = "sphinx-book-theme", marker = "extra == 'docs'", specifier = ">=0.1.3" },
     { name = "sphinx-exercise", marker = "extra == 'docs'" },
     { name = "sphinx-proof", marker = "extra == 'docs'" },
@@ -2227,19 +2223,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5b/be/50e50cb4f2eff47df05673d361095cafd95521d2a22521b920c67a372dcb/sphinx-7.4.7.tar.gz", hash = "sha256:242f92a7ea7e6c5b406fdc2615413890ba9f699114a9c09192d7dfead2ee9cfe", size = 8067911, upload-time = "2024-07-20T14:46:56.059Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/ef/153f6803c5d5f8917dbb7f7fcf6d34a871ede3296fa89c2c703f5f8a6c8e/sphinx-7.4.7-py3-none-any.whl", hash = "sha256:c2419e2135d11f1951cd994d6eb18a1835bd8fdd8429f9ca375dc1f3281bd239", size = 3401624, upload-time = "2024-07-20T14:46:52.142Z" },
-]
-
-[[package]]
-name = "sphinx-argparse"
-version = "0.6.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "docutils" },
-    { name = "sphinx" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/3d/6caa961384aa9198ecbe23d089ef846533a3413d180173a7001a054cfaab/sphinx_argparse-0.6.1.tar.gz", hash = "sha256:f8be167aedf5670bd7c812ef515968ff4717c63cfc9cb4df5f34b54fd5649c37", size = 38591, upload-time = "2026-08-21T07:38:26.571Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/2a/6f4b73c1086822852eb9a2a905cfe377daafa7ab2c3196d8854dc99d1616/sphinx_argparse-0.6.1-py3-none-any.whl", hash = "sha256:5b4c5e8f9194be4a48f0b3918eb5c32434c400e08f92a64fb5343ee282158c4a", size = 18141, upload-time = "2026-08-21T07:38:25.225Z" },
 ]
 
 [[package]]

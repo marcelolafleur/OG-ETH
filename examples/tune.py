@@ -219,10 +219,13 @@ def main():
         baseline_dir=out,
         output_base=out,
     )
-    with importlib.resources.open_text(
-        "ogeth", "ogeth_default_parameters.json"
-    ) as file:
-        p.update_specifications(json.load(file))
+    p.update_specifications(
+        json.loads(
+            importlib.resources.files("ogeth")
+            .joinpath("ogeth_default_parameters.json")
+            .read_text(encoding="utf-8")
+        )
+    )
     overrides = {}
     if args.overrides:
         with open(args.overrides) as f:

@@ -1,5 +1,6 @@
 from ogeth import input_output as io
 from ogeth import macro_params, income
+import copy
 import os
 import numpy as np
 import pandas as pd
@@ -220,7 +221,7 @@ def demographic_rates(E, S, T, start_year, download_path=None):
     }
 
 
-def demographic_params(p, download_path=None, plot_path=None):
+def demographic_params(p, download_path=None):
     """
     Rebuild the demographics (UN data, income gradients) and the earnings
     matrix e. The allocations and fiscal paths that depend on them come
@@ -229,7 +230,6 @@ def demographic_params(p, download_path=None, plot_path=None):
     Args:
         p (OG-Core Specifications object): model parameters
         download_path (str): directory to save the demographic data to
-        plot_path (str): directory to save a plot of e to
 
     Returns:
         dict: OG-Core demographic parameters and e
@@ -266,7 +266,6 @@ def demographic_params(p, download_path=None, plot_path=None):
             p.J,
             p.lambdas,
             d["omega_SS"],
-            plot_path=plot_path,
         )
         * macro_params.EARNINGS_SCALE
     )
@@ -285,24 +284,21 @@ class Calibration:
         Args:
             p (OG-Core Specifications object): model parameters
             update_from_api (bool): rebuild the demographics and e from the
-                UN data, with the allocations that depend on them, and (for
-                a multi-industry model) alpha_c and io_matrix from the SAM
+                UN data, everything macro_params.baseline_params derives
+                from them, and (for a multi-industry model) alpha_c and
+                io_matrix from the SAM
             demographic_data_path (str): directory to save the UN data to
         """
         self.params = {}
         if not update_from_api:
             return
-        import copy
-
         demog = demographic_params(p, download_path=demographic_data_path)
-        self.params.update(demog)
         p_new = copy.deepcopy(p)
         p_new.update_specifications(
             {k: np.asarray(v).tolist() for k, v in demog.items()}
         )
-        new = macro_params.baseline_params(p_new)
-        for key in ("eta", "eta_RM", "g_RM", "phi_FT"):
-            self.params[key] = new[key]
+        self.params.update(demog)
+        self.params.update(macro_params.baseline_params(p_new))
         if p.I > 1:
             self.params["alpha_c"] = list(io.get_alpha_c().values())
         if p.M > 1:

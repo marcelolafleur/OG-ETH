@@ -14,29 +14,17 @@ def read_SAM():
     Read the packaged Ethiopia SAM file.
 
     Returns:
-        pd.DataFrame | None: parsed SAM table, or None if unavailable
+        pd.DataFrame: parsed SAM table
     """
-    try:
-        sam = pd.read_csv(
-            sam_path,
-            index_col=1,
-            thousands=",",
-        ).dropna(how="all")
-
-        # first column is labels; the rest are values
-        label_col = sam.columns[0]
-        value_cols = sam.columns.drop(label_col)
-
-        sam[value_cols] = (
-            sam[value_cols]
-            .apply(lambda s: pd.to_numeric(s, errors="coerce"))
-            .fillna(0)
-        )
-
-        return sam
-    except Exception as exc:
-        print(f"Failed to read packaged SAM file: {exc}")
-        return None
+    sam = pd.read_csv(sam_path, index_col=1, thousands=",").dropna(how="all")
+    # first column is labels; the rest are values
+    value_cols = sam.columns.drop(sam.columns[0])
+    sam[value_cols] = (
+        sam[value_cols]
+        .apply(lambda s: pd.to_numeric(s, errors="coerce"))
+        .fillna(0)
+    )
+    return sam
 
 
 def get_alpha_c(sam=None, cons_dict=CONS_DICT):
@@ -52,8 +40,6 @@ def get_alpha_c(sam=None, cons_dict=CONS_DICT):
     """
     if sam is None:
         sam = read_SAM()
-    if sam is None:
-        raise RuntimeError("SAM data is unavailable. Cannot compute alpha_c.")
 
     hh_cols = [
         "hhd-r1",
@@ -95,10 +81,6 @@ def get_io_matrix(sam=None, cons_dict=CONS_DICT, prod_dict=PROD_DICT):
     """
     if sam is None:
         sam = read_SAM()
-    if sam is None:
-        raise RuntimeError(
-            "SAM data is unavailable. Cannot compute io_matrix."
-        )
     # goods x industries, filled below
     io_dict = {}
     for key in prod_dict.keys():

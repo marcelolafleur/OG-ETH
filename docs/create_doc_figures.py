@@ -177,8 +177,13 @@ def main():
     earnings_vs_data()
     demographics_by_income_group()
     statutory_tax_functions()
-    # needs the output of examples/run_og_eth.py
-    if os.path.exists(os.path.join(EXAMPLE_OUTPUT, "SS", "SS_vars.pkl")):
+    # needs the output of examples/run_og_eth.py, newer than the packaged
+    # parameters (an older run would plot a superseded calibration)
+    ss_path = os.path.join(EXAMPLE_OUTPUT, "SS", "SS_vars.pkl")
+    json_path = str(files("ogeth").joinpath("ogeth_default_parameters.json"))
+    if os.path.exists(ss_path) and os.path.getmtime(
+        ss_path
+    ) > os.path.getmtime(json_path):
         labor_supply_vs_data()
 
 
@@ -473,7 +478,15 @@ def statutory_tax_functions(save_path=None):
         mp.NOMINAL_GDP_REBASED_BIRR_BN["FY2025/26"]
         / mp.NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"]
     ) / (1 + mp.POPULATION_GROWTH)
-    incomes = np.logspace(np.log10(12_000), np.log10(5_000_000), 400)
+    incomes = np.geomspace(*mp.TAX_FIT_INCOME_RANGE, 400)
+    packaged = json.loads(
+        files("ogeth")
+        .joinpath("ogeth_default_parameters.json")
+        .read_text(encoding="utf-8")
+    )
+    group_means = income.implied_group_shares(
+        np.asarray(packaged["e"]), np.asarray(packaged["omega_SS"])
+    ) / np.asarray(packaged["lambdas"], dtype=float)
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     for ax, rate_type, title in [
         (axes[0], "etr", "Effective rate"),
@@ -511,14 +524,6 @@ def statutory_tax_functions(save_path=None):
                 lw=2,
                 label="Gouveia-Strauss fit",
             )
-        packaged = json.loads(
-            files("ogeth")
-            .joinpath("ogeth_default_parameters.json")
-            .read_text(encoding="utf-8")
-        )
-        group_means = income.implied_group_shares(
-            np.asarray(packaged["e"]), np.asarray(packaged["omega_SS"])
-        ) / np.asarray(packaged["lambdas"], dtype=float)
         for j, m in enumerate(group_means, start=1):
             x = m * params["mean_income_data"] / 12000
             ax.axvline(x, color="grey", lw=0.5, alpha=0.6)

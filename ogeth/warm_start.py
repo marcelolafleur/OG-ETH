@@ -77,7 +77,7 @@ def enable(path=SEED_PATH):
         r_p_g = r_tr_scalars[0] * seed["r_p"]
         BQ_g = seed["BQ"] * r_tr_scalars[1]
         BQ_items = [BQ_g.sum()] if p.use_zeta else list(BQ_g)
-        if "Y" in seed and seed["p_m"].size == p.M:
+        if seed["p_m"].size == p.M:
             # solved Y, w and p_m; TR is the run's own share of Y, and w
             # moves with r as the firms' condition implies
             Y_g = seed["Y"]

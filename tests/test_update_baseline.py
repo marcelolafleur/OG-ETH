@@ -23,7 +23,7 @@ def packaged():
 
 def test_packaged_parameters_are_the_regeneration(packaged):
     """The shipped values are what update_baseline.py derives from the
-    sources, and the CIT factor gamma is derived with is the tuned one."""
+    sources, and the inputs the code also holds as constants agree."""
     p = Specifications()
     p.update_specifications(packaged)
     assert not p.errors
@@ -37,3 +37,9 @@ def test_packaged_parameters_are_the_regeneration(packaged):
     assert packaged["adjustment_factor_for_cit_receipts"][0] == pytest.approx(
         mp.CIT_COLLECTIONS_FACTOR, abs=1e-4
     )
+    # inputs the code reads as constants (gamma, informality) that the JSON
+    # also holds
+    assert packaged["cit_rate"][0][0] == mp.CIT_RATE
+    assert packaged["c_corp_share_of_assets"] == mp.C_CORP_SHARE_OF_ASSETS
+    assert np.allclose(packaged["delta_tau_annual"], mp.DELTA_TAU_ANNUAL)
+    assert packaged["lambdas"] == mp.LAMBDAS

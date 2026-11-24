@@ -105,42 +105,24 @@ def remittance_eta(omega_SS, lambdas):
     return within * group_share.reshape(1, -1)
 
 
-def derive_remittance_params(g_y, g_n, omega_SS, lambdas, omega):
+def remittance_params(p):
     """
-    The remittance parameters that depend on a given set of demographics.
-
-    Args:
-        g_y (scalar): model-period productivity growth rate
-        g_n (array_like): population growth path, length T + S
-        omega_SS (array_like): steady-state population distribution, (S, J)
-        lambdas (array_like): population shares of the J groups
-        omega (array_like): population by year, (T+S, S, J); eta_RM is a
-            path built from each year's population (allocation_path)
-
-    Returns:
-        dict: g_RM and eta_RM, as lists
-    """
-    g_RM = flat_share_g_RM(g_y, g_n)
-    eta_RM = allocation_path(
-        lambda om: remittance_eta(om, lambdas), omega, omega_SS
-    )
-    return {"g_RM": g_RM.tolist(), "eta_RM": eta_RM.tolist()}
-
-
-def derived_remittance_params(p):
-    """
-    The remittance parameters that depend on the demographics in ``p``.
+    The remittance growth path and allocation for the demographics in ``p``:
+    g_RM keeps remittances on trend GDP, and eta_RM is built from each
+    year's population (allocation_path).
 
     Args:
         p (Specifications): model parameters
 
     Returns:
-        dict: see ``derive_remittance_params``
+        dict: g_RM and eta_RM, as lists
     """
     g_n = np.asarray(p.g_n, dtype=float)[: p.T + p.S]
-    return derive_remittance_params(
-        p.g_y, g_n, p.omega_SS, p.lambdas, omega=p.omega
+    g_RM = flat_share_g_RM(p.g_y, g_n)
+    eta_RM = allocation_path(
+        lambda om: remittance_eta(om, p.lambdas), p.omega, p.omega_SS
     )
+    return {"g_RM": g_RM.tolist(), "eta_RM": eta_RM.tolist()}
 
 
 # ---------------------------------------------------------------------------
@@ -296,19 +278,18 @@ REVENUE_FY2425_BIRR_BN = {
 }
 
 
-def revenue_share(*lines, year="FY2024/25"):
+def revenue_share(*lines):
     """
     Revenue lines as a share of rebased GDP at market prices.
 
     Args:
         *lines (str): keys of REVENUE_FY2425_BIRR_BN to add up
-        year (str): fiscal year of the GDP denominator
 
     Returns:
         float: share of GDP
     """
     total = sum(REVENUE_FY2425_BIRR_BN[k] for k in lines)
-    return round(total / NOMINAL_GDP_REBASED_BIRR_BN[year], 5)
+    return round(total / NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"], 5)
 
 
 PIT_REVENUE_SHARE = revenue_share("personal income tax")
@@ -876,23 +857,17 @@ def allocation_path(allocation, omega, omega_SS, tol=1e-12):
     return np.concatenate([path[:n], eta_SS[np.newaxis]])
 
 
-def transfer_eta_path(omega, omega_SS, first_age=20):
+def transfer_eta_path(p):
     """
-    ``transfer_eta`` for each transition year (``allocation_path``).
+    ``transfer_eta`` for each transition year of the demographics in ``p``
+    (``allocation_path``).
 
     Returns:
         Numpy array: (n + 1, S, J), each year summing to one
     """
     return allocation_path(
-        lambda om: transfer_eta(om, first_age),
-        omega,
-        omega_SS,
+        lambda om: transfer_eta(om, int(p.E)), p.omega, p.omega_SS
     )
-
-
-def derived_transfer_eta(p):
-    """The transfer allocation path for the demographics in ``p``."""
-    return {"eta": transfer_eta_path(p.omega, p.omega_SS, int(p.E)).tolist()}
 
 
 # Net family transfers (phi_FT): working-age members of each group support
@@ -939,28 +914,36 @@ def family_transfers(omega, e, eta, alpha_T, total_share, first_age=20):
     return phi
 
 
-def family_transfer_path(
-    omega, omega_SS, e, eta, alpha_T, first_age=20, tol=1e-12
-):
+def family_transfer_path(p, eta, alpha_T, tol=1e-12):
     """
-    Net family transfer shares for each transition year (allocation_path).
+    Net family transfer shares for each transition year of the demographics
+    and earnings in ``p`` (allocation_path).
 
     Args:
-        omega (array_like): population by year, (T+S, S, J)
-        omega_SS (array_like): steady-state population, (S, J)
-        e (array_like): earnings matrix, (S, J)
-        eta (array_like): transfer matrices by year, (T+S, S, J)
-        alpha_T (array_like): government transfers, share of GDP, length T+S
-        first_age (int): age of the first model age (OG-Core's E)
+        p (Specifications): model parameters
+        eta (array_like): transfer matrices by year, (n, S, J)
+        alpha_T (array_like): government transfers, share of GDP, by year
         tol (scalar): trailing years within tol of steady state are dropped
 
     Returns:
         Numpy array: (n + 1, S, J)
     """
-    omega = np.asarray(omega, dtype=float)
-    omega_SS = np.asarray(omega_SS, dtype=float)
-    eta = np.asarray(eta, dtype=float)
-    alpha_T = np.asarray(alpha_T, dtype=float).flatten()
+    TS = int(p.T) + int(p.S)
+    first_age = int(p.E)
+    e = np.asarray(p.e, dtype=float)
+    e = e[-1] if e.ndim == 3 else e
+
+    def held(value):
+        value = np.asarray(value, dtype=float)
+        if value.shape[0] >= TS:
+            return value[:TS]
+        pad = np.repeat(value[-1:], TS - value.shape[0], axis=0)
+        return np.concatenate([value, pad])
+
+    omega = np.asarray(p.omega, dtype=float)
+    omega_SS = np.asarray(p.omega_SS, dtype=float)
+    eta = held(eta)
+    alpha_T = held(np.asarray(alpha_T, dtype=float).flatten())
     S = omega_SS.shape[0]
     recv = np.arange(S) + first_age >= FAMILY_RECEIVER_AGE
 
@@ -988,32 +971,6 @@ def family_transfer_path(
     while n > 0 and np.abs(path[n - 1] - phi_SS).max() < tol:
         n -= 1
     return np.concatenate([path[:n], phi_SS[np.newaxis]])
-
-
-def _time_path(value, length):
-    """A path of ``length`` periods from a shorter one, holding its last."""
-    value = np.asarray(value, dtype=float)
-    if value.shape[0] >= length:
-        return value[:length]
-    pad = np.repeat(value[-1:], length - value.shape[0], axis=0)
-    return np.concatenate([value, pad])
-
-
-def derived_family_transfers(p, eta, alpha_T):
-    """The net family transfer path for ``p``, ``eta`` and ``alpha_T``."""
-    TS = int(p.T) + int(p.S)
-    e = np.asarray(p.e, dtype=float)
-    e = e[-1] if e.ndim == 3 else e
-    return {
-        "phi_FT": family_transfer_path(
-            p.omega,
-            p.omega_SS,
-            e,
-            _time_path(eta, TS),
-            _time_path(np.asarray(alpha_T, dtype=float).flatten(), TS),
-            int(p.E),
-        ).tolist()
-    }
 
 
 def dsa_annual(values, last_year=None):
@@ -1240,9 +1197,11 @@ def baseline_params(p):
     out.update(spending_paths())
     out.update(compliance_paths())
     out["zeta_D"] = zeta_D_path()
-    out.update(derived_transfer_eta(p))
-    out.update(derived_family_transfers(p, out["eta"], out["alpha_T"]))
-    out.update(derived_remittance_params(p))
+    out["eta"] = transfer_eta_path(p).tolist()
+    out["phi_FT"] = family_transfer_path(
+        p, out["eta"], out["alpha_T"]
+    ).tolist()
+    out.update(remittance_params(p))
     out.update(remittance_level_params())
     out.update(
         revenue_paths(

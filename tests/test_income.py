@@ -1,8 +1,9 @@
 """
 Tests of income.py: the WID x NTA reshaping of the OG-USA ability matrix.
 
-The OG-USA download is replaced by a synthetic matrix so the tests run
-offline; the Ethiopian and US inputs are the packaged data files.
+The OG-USA matrix (ogeth/data/ogusa_e_lambdas.json) is replaced by a
+synthetic one so the tests control its shape; the Ethiopian and US inputs
+are the packaged data files.
 """
 
 import json
@@ -21,7 +22,7 @@ LAMBDAS_USA = np.array(
 
 @pytest.fixture
 def synthetic_usa_e(monkeypatch):
-    """A smooth (80, 10) matrix standing in for the OG-USA download."""
+    """A smooth (80, 10) matrix standing in for the OG-USA matrix."""
     ages = income.model_ages(income.OGUSA_E, income.OGUSA_S)
     hump = 1 + 0.02 * (ages - 20) - 0.0003 * (ages - 20) ** 2
     groups = np.array([0.4, 0.55, 0.8, 1.05, 1.35, 2.5, 5.0, 7.0, 15.0, 40.0])
@@ -51,11 +52,6 @@ def test_get_e_interp_shape_and_normalization(synthetic_usa_e, S):
     assert e.shape == (S, 7)
     assert (e * omega).sum() == pytest.approx(1.0)
     assert (e > 0).all()
-    # a one-dimensional age distribution is spread with lambdas
-    e1 = income.get_e_interp(20, S, 7, LAMBDAS, omega.sum(axis=1))
-    assert (e1 * omega.sum(axis=1).reshape(S, 1) * LAMBDAS).sum() == (
-        pytest.approx(1.0)
-    )
 
 
 def test_get_e_interp_applies_both_factors(synthetic_usa_e):

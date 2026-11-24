@@ -8,7 +8,6 @@ on:
       - '**.json'
       - '**.csv'
       - '**.pkl'
-      - '**.pbz2'
       - '**.lock'
   pull_request:
     paths:
@@ -18,7 +17,6 @@ on:
       - '**.json'
       - '**.csv'
       - '**.pkl'
-      - '**.pbz2'
       - '**.lock'
 jobs:
   build:
