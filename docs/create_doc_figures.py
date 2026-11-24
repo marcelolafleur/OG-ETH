@@ -177,8 +177,7 @@ def calibration_vs_data(
     Args:
         output_dir (str): OUTPUT_BASELINE directory of an example run;
             defaults to examples/OG-ETH-Example/OUTPUT_BASELINE (the
-            history-anchored baseline; the program scenario's run is under
-            examples/OG-ETH-Example/program)
+            baseline)
         save_path (str): where to save the figure; defaults to the docs
             images folder
         program (module): module carrying the IMF program constants
@@ -827,12 +826,13 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
 
 def program_scenario_vs_data(output_dir=None, save_path=None):
     """
-    The program scenario's transition against the IMF program path it
-    follows (examples/run_og_eth.py --scenario program).
+    The IMF program example's transition against the program path it
+    follows (examples/eth_imf_program.py, an extra example; not used in the
+    documentation).
 
     Args:
-        output_dir (str): OUTPUT_BASELINE directory of the program-scenario
-            run; defaults to examples/OG-ETH-Example/program/OUTPUT_BASELINE
+        output_dir (str): OUTPUT_BASELINE directory of that run; defaults to
+            examples/OG-ETH-IMF-Program/OUTPUT_BASELINE
         save_path (str): defaults to the docs images folder
 
     Returns:
@@ -843,8 +843,7 @@ def program_scenario_vs_data(output_dir=None, save_path=None):
             CUR_DIR,
             "..",
             "examples",
-            "OG-ETH-Example",
-            "program",
+            "OG-ETH-IMF-Program",
             "OUTPUT_BASELINE",
         )
     if save_path is None:
