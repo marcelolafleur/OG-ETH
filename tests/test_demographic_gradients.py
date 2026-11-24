@@ -11,19 +11,8 @@ from unittest.mock import MagicMock, patch
 
 from ogeth import calibrate
 
-# library values for Ethiopia
-TFR, IMR, CMR, G45 = -0.73607, -0.65661, -0.82433, 0.0745
-OFFSETS = {
-    15: -0.77754,
-    20: -0.09955,
-    25: 0.20895,
-    30: 0.32450,
-    35: 0.09223,
-    40: -0.39232,
-    45: -0.98271,
-}
-BAND = {"15-29": -0.4063, "30-44": -0.18, "45-59": 0.2069}
-RULE_SLOPE = -0.4324
+# the library's infant-mortality gradient for Ethiopia
+IMR = -0.65661
 
 
 def _rates(p=0.1, n=400):

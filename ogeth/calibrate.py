@@ -299,16 +299,16 @@ class Calibration:
         )
         self.params.update(demog)
         self.params.update(macro_params.baseline_params(p_new))
-        # single-industry values; a multi-industry model keeps its own
+        # a multi-industry model keeps its own per-industry and per-good
+        # values and takes the SAM's consumption shares and I-O matrix
         if p.M > 1:
             for key in ("gamma", "gamma_g"):
                 self.params.pop(key)
-        if p.I > 1:
-            self.params.pop("c_min")
-        if p.I > 1:
-            self.params["alpha_c"] = list(io.get_alpha_c().values())
-        if p.M > 1:
             self.params["io_matrix"] = io.get_io_matrix().values.tolist()
+        if p.I > 1:
+            for key in ("c_min", "tau_c"):
+                self.params.pop(key)
+            self.params["alpha_c"] = list(io.get_alpha_c().values())
 
     def get_dict(self):
         """The rebuilt parameters, for Specifications.update_specifications."""
