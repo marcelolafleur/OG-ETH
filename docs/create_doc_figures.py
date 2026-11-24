@@ -13,9 +13,9 @@ from ogcore.parameters import Specifications
 from ogcore import parameter_plots as pp
 from ogcore import parameter_tables as pt
 from ogcore import demographics as demog
+from ogeth import calibrate
 
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
-UN_COUNTRY_CODE = "231"
 plot_path = os.path.join(CUR_DIR, "book", "content", "calibration", "images")
 EXAMPLE_OUTPUT = os.path.join(
     CUR_DIR, "..", "examples", "OG-ETH-Example", "OUTPUT_BASELINE"
@@ -56,7 +56,7 @@ def main():
         totpers=100,
         min_age=0,
         max_age=99,
-        country_id=UN_COUNTRY_CODE,
+        country_id=calibrate.UN_COUNTRY_CODE,
         start_year=YEAR_TO_PLOT,
         end_year=YEAR_TO_PLOT,
         graph=True,
@@ -69,7 +69,7 @@ def main():
         totpers=100,
         min_age=0,
         max_age=99,
-        country_id=UN_COUNTRY_CODE,
+        country_id=calibrate.UN_COUNTRY_CODE,
         start_year=YEAR_TO_PLOT,
         end_year=YEAR_TO_PLOT,
         graph=True,
@@ -88,7 +88,7 @@ def main():
         mort_rates=None,
         infmort_rates=None,
         pop_dist=None,
-        country_id=UN_COUNTRY_CODE,
+        country_id=calibrate.UN_COUNTRY_CODE,
         start_year=YEAR_TO_PLOT,
         end_year=YEAR_TO_PLOT + 50,
         graph=True,
@@ -113,7 +113,7 @@ def main():
         imm_rates=None,
         infer_pop=False,
         pop_dist=None,
-        country_id=UN_COUNTRY_CODE,
+        country_id=calibrate.UN_COUNTRY_CODE,
         initial_data_year=YEAR_TO_PLOT - 1,
         final_data_year=YEAR_TO_PLOT + 2,
         GraphDiag=True,
@@ -559,9 +559,7 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
     from ogeth import income, labor
 
     if output_dir is None:
-        output_dir = os.path.join(
-            CUR_DIR, "..", "examples", "OG-ETH-Example", "OUTPUT_BASELINE"
-        )
+        output_dir = EXAMPLE_OUTPUT
     if save_path is None:
         save_path = os.path.join(plot_path, "labor_supply_vs_data.png")
     ss = safe_read_pickle(os.path.join(output_dir, "SS", "SS_vars.pkl"))
@@ -581,7 +579,7 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
         scale * target,
         "--",
         color="C3",
-        label="Calibration target (LFMS bands interpolated, NTA taper)",
+        label="Target (LFMS 2021; decline from 65 fitted to ESS 2021/22)",
     )
     ax.plot(
         hours.age_band.map(labor.HOURS_BAND_MIDPOINTS),

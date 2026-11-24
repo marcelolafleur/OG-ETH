@@ -57,3 +57,31 @@ def test_get_io_matrix(sam_df):
     assert test_df.loc["Food", "Secondary"] == pytest.approx(1 / 3)
     assert test_df.loc["Non-food", "Primary"] == pytest.approx(1 / 4)
     assert test_df.loc["Non-food", "Secondary"] == pytest.approx(3 / 4)
+
+
+def test_multi_industry_parameters_load():
+    """The packaged parameters, the multi-industry overlay and the SAM's
+    consumption shares and input-output matrix load together (the setup of
+    examples/run_og_eth_multi_industry.py)."""
+    import json
+    from importlib.resources import files
+
+    from ogcore.parameters import Specifications
+
+    p = Specifications()
+    for name in (
+        "ogeth_default_parameters.json",
+        "ogeth_multi_industry_parameters.json",
+    ):
+        p.update_specifications(
+            json.loads(files("ogeth").joinpath(name).read_text())
+        )
+    alpha_c, io_matrix = io.get_alpha_c(), io.get_io_matrix()
+    p.update_specifications(
+        {
+            "alpha_c": list(alpha_c.values()),
+            "io_matrix": io_matrix.values.tolist(),
+        }
+    )
+    assert not p.errors
+    assert p.io_matrix.shape == (p.I, p.M)

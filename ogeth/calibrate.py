@@ -1,9 +1,7 @@
 from ogeth import macro_params, income
-from ogeth import input_output as io
 import os
 import numpy as np
 import pandas as pd
-import warnings
 
 CUR_PATH = os.path.abspath(os.path.dirname(__file__))
 # UN M49 code for Ethiopia, used for the UN population data
@@ -130,8 +128,6 @@ def to_ogcore_units(gradient, rate):
 def demographic_gradients(
     E,
     S,
-    T=None,
-    start_year=None,
     g_y_annual=None,
     rates=None,
     path=GRADIENT_FILE,
@@ -144,8 +140,6 @@ def demographic_gradients(
     Args:
         E (int): age at which agents become economically active
         S (int): number of model periods in a lifetime
-        T (int): number of periods in the transition path
-        start_year (int): calendar year of the first model period
         g_y_annual (float): annual growth of income per head
         rates (dict): output of ``demographic_rates``; None takes p = 0
             and the census-year gradients
@@ -225,137 +219,54 @@ def demographic_rates(E, S, T, start_year, download_path=None):
     }
 
 
-# Bounds on the discount factor that examples/tune.py sets (households.md)
-BETA_BOUNDS = (0.5, 0.995)
+def demographic_params(p, download_path=None, plot_path=None):
+    """
+    Rebuild the demographics (UN data, income gradients) and the earnings
+    matrix e. The allocations and fiscal paths that depend on them come
+    from macro_params.baseline_params (update_baseline.py).
 
+    Args:
+        p (OG-Core Specifications object): model parameters
+        download_path (str): directory to save the demographic data to
+        plot_path (str): directory to save a plot of e to
 
-class Calibration:
-    """OG-ETH calibration class"""
+    Returns:
+        dict: OG-Core demographic parameters and e
+    """
+    from ogcore import demographics
 
-    def __init__(
-        self,
-        p,
-        demographic_data_path=None,
-        output_path=None,
-        # True rebuilds demographics, earnings and input-output data
-        update_from_api=False,
-    ):
-        """
-        Args:
-            p (OG-Core Specifications object): model parameters
-            demographic_data_path (str): path to save demographic data
-            output_path (str): path to save output to
-            update_from_api (bool): Set True to rebuild the demographics,
-                earnings and (multi-industry) input-output data
-
-        Returns:
-            None
-        """
-        # Create output_path if it doesn't exist
-        if output_path is not None:
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
-
-        # Initialize attributes — populated only when update succeeds
-        self.demographic_params = {}
-        self.e = None
-        self.alpha_c = np.array([1.0]) if p.I == 1 else None
-        self.io_matrix = np.array([[1.0]]) if p.M == 1 else None
-
-        if not update_from_api:
-            return
-
-        # --- Online path: try each source independently ---
-
-        # io matrix and alpha_c (multi-sector only)
-        if p.I > 1:
-            try:
-                alpha_c_dict = io.get_alpha_c()
-                assert p.I == len(list(alpha_c_dict.keys()))
-                self.alpha_c = np.array(list(alpha_c_dict.values()))
-            except Exception as exc:
-                warnings.warn(f"alpha_c update failed: {exc}", stacklevel=2)
-        if p.M > 1:
-            try:
-                io_df = io.get_io_matrix()
-                assert p.M == len(list(io_df.keys()))
-                self.io_matrix = io_df.values
-            except Exception as exc:
-                warnings.warn(f"io_matrix update failed: {exc}", stacklevel=2)
-
-        # Demographics + income (atomic — e depends on demographic output)
-        try:
-            self.update_demographics(p, demographic_data_path, output_path)
-        except Exception as exc:
-            warnings.warn(
-                f"Demographics/income update failed: {exc}", stacklevel=2
-            )
-            self.demographic_params = {}
-            self.e = None
-
-    def update_demographics(
-        self, p, demographic_data_path=None, output_path=None
-    ):
-        """
-        Rebuild the demographics (UN data, income gradients) and the
-        earnings matrix e. The allocations and fiscal paths that depend on
-        them come from macro_params.baseline_params (update_baseline.py).
-
-        Args:
-            p (OG-Core Specifications object): model parameters
-            demographic_data_path (str): path to save demographic data
-            output_path (str): path to save plots to
-
-        Returns:
-            None
-        """
-        from ogcore import demographics
-
-        self.demographic_params = demographics.get_pop_objs(
+    d = demographics.get_pop_objs(
+        p.E,
+        p.S,
+        p.T,
+        0,
+        99,
+        country_id=UN_COUNTRY_CODE,
+        initial_data_year=p.start_year - 1,
+        final_data_year=DEMOG_FINAL_DATA_YEAR,
+        income_percentiles=p.lambdas.flatten(),
+        GraphDiag=False,
+        download_path=download_path,
+        **demographic_gradients(
             p.E,
             p.S,
-            p.T,
-            0,
-            99,
-            country_id=UN_COUNTRY_CODE,
-            initial_data_year=p.start_year - 1,
-            final_data_year=DEMOG_FINAL_DATA_YEAR,
-            income_percentiles=p.lambdas.flatten(),
-            GraphDiag=False,
-            download_path=demographic_data_path,
-            **demographic_gradients(
-                p.E,
-                p.S,
-                p.T,
-                p.start_year,
-                p.g_y_annual,
-                rates=demographic_rates(
-                    p.E, p.S, p.T, p.start_year, demographic_data_path
-                ),
+            p.g_y_annual,
+            rates=demographic_rates(
+                p.E, p.S, p.T, p.start_year, download_path
             ),
-        )
+        ),
+    )
 
-        # earnings profiles, scaled on the joint population distribution
-        self.e = (
-            income.get_e_interp(
-                p.E,
-                p.S,
-                p.J,
-                p.lambdas,
-                self.demographic_params["omega_SS"],
-                plot_path=output_path,
-            )
-            * macro_params.EARNINGS_SCALE
+    # earnings profiles, scaled on the joint population distribution
+    d["e"] = (
+        income.get_e_interp(
+            p.E,
+            p.S,
+            p.J,
+            p.lambdas,
+            d["omega_SS"],
+            plot_path=plot_path,
         )
-
-    # method to return all newly calibrated parameters in a dictionary
-    def get_dict(self):
-        d = {}
-        d.update(self.demographic_params)
-        if self.e is not None:
-            d["e"] = self.e
-        if self.alpha_c is not None:
-            d["alpha_c"] = self.alpha_c
-        if self.io_matrix is not None:
-            d["io_matrix"] = self.io_matrix
-        return d
+        * macro_params.EARNINGS_SCALE
+    )
+    return d

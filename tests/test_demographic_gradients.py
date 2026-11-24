@@ -1,7 +1,8 @@
 """
-Tests of the income gradients in fertility and mortality that Calibration
-passes to OG-Core's demographics, built from the Demographic-Gradients
-library's values for Ethiopia (commit ccf53a0, 2026-11-16).
+Tests of the income gradients in fertility and mortality that
+demographic_params passes to OG-Core's demographics, built from the
+Demographic-Gradients library's values for Ethiopia (commit ccf53a0,
+2026-11-16).
 """
 
 import numpy as np
@@ -71,7 +72,7 @@ def test_calibration_passes_gradients_to_demographics():
                 mock_demog.return_value = demog
                 with patch("ogeth.calibrate.income.get_e_interp") as mock_e:
                     mock_e.return_value = np.ones((80, 7))
-                    c = calibrate.Calibration(p, update_from_api=True)
+                    d = calibrate.demographic_params(p)
     kwargs = mock_demog.call_args.kwargs
     assert kwargs["country_id"] == calibrate.UN_COUNTRY_CODE
     np.testing.assert_array_equal(kwargs["income_percentiles"], p.lambdas)
@@ -81,4 +82,4 @@ def test_calibration_passes_gradients_to_demographics():
     assert kwargs["infmort_gradient"][0] == pytest.approx(
         IMR / (100 * 0.95), abs=1e-6
     )
-    assert "e" in c.get_dict()
+    assert "e" in d

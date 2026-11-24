@@ -7,7 +7,7 @@
 #
 # Requires `uv` (https://docs.astral.sh/uv/) to be installed.
 
-.PHONY=help
+.PHONY: help
 help:
 	@echo "USAGE: make [TARGET]"
 	@echo "TARGETS:"
@@ -23,7 +23,7 @@ help:
 	@echo "documentation : build documentation using jupyter-book"
 	@echo "new-baseline  : regenerate the demographics and the parameters derived from them"
 
-.PHONY=clean
+.PHONY: clean
 clean:
 	@find . -name '*.pyc' -exec rm {} \;
 	@find . -name '__pycache__' -type d -exec rm -r {} +
@@ -31,24 +31,24 @@ clean:
 	@find . -name '.ruff_cache' -type d -exec rm -r {} +
 	@rm -rf .venv build dist *.egg-info
 
-.PHONY=install
+.PHONY: install
 install:
 	uv sync --extra dev
 
-.PHONY=test
+.PHONY: test
 test:
 	uv run python -m pytest -m 'not local' --cov=./ --cov-report=xml
 
-.PHONY=pytest
+.PHONY: pytest
 pytest:
 	uv run python -m pytest -W ignore -m 'not local'
 
-.PHONY=format
+.PHONY: format
 format:
 	uvx ruff format .
 	uvx ruff check . --fix
 
-.PHONY=lint
+.PHONY: lint
 lint:
 	uvx ruff format --check .
 	uvx ruff check .
@@ -61,7 +61,7 @@ COVMARK = "not local"
 
 OS := $(shell uname -s)
 
-.PHONY=coverage
+.PHONY: coverage
 coverage:
 	@$(coverage-cleanup)
 	@uv run coverage run -m pytest -v -m $(COVMARK) > /dev/null
@@ -72,16 +72,16 @@ else
 	@echo "Open htmlcov/index.html in browser to view report"
 endif
 
-.PHONY=pip-package
+.PHONY: pip-package
 pip-package:
 	uv build
 
-.PHONY=documentation
+.PHONY: documentation
 documentation:
 	uv run jupyter-book clean docs/book
 	uv run python docs/create_doc_figures.py
 	uv run jupyter-book build docs/book
 
-.PHONY=new-baseline
+.PHONY: new-baseline
 new-baseline:
 	uv run python -m ogeth.update_baseline

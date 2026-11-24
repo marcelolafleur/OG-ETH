@@ -128,6 +128,20 @@ def sovereign_rate_scale():
     return float(slope)
 
 
+def nta_old_age_consumption():
+    """NTA 2005 private consumption per person at 65-69, 70-79 and 80-85
+    relative to ages 30-49 (simple means over single ages): the target that
+    sizes net family transfers (households.md)."""
+    c = pd.read_csv(
+        DATA / "nta_consumption_by_age.csv", comment="#"
+    ).set_index("age")["private_consumption"]
+    base = c.loc[30:49].mean()
+    return {
+        f"{a}-{b - 1}": float(c.loc[a : b - 1].mean() / base)
+        for a, b in ((65, 70), (70, 80), (80, 86))
+    }
+
+
 def main():
     rows = [
         ("peer FDI return, nominal", peer_fdi_return(), None),
@@ -157,6 +171,9 @@ def main():
         ("  gap from 2019", rebased_capital_output_ratio(2019), None),
         ("FDI stock, USD bn", fdi_stock_usd_bn(), mp.FDI_STOCK_USD_BN),
         ("r_gov_scale", sovereign_rate_scale(), None),
+    ] + [
+        (f"NTA consumption {band} / 30-49", ratio, None)
+        for band, ratio in nta_old_age_consumption().items()
     ]
     for name, value, constant in rows:
         held = "" if constant is None else f"   (macro_params: {constant})"

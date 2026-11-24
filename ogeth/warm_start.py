@@ -69,7 +69,7 @@ def enable(path=SEED_PATH):
 
     def warm(p, b_val=None, n_val=None, r_tr_scalars=[1.0, 1.0]):
         if seed["b"].shape != (p.S, p.J) or seed["BQ"].size != p.J:
-            # seed built for other model dimensions: cold start
+            print("Warm-start seed is for other dimensions; cold start.")
             return original(p, b_val, n_val, r_tr_scalars)
 
         # scale by ogcore's retry-ladder factors (DEV_FACTOR_LIST)

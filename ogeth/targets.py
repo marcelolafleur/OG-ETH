@@ -4,10 +4,7 @@ from a solved ``SS_vars.pkl`` or ``TPI_vars.pkl``. Ratios are to rebased GDP
 (FY2024/25) at market prices: model Y plus the consumption tax (macro.md).
 """
 
-import os
-
 import numpy as np
-import pandas as pd
 
 from ogeth import macro_params as mp
 
@@ -130,35 +127,6 @@ SS_TARGETS = {
     "r": (mp.WORLD_INT_RATE_ANNUAL, "discount factor level"),
     "K/Y": (mp.PRIVATE_CAPITAL_OUTPUT_RATIO, "outcome (provisional anchor)"),
 }
-
-
-# Old-age consumption relative to ages 30-49, the target for family
-# transfers (phi_FT): NTA 2005 private consumption per person, simple means
-# over single ages (households.md, Net family transfers)
-NTA_CONSUMPTION_BASE_AGES = (30, 50)
-NTA_CONSUMPTION_OLD_AGE_BANDS = ((65, 70), (70, 80), (80, 86))
-
-
-def nta_old_age_consumption():
-    """
-    NTA consumption per person in each old-age band relative to ages 30-49.
-
-    Returns:
-        dict: {(first age, last age + 1): ratio}
-    """
-    path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "data",
-        "nta_consumption_by_age.csv",
-    )
-    df = pd.read_csv(path, comment="#").set_index("age")
-    c = df["private_consumption"]
-    lo, hi = NTA_CONSUMPTION_BASE_AGES
-    base = c.loc[lo : hi - 1].mean()
-    return {
-        (a, b): float(c.loc[a : b - 1].mean() / base)
-        for a, b in NTA_CONSUMPTION_OLD_AGE_BANDS
-    }
 
 
 def _cfc_g(k_g):

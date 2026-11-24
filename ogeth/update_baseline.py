@@ -1,6 +1,7 @@
 """
-Regenerate the demographics, the earnings matrix and the parameters derived
-from them in the packaged JSON, leaving every other value as it is.
+Rebuild the demographics and the earnings matrix and rewrite them, with
+everything macro_params.baseline_params derives, in the packaged JSON; other
+entries are left as they are.
 
     python -m ogeth.update_baseline
 """
@@ -12,7 +13,7 @@ from importlib.resources import files
 import numpy as np
 from ogcore.parameters import Specifications
 
-from ogeth.calibrate import Calibration
+from ogeth.calibrate import demographic_params
 from ogeth.income import write_json_parameters
 from ogeth.macro_params import baseline_params
 
@@ -40,10 +41,7 @@ def main():
             .read_text(encoding="utf-8")
         )
     )
-    c = Calibration(p, update_from_api=False)
-    c.update_demographics(p)
-    d = dict(c.demographic_params)
-    d["e"] = c.e
+    d = demographic_params(p)
     p.update_specifications({k: _jsonable(v) for k, v in d.items()})
     # the fiscal, transfer and remittance paths depend on the demographics
     d.update(baseline_params(p))

@@ -56,9 +56,8 @@ def main():
         .open("r") as file
     ):
         multi_defaults = json.load(file)
-    # NOTE: industries are (in order): Primary, Energy, Tertiary, Secondary
-    # Consumer goods are (in order): Food, Energy, Non-durables,
-    # Durables, Services
+    # industries and consumption goods, in order, are the keys of
+    # input_output.PROD_DICT and CONS_DICT (work in progress)
     p.update_specifications(multi_defaults)
     # consumption shares and input-output matrix from the IFPRI SAM
     # (ogeth/data), mapped to the model's goods and industries

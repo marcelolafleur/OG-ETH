@@ -88,7 +88,7 @@ def model_ages(E, S):
         ages (Numpy array): midpoint age of each period, length S
     """
     step = OGUSA_S / S
-    return np.linspace(E + 0.5 * step, E + S - 0.5 * step, S)
+    return E + step * (np.arange(S) + 0.5)
 
 
 def interpolate_usa_e(e_usa, lambdas_usa, E, S, lambdas):
@@ -394,7 +394,6 @@ def get_e_interp(
     J,
     lambdas,
     age_wgts,
-    group_shares=None,
     plot_path=None,
 ):
     """
@@ -406,8 +405,6 @@ def get_e_interp(
         J (int): number of lifetime-income groups
         lambdas (Numpy array): population share of each group, length J
         age_wgts (Numpy array): population distribution, (S, J) or (S,)
-        group_shares (Numpy array): target income shares, length J;
-            None uses the WID shares for Ethiopia
         plot_path (str): directory to save a plot of the profiles to
 
     Returns:
@@ -424,8 +421,7 @@ def get_e_interp(
     e_base = interpolate_usa_e(e_usa, lambdas_usa, E, S, lambdas)
     ages = model_ages(E, S)
     e_age = e_base * earnings_age_factor(ages).reshape(S, 1)
-    if group_shares is None:
-        group_shares = wid_group_shares("ETH", lambdas)
+    group_shares = wid_group_shares("ETH", lambdas)
     e_new = scale_groups_to_shares(e_age, age_wgts, group_shares)
     emat_new_scaled = e_new / (e_new * age_wgts).sum()
     if plot_path is not None:

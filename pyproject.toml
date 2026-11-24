@@ -51,7 +51,6 @@ Homepage = "https://github.com/EAPD-DRB/OG-ETH/"
 dev = [
     "pytest>=6.0",
     "pytest-cov",
-    "pytest-xdist",
     "coverage",
     "ruff",
     "ipython",

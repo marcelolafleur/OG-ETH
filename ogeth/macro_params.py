@@ -79,24 +79,20 @@ def remittance_level_params():
     return {"alpha_RM_1": share, "alpha_RM_T": share}
 
 
-def remittance_eta(omega_SS, lambdas, quintile_value_shares=None):
+def remittance_eta(omega_SS, lambdas):
     """
     Allocation matrix distributing aggregate remittances across households.
 
     Args:
         omega_SS (array_like): steady-state population, (S, J)
         lambdas (array_like): group population shares, poorest first
-        quintile_value_shares (array_like): defaults to
-            RM_QUINTILE_VALUE_SHARES
 
     Returns:
         eta_RM (Numpy array): (S, J), sums to one; per capita within groups
     """
     omega_SS = np.asarray(omega_SS, dtype=float)
     lambdas = np.asarray(lambdas, dtype=float).flatten()
-    if quintile_value_shares is None:
-        quintile_value_shares = RM_QUINTILE_VALUE_SHARES
-    q = np.asarray(quintile_value_shares, dtype=float)
+    q = np.asarray(RM_QUINTILE_VALUE_SHARES, dtype=float)
     q = q / q.sum()
     # cumulative remittance value at each population percentile, evaluated
     # at the lambdas group boundaries
@@ -817,13 +813,12 @@ FARM_GROUPS = [0, 1, 2]  # bottom 70 percent: smallholder agriculture
 PENSION_GROUPS = [5, 6]  # the formal groups, as in PENSION_COVERAGE
 
 
-def transfer_eta(omega_SS, lambdas, first_age=20):
+def transfer_eta(omega_SS, first_age=20):
     """
     Allocation matrix eta of aggregate transfers, by programme, (S, J).
 
     Args:
         omega_SS (array_like): population distribution, (S, J)
-        lambdas (array_like): population shares of the J groups
         first_age (int): age of the first model age (OG-Core's E)
 
     Returns:
@@ -881,7 +876,7 @@ def allocation_path(allocation, omega, omega_SS, tol=1e-12):
     return np.concatenate([path[:n], eta_SS[np.newaxis]])
 
 
-def transfer_eta_path(omega, omega_SS, lambdas, first_age=20):
+def transfer_eta_path(omega, omega_SS, first_age=20):
     """
     ``transfer_eta`` for each transition year (``allocation_path``).
 
@@ -889,7 +884,7 @@ def transfer_eta_path(omega, omega_SS, lambdas, first_age=20):
         Numpy array: (n + 1, S, J), each year summing to one
     """
     return allocation_path(
-        lambda om: transfer_eta(om, lambdas, first_age),
+        lambda om: transfer_eta(om, first_age),
         omega,
         omega_SS,
     )
@@ -897,11 +892,7 @@ def transfer_eta_path(omega, omega_SS, lambdas, first_age=20):
 
 def derived_transfer_eta(p):
     """The transfer allocation path for the demographics in ``p``."""
-    return {
-        "eta": transfer_eta_path(
-            p.omega, p.omega_SS, p.lambdas, int(p.E)
-        ).tolist()
-    }
+    return {"eta": transfer_eta_path(p.omega, p.omega_SS, int(p.E)).tolist()}
 
 
 # Net family transfers (phi_FT): working-age members of each group support
@@ -1235,25 +1226,24 @@ GAMMA = round(
 DEBT_RATIO_SS = INITIAL_DEBT_RATIO
 
 
-def fiscal_params(p, r_ss=None):
+def baseline_params(p):
     """
-    The baseline's fiscal and external parameters.
+    The parameters update_baseline.py writes into the packaged JSON.
 
     Args:
-        p (Specifications): model parameters
-        r_ss (scalar): return for the shift path; default R_SS_FOR_R_GOV
+        p (Specifications): model parameters with the packaged demographics
 
     Returns:
         dict: ready for Specifications.update_specifications
     """
-    if r_ss is None:
-        r_ss = R_SS_FOR_R_GOV
     out = {}
     out.update(spending_paths())
     out.update(compliance_paths())
     out["zeta_D"] = zeta_D_path()
     out.update(derived_transfer_eta(p))
     out.update(derived_family_transfers(p, out["eta"], out["alpha_T"]))
+    out.update(derived_remittance_params(p))
+    out.update(remittance_level_params())
     out.update(
         revenue_paths(
             float(np.asarray(p.tau_c).flatten()[0]),
@@ -1266,25 +1256,12 @@ def fiscal_params(p, r_ss=None):
         float(np.asarray(p.r_gov_scale).flatten()[0]),
         float(p.r_gov_DY2),
         DEBT_RATIO_SS,
-        r_ss,
+        R_SS_FOR_R_GOV,
     )
     out.update(external_debt_params())
     out["debt_ratio_ss"] = DEBT_RATIO_SS
     out["r_gov_DY"] = -2 * float(p.r_gov_DY2) * DEBT_RATIO_SS
     out["tG1"] = TG1
-    out.update(remittance_level_params())
-    out.update(common_params())
-    return out
-
-
-def common_params():
-    """
-    Taxes, pensions, capital, preferences, initial conditions and solver.
-
-    Returns:
-        dict: ready for Specifications.update_specifications
-    """
-    out = {}
     out.update(statutory_tax_params())
     out.update(defined_benefit_params())
     out.update(payroll_tax_params())
@@ -1308,20 +1285,4 @@ def common_params():
             "TPI_anderson_beta": TPI_ANDERSON_BETA,
         }
     )
-    return out
-
-
-def baseline_params(p, r_ss=None):
-    """
-    Baseline parameters that update_baseline.py writes into the JSON.
-
-    Args:
-        p (Specifications): see fiscal_params
-        r_ss (scalar): see fiscal_params
-
-    Returns:
-        dict: ready for Specifications.update_specifications
-    """
-    out = fiscal_params(p, r_ss)
-    out.update(derived_remittance_params(p))
     return out

@@ -1,14 +1,10 @@
 .. _calibrate:
 
-Main Calibration Functions
+Demographics and Earnings
 =================================================
-
-**calibrate.py classes, methods, and modules**
 
 ogeth.calibrate
 ------------------------------------------
 
-.. currentmodule:: ogeth.calibrate
-
-.. autoclass:: Calibration
-  :members: get_dict
+.. automodule:: ogeth.calibrate
+  :members: demographic_params, demographic_gradients, demographic_rates

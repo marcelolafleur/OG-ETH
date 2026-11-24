@@ -19,6 +19,7 @@ its own target:
     p_wealth                           land-use fees/Y in FY2024/25
     pension coverage scale             pension outlays/Y in FY2024/25
     payroll coverage scale             contributions/Y in FY2024/25
+    r_gov_shift, mean_income_data      follow the solved return and income
 
 The next-overrides file keeps every override of the run, with the dials
 replaced by their next values, so each step of a tuning sequence is one call
@@ -30,6 +31,9 @@ every reported number from run_og_eth.py.
 
     python examples/tune.py [overrides.json] [--label NAME] [--tpi]
                             [--next next.json] [--warm SS_vars.pkl]
+
+--warm starts the steady state from a solved SS_vars.pkl; it is ignored with
+--tpi, which runs the official warm start.
 """
 
 import argparse
@@ -48,10 +52,12 @@ from ogcore.utils import safe_read_pickle
 
 from ogeth import income, initial_wealth, labor
 from ogeth import macro_params as mp
-from ogeth.calibrate import BETA_BOUNDS
 from ogeth.targets import SS_TARGETS, TRANSITION_TARGETS, ss_moments
 from ogeth.targets import tpi_moments
 from ogeth.warm_start import enable, solve_ss_from
+
+# Bounds on the discount factor (households.md)
+BETA_BOUNDS = (0.5, 0.995)
 
 # Revenue is close to proportional to its rate or scale, so those dials
 # take the full step. The level of the discount factors moves the
