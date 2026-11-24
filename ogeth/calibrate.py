@@ -3,7 +3,6 @@ from ogeth import input_output as io
 import os
 import numpy as np
 import pandas as pd
-import datetime
 import warnings
 
 CUR_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -277,11 +276,10 @@ class Calibration:
     def __init__(
         self,
         p,
-        macro_data_start_year=datetime.datetime(1947, 1, 1),
-        macro_data_end_year=datetime.datetime(2024, 12, 31),
         demographic_data_path=None,
         output_path=None,
-        # Set True to update from World Bank and UN APIs
+        # Set True to rebuild demographics and earnings (UN data) and the
+        # input-output data
         update_from_api=False,
     ):
         """
@@ -291,8 +289,8 @@ class Calibration:
             p (OG-Core Specifications object): model parameters
             demographic_data_path (str): path to save demographic data
             output_path (str): path to save output to
-            update_from_api (bool): Set True to pull updated macro data
-                from World Bank and UN APIs
+            update_from_api (bool): Set True to rebuild the demographics,
+                earnings and (multi-industry) input-output data
 
         Returns:
             None
@@ -304,7 +302,6 @@ class Calibration:
                 os.makedirs(output_path)
 
         # Initialize attributes — populated only when update succeeds
-        self.macro_params = {}
         self.demographic_params = {}
         self.e = None
         self.alpha_c = np.array([1.0]) if p.I == 1 else None
@@ -314,16 +311,6 @@ class Calibration:
             return
 
         # --- Online path: try each source independently ---
-
-        # Macro estimation
-        try:
-            self.macro_params = macro_params.get_macro_params(
-                macro_data_start_year,
-                macro_data_end_year,
-                update_from_api=update_from_api,
-            )
-        except Exception as exc:
-            warnings.warn(f"Macro params update failed: {exc}", stacklevel=2)
 
         # io matrix and alpha_c (multi-sector only)
         if p.I > 1:
@@ -435,7 +422,6 @@ class Calibration:
     # method to return all newly calibrated parameters in a dictionary
     def get_dict(self):
         d = {}
-        d.update(self.macro_params)
         d.update(self.demographic_params)
         if self.e is not None:
             d["e"] = self.e

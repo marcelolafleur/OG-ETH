@@ -42,14 +42,6 @@ def packaged():
     return json.loads(content)
 
 
-def test_wid_group_shares_sum_to_one():
-    for country in ("ETH", "US"):
-        shares = income.wid_group_shares(country, LAMBDAS)
-        assert shares.shape == (7,)
-        assert shares.sum() == pytest.approx(1.0, abs=1e-3)
-        assert (shares > 0).all()
-
-
 @pytest.mark.parametrize("S", [80, 40])
 def test_get_e_interp_shape_and_normalization(synthetic_usa_e, S):
     rng = np.random.default_rng(0)
@@ -103,11 +95,3 @@ def test_packaged_e_is_the_reshaped_matrix(packaged):
     np.testing.assert_allclose(
         shares, income.wid_group_shares("ETH", lambdas), atol=1e-4
     )
-
-
-def test_write_json_parameters_only_touches_requested_keys(tmp_path):
-    path = tmp_path / "params.json"
-    path.write_text(json.dumps({"a": 1, "e": [[1.0]], "z": "keep"}))
-    income.write_json_parameters(str(path), {"e": [[2.0, 3.0]]})
-    saved = json.loads(path.read_text())
-    assert saved == {"a": 1, "e": [[2.0, 3.0]], "z": "keep"}

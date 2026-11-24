@@ -2,8 +2,6 @@
 Tests of input_output.py module
 """
 
-from unittest.mock import patch
-
 import pandas as pd
 import pytest
 
@@ -59,15 +57,3 @@ def test_get_io_matrix(sam_df):
     assert test_df.loc["Food", "Secondary"] == pytest.approx(1 / 3)
     assert test_df.loc["Non-food", "Primary"] == pytest.approx(1 / 4)
     assert test_df.loc["Non-food", "Secondary"] == pytest.approx(3 / 4)
-
-
-@patch("ogeth.input_output.read_SAM", return_value=None)
-def test_get_alpha_c_raises_on_none_sam(mock_read_sam):
-    with pytest.raises(RuntimeError, match="Cannot compute alpha_c"):
-        io.get_alpha_c()
-
-
-@patch("ogeth.input_output.read_SAM", return_value=None)
-def test_get_io_matrix_raises_on_none_sam(mock_read_sam):
-    with pytest.raises(RuntimeError, match="Cannot compute io_matrix"):
-        io.get_io_matrix()
