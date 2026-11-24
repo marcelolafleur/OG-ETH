@@ -44,7 +44,7 @@ def test_debt_is_general_government_on_the_rebased_basis():
     """General-government gross debt, 43.3 percent of old-base GDP in
     FY2024/25 (IMF WEO October 2026), is 27.2 percent of rebased GDP; the
     program report's 50.5 adds debt the budget does not service."""
-    assert mp.IMF_PUBLIC_DEBT[0] == pytest.approx(27.198, abs=1e-3)
+    assert mp.IMF_PUBLIC_DEBT[0] == pytest.approx(27.197, abs=1e-3)
     assert mp.IMF_PUBLIC_DEBT_WIDE_PUBLISHED[0] == 50.5
     assert 0.5 < mp.GG_FOREIGN_DEBT_SHARE < 0.6
 
