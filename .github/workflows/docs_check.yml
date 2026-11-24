@@ -3,13 +3,13 @@ on:
   pull_request:
     paths:
       - '**.md'
-      - './docs/**.py'
-      - './docs/**.png'
-      - './docs/book/**.yml'
-      - './docs/book/**.bib'
-      - './docs/book/content/calibration/images/**.png'
-      - './docs/book/content/api/**.rst'
-      - './ogeth/**.py'
+      - 'docs/**.py'
+      - 'docs/**.png'
+      - 'docs/book/**.yml'
+      - 'docs/book/**.bib'
+      - 'docs/book/content/calibration/images/**.png'
+      - 'docs/book/content/api/**.rst'
+      - 'ogeth/**.py'
 
 jobs:
   build:

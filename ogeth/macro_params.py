@@ -109,7 +109,7 @@ def remittance_eta(omega_SS, lambdas, quintile_value_shares=None):
     return within * group_share.reshape(1, -1)
 
 
-def derive_remittance_params(g_y, g_n, omega_SS, lambdas, omega=None):
+def derive_remittance_params(g_y, g_n, omega_SS, lambdas, omega):
     """
     The remittance parameters that depend on a given set of demographics.
 
@@ -118,19 +118,16 @@ def derive_remittance_params(g_y, g_n, omega_SS, lambdas, omega=None):
         g_n (array_like): population growth path, length T + S
         omega_SS (array_like): steady-state population distribution, (S, J)
         lambdas (array_like): population shares of the J groups
-        omega (array_like): population by year, (T+S, S, J); if given,
-            eta_RM is a path (allocation_path)
+        omega (array_like): population by year, (T+S, S, J); eta_RM is a
+            path built from each year's population (allocation_path)
 
     Returns:
         dict: g_RM and eta_RM, as lists
     """
     g_RM = flat_share_g_RM(g_y, g_n)
-    if omega is None:
-        eta_RM = remittance_eta(omega_SS, lambdas)
-    else:
-        eta_RM = allocation_path(
-            lambda om: remittance_eta(om, lambdas), omega, omega_SS
-        )
+    eta_RM = allocation_path(
+        lambda om: remittance_eta(om, lambdas), omega, omega_SS
+    )
     return {"g_RM": g_RM.tolist(), "eta_RM": eta_RM.tolist()}
 
 
@@ -212,9 +209,7 @@ def rebased(series):
 # and Ethio Telecom external debt the budget does not service.
 IMF_PUBLIC_DEBT_PUBLISHED = [43.3, 40.7]
 IMF_PUBLIC_DEBT_WIDE_PUBLISHED = [50.5, 45.3]
-IMF_REVENUE_PUBLISHED = [9.2, 10.8]
 IMF_GRANTS_PUBLISHED = [1.7, 1.3]
-IMF_EXPENDITURE_PUBLISHED = [12.0, 14.1]
 IMF_RECURRENT_PUBLISHED = [7.1, 8.2]
 IMF_INTEREST_PUBLISHED = [0.8, 1.3]
 IMF_CAPITAL_PUBLISHED = [5.0, 5.8]
@@ -223,9 +218,7 @@ IMF_DOMESTIC_DEBT_PUBLISHED = [18.7, 15.4]
 
 # The same series in percent of rebased GDP: what the calibration uses
 IMF_PUBLIC_DEBT = rebased(IMF_PUBLIC_DEBT_PUBLISHED)
-IMF_REVENUE = rebased(IMF_REVENUE_PUBLISHED)  # excl. grants
 IMF_GRANTS = rebased(IMF_GRANTS_PUBLISHED)
-IMF_EXPENDITURE = rebased(IMF_EXPENDITURE_PUBLISHED)
 IMF_RECURRENT = rebased(IMF_RECURRENT_PUBLISHED)
 IMF_INTEREST = rebased(IMF_INTEREST_PUBLISHED)
 IMF_CAPITAL = rebased(IMF_CAPITAL_PUBLISHED)
@@ -423,10 +416,9 @@ def formal_share_by_group(informal_share, lambdas=LAMBDAS):
 NONCOMPLIANCE = [
     round(1 - x, 4) for x in formal_share_by_group(INFORMAL_EMPLOYMENT_SHARE)
 ]
-# Scale on compliance so PIT collects PIT_REVENUE_TARGET of GDP in
+# Scale on compliance so PIT collects PIT_REVENUE_SHARE of GDP in
 # FY2024/25 (examples/tune.py; taxes.md).
 COMPLIANCE_SCALE = 0.056434
-PIT_REVENUE_TARGET = PIT_REVENUE_SHARE
 
 # Pension coverage by group: PSSSA and POESSA cover formal employment only.
 PENSION_COVERAGE = [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0]
@@ -434,7 +426,6 @@ PENSION_COVERAGE = [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0]
 # at 60 after 10 years, 30 percent of the last 3 years' salary plus 1.25
 # percent per year beyond 10, capped at 70. alpha_db is the replacement
 # rate per year of contribution.
-PENSIONS_ON = True
 LEGAL_RETIREMENT_AGE = 60
 # OG-Core counts years of life, so legal age 60 is entered as 61.
 PENSION_RETIREMENT_AGE = LEGAL_RETIREMENT_AGE + 1
@@ -509,10 +500,9 @@ def spending_paths():
     interest = np.array(IMF_INTEREST) / 100
     tr = np.array(CASH_TRANSFERS) / 100
     g = rec - interest - tr
-    if PENSIONS_ON:
-        # old-age pensions are paid by the pension system, not as transfers;
-        # survivor and invalidity benefits stay in the cash transfers
-        tr = tr - PENSIONS_SHARE_OF_GDP / 100
+    # old-age pensions are paid by the pension system, not as transfers;
+    # survivor and invalidity benefits stay in the cash transfers
+    tr = tr - PENSIONS_SHARE_OF_GDP / 100
     ig = np.array(IMF_CAPITAL) / 100
     fa = np.array(IMF_GRANTS) / 100
     # shares of market-price GDP -> shares of the model's Y
@@ -826,14 +816,13 @@ FARM_GROUPS = [0, 1, 2]  # bottom 70 percent: smallholder agriculture
 PENSION_GROUPS = [5, 6]  # the formal groups, as in PENSION_COVERAGE
 
 
-def transfer_eta(omega_SS, lambdas, retire_age_index, first_age=20):
+def transfer_eta(omega_SS, lambdas, first_age=20):
     """
     Allocation matrix eta of aggregate transfers, by programme, (S, J).
 
     Args:
         omega_SS (array_like): population distribution, (S, J)
         lambdas (array_like): population shares of the J groups
-        retire_age_index (int): model age index of retirement
         first_age (int): age of the first model age (OG-Core's E)
 
     Returns:
@@ -866,12 +855,6 @@ def transfer_eta(omega_SS, lambdas, retire_age_index, first_age=20):
     # survivor and invalidity benefits to the households of the covered
     # groups, at all ages (widows, orphans and invalidity pensioners)
     eta += spread(PENSION_GROUPS, range(S), SURVIVOR_INVALIDITY_SHARE_OF_GDP)
-    if not PENSIONS_ON:
-        # pensions inside the cash-transfer ratio, to the retired formal
-        # groups; with the pension system on they are paid as benefits
-        eta += spread(
-            PENSION_GROUPS, range(retire_age_index, S), PENSIONS_SHARE_OF_GDP
-        )
     return eta / eta.sum()
 
 
@@ -897,9 +880,7 @@ def allocation_path(allocation, omega, omega_SS, tol=1e-12):
     return np.concatenate([path[:n], eta_SS[np.newaxis]])
 
 
-def transfer_eta_path(
-    omega, omega_SS, lambdas, retire_age_index, first_age=20
-):
+def transfer_eta_path(omega, omega_SS, lambdas, first_age=20):
     """
     ``transfer_eta`` for each transition year (``allocation_path``).
 
@@ -907,7 +888,7 @@ def transfer_eta_path(
         Numpy array: (n + 1, S, J), each year summing to one
     """
     return allocation_path(
-        lambda om: transfer_eta(om, lambdas, retire_age_index, first_age),
+        lambda om: transfer_eta(om, lambdas, first_age),
         omega,
         omega_SS,
     )
@@ -915,10 +896,9 @@ def transfer_eta_path(
 
 def derived_transfer_eta(p):
     """The transfer allocation path for the demographics in ``p``."""
-    retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
     return {
         "eta": transfer_eta_path(
-            p.omega, p.omega_SS, p.lambdas, retire_idx, int(p.E)
+            p.omega, p.omega_SS, p.lambdas, int(p.E)
         ).tolist()
     }
 
@@ -1305,9 +1285,8 @@ def common_params():
     """
     out = {}
     out.update(statutory_tax_params())
-    if PENSIONS_ON:
-        out.update(defined_benefit_params())
-        out.update(payroll_tax_params())
+    out.update(defined_benefit_params())
+    out.update(payroll_tax_params())
     out.update(
         {
             "world_int_rate_annual": [WORLD_INT_RATE_ANNUAL],

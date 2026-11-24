@@ -5,13 +5,13 @@ on:
       - main
     paths:
       - '**.md'
-      - './docs/**.py'
-      - './docs/**.png'
-      - './docs/book/**.yml'
-      - './docs/book/**.bib'
-      - './docs/book/content/calibration/images/**.png'
-      - './docs/book/content/api/**.rst'
-      - './ogeth/**.py'
+      - 'docs/**.py'
+      - 'docs/**.png'
+      - 'docs/book/**.yml'
+      - 'docs/book/**.bib'
+      - 'docs/book/content/calibration/images/**.png'
+      - 'docs/book/content/api/**.rst'
+      - 'ogeth/**.py'
 jobs:
   build-and-deploy:
     if: github.repository == 'EAPD-DRB/OG-ETH'

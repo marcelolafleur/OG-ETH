@@ -7,13 +7,12 @@ import time
 import copy
 from importlib.resources import files
 import matplotlib.pyplot as plt
-from ogeth.calibrate import Calibration
+from ogeth import input_output as io
 from ogcore.parameters import Specifications
 from ogcore import output_tables as ot
 from ogcore import output_plots as op
 from ogcore.execute import runner
 from ogcore.utils import safe_read_pickle
-from ogeth.utils import is_connected
 
 # Use a custom matplotlib style file for plots
 plt.style.use("ogcore.OGcorePlots")
@@ -61,16 +60,17 @@ def main():
     # Consumer goods are (in order): Food, Energy, Non-durables,
     # Durables, Services
     p.update_specifications(multi_defaults)
-    # Update parameters from calibrate.py Calibration class
-    if is_connected():  # only update if connected to internet
-        c = Calibration(
-            p, update_from_api=True
-        )  # =True will update data from online sources
-        updated_params = c.get_dict()
-        # don't update gamma here, use json file value
-        if "gamma" in updated_params:
-            del updated_params["gamma"]
-        p.update_specifications(updated_params)
+    # consumption shares and input-output matrix from the IFPRI SAM
+    # (ogeth/data), mapped to the model's goods and industries
+    alpha_c = io.get_alpha_c()
+    io_matrix = io.get_io_matrix()
+    assert len(alpha_c) == p.I and io_matrix.shape[0] == p.I
+    p.update_specifications(
+        {
+            "alpha_c": list(alpha_c.values()),
+            "io_matrix": io_matrix.values.tolist(),
+        }
+    )
 
     print("IO Matrix for baseline:", p.io_matrix)
     # Run model

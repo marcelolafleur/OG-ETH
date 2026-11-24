@@ -1,13 +1,20 @@
-import os
-import sys
+"""
+Regenerate the demographics, the earnings matrix and the parameters derived
+from them in the packaged JSON, leaving every other value as it is.
+
+    python -m ogeth.update_baseline
+"""
+
 import json
+import os
 from importlib.resources import files
+
 import numpy as np
+from ogcore.parameters import Specifications
+
 from ogeth.calibrate import Calibration
 from ogeth.income import write_json_parameters
 from ogeth.macro_params import baseline_params
-from ogcore.parameters import Specifications
-from ogcore.utils import params_to_json
 
 
 def _jsonable(value):
@@ -19,57 +26,29 @@ def _jsonable(value):
     return value
 
 
-def main(demographics_only=False):
-    """
-    Regenerate the packaged default parameters.
-
-    Args:
-        demographics_only (bool): rebuild only the demographics, e and
-            the parameters derived from them, leaving the rest of the JSON;
-            False rebuilds via Calibration(update_from_api=True) and
-            rewrites the whole file
-
-    Returns:
-        None
-    """
-    # Directories to save data
-    CUR_DIR = os.path.dirname(os.path.realpath(__file__))
-    json_path = os.path.join(CUR_DIR, "ogeth_default_parameters.json")
-
-    # Set up baseline parameterization
+def main():
+    """Rebuild the demographic-dependent parameters and write them."""
+    json_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "ogeth_default_parameters.json",
+    )
     p = Specifications(baseline=True)
-    # Update parameters for baseline from default json file
-    content = (
-        files("ogeth")
-        .joinpath("ogeth_default_parameters.json")
-        .read_text(encoding="utf-8")
-    )
-    defaults = json.loads(content)
-    p.update_specifications(defaults)
-    if demographics_only:
-        c = Calibration(p, update_from_api=False)
-        c.update_demographics(p)
-        d = dict(c.demographic_params)
-        d["e"] = c.e
-        p.update_specifications({k: _jsonable(v) for k, v in d.items()})
-        # fiscal and remittance paths depend on g_n, so rebuild them
-        d.update(baseline_params(p))
-        write_json_parameters(
-            json_path, {k: _jsonable(v) for k, v in d.items()}
+    p.update_specifications(
+        json.loads(
+            files("ogeth")
+            .joinpath("ogeth_default_parameters.json")
+            .read_text(encoding="utf-8")
         )
-        return
-    c = Calibration(
-        p,
-        update_from_api=True,
     )
-    d = c.get_dict()
-    # update parameters
-    p.update_specifications(d)
-    # fiscal and remittance paths depend on the demographics
-    p.update_specifications(baseline_params(p))
-    # save to json file
-    params_to_json(p, json_path)
+    c = Calibration(p, update_from_api=False)
+    c.update_demographics(p)
+    d = dict(c.demographic_params)
+    d["e"] = c.e
+    p.update_specifications({k: _jsonable(v) for k, v in d.items()})
+    # the fiscal, transfer and remittance paths depend on the demographics
+    d.update(baseline_params(p))
+    write_json_parameters(json_path, {k: _jsonable(v) for k, v in d.items()})
 
 
 if __name__ == "__main__":
-    main(demographics_only="--demographics-only" in sys.argv)
+    main()

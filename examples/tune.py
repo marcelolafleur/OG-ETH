@@ -115,8 +115,7 @@ def next_overrides(p, ss, tm, tpi=None):
     # hours by age: chi_n's first-order step
     n_target = labor.labor_supply_target(p.E, p.S, p.ltilde)
     n_model = labor.average_labor_supply(np.asarray(ss["n"]), p.omega_SS)
-    chi_n = np.asarray(p.chi_n, dtype=float)
-    chi_n = chi_n[-1] if chi_n.ndim > 1 else chi_n
+    chi_n = labor.steady_state_chi_n(p)
     out["chi_n"] = labor.chi_n_step(chi_n, n_model, n_target, p).tolist()
     # One discount factor for every group. The WID wealth shares for
     # Ethiopia are imputed (from income inequality and similar countries,
@@ -224,7 +223,6 @@ def main():
             overrides = json.load(f)
         overrides.pop("_scales", None)
         overrides.pop("_r_ss", None)
-        overrides.pop("_beta_state", None)
         p.update_specifications(overrides)
     print(f"label {args.label}; overrides: {sorted(overrides)}", flush=True)
 
@@ -262,8 +260,7 @@ def main():
     n_model = labor.average_labor_supply(np.asarray(ss["n"]), p.omega_SS)
     ages = income.model_ages(p.E, p.S)
     fit = (ages >= labor.FIT_AGES[0]) & (ages < labor.FIT_AGES[1])
-    chi_n = np.asarray(p.chi_n, dtype=float)
-    chi_n = chi_n[-1] if chi_n.ndim > 1 else chi_n
+    chi_n = labor.steady_state_chi_n(p)
     free = fit & (chi_n < labor.MAX_CHI_N)
     hours_gap = float(np.max(np.abs(n_model[free] / n_target[free] - 1)))
     lambdas = np.asarray(p.lambdas).flatten()

@@ -17,6 +17,15 @@ from ogcore import demographics as demog
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 UN_COUNTRY_CODE = "231"
 plot_path = os.path.join(CUR_DIR, "book", "content", "calibration", "images")
+EXAMPLE_OUTPUT = os.path.join(
+    CUR_DIR, "..", "examples", "OG-ETH-Example", "OUTPUT_BASELINE"
+)
+# OG-USA's chi_n for comparison, at a fixed OG-USA commit
+OGUSA_PARAMS_URL = (
+    "https://raw.githubusercontent.com/PSLmodels/OG-USA/"
+    "c225f85ecca0c5d4244bb97ab9e30aded09794ab/ogusa/"
+    "ogusa_default_parameters.json"
+)
 
 
 def main():
@@ -162,9 +171,15 @@ def main():
         path=os.path.join(plot_path, "exogenous_parameters_table.md"),
     )
 
-
-if __name__ == "__main__":
-    main()
+    """
+    Figures built from the packaged parameters and data
+    """
+    earnings_vs_data()
+    demographics_by_income_group()
+    statutory_tax_functions()
+    # needs the output of examples/run_og_eth.py
+    if os.path.exists(os.path.join(EXAMPLE_OUTPUT, "SS", "SS_vars.pkl")):
+        labor_supply_vs_data()
 
 
 def earnings_vs_data(save_path=None):
@@ -448,6 +463,7 @@ def statutory_tax_functions(save_path=None):
     Returns:
         matplotlib Figure
     """
+    from ogeth import income
     from ogeth import macro_params as mp
 
     if save_path is None:
@@ -495,9 +511,15 @@ def statutory_tax_functions(save_path=None):
                 lw=2,
                 label="Gouveia-Strauss fit",
             )
-        for j, m in enumerate(
-            [0.176, 0.518, 0.80, 1.10, 1.52, 3.33, 10.47], start=1
-        ):
+        packaged = json.loads(
+            files("ogeth")
+            .joinpath("ogeth_default_parameters.json")
+            .read_text(encoding="utf-8")
+        )
+        group_means = income.implied_group_shares(
+            np.asarray(packaged["e"]), np.asarray(packaged["omega_SS"])
+        ) / np.asarray(packaged["lambdas"], dtype=float)
+        for j, m in enumerate(group_means, start=1):
             x = m * params["mean_income_data"] / 12000
             ax.axvline(x, color="grey", lw=0.5, alpha=0.6)
             if rate_type == "etr":
@@ -512,84 +534,10 @@ def statutory_tax_functions(save_path=None):
         ax.legend(loc="lower right", fontsize=7)
     fig.suptitle(
         "Vertical lines: mean income of the seven lifetime-income groups "
-        "(GDP per adult times the group means of e)"
+        "(mean_income_data times the group means of e)"
     )
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
-    return fig
-
-
-def wealth_distribution_vs_data(output_dir=None, save_path=None):
-    """
-    Plot the steady-state share of wealth held by each lifetime-income
-    group against the WID net wealth shares, and the calibrated discount
-    factors.
-
-    Args:
-        output_dir (str): OUTPUT_BASELINE directory of an example run;
-            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE
-        save_path (str): where to save the figure; defaults to the docs
-            images folder
-
-    Returns:
-        matplotlib Figure
-    """
-    from ogcore.utils import safe_read_pickle
-    from ogeth import income
-
-    if output_dir is None:
-        output_dir = os.path.join(
-            CUR_DIR, "..", "examples", "OG-ETH-Example", "OUTPUT_BASELINE"
-        )
-    if save_path is None:
-        save_path = os.path.join(plot_path, "wealth_vs_data.png")
-    ss = safe_read_pickle(os.path.join(output_dir, "SS", "SS_vars.pkl"))
-    params = safe_read_pickle(os.path.join(output_dir, "model_params.pkl"))
-    lambdas = np.asarray(params.lambdas).flatten()
-    model = income.implied_wealth_shares(
-        np.asarray(ss["b_s"]), params.omega_SS
-    )
-    wid = income.wid_group_shares("ETH", lambdas, income.WID_WEALTH_VARIABLE)
-    target = income.wealth_share_targets(lambdas)
-    labels = ["0-25", "25-50", "50-70", "70-80", "80-90", "90-99", "Top 1"]
-    x = np.arange(len(lambdas))
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    ax = axes[0]
-    width = 0.27
-    ax.bar(x - width, 100 * model, width, label="OG-ETH steady state")
-    ax.bar(x, 100 * target, width, color="C3", label="target (WID, floored)")
-    ax.bar(x + width, 100 * wid, width, color="C7", label="WID Ethiopia 2021")
-    ax.axhline(0, color="grey", lw=0.8)
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.set_xlabel("Lifetime-income group (percentiles)")
-    ax.set_ylabel("Share of household wealth (%)")
-    ax.set_title("Wealth shares by group: model vs. WID")
-    ax.legend(loc="upper left", fontsize=8)
-    ax = axes[1]
-    beta = np.asarray(params.beta_annual, dtype=float).flatten()
-    ax.bar(x, beta, color="C0")
-    ax.axhline(0.88, color="C7", ls="--", label="single value used before")
-    ax.set_ylim(min(beta.min(), 0.88) - 0.05, 1.0)
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.set_xlabel("Lifetime-income group (percentiles)")
-    ax.set_ylabel(r"annual $\beta_j$")
-    ax.set_title("Calibrated discount factors by group")
-    ax.legend(loc="upper left", fontsize=8)
-    fig.tight_layout()
-    fig.savefig(save_path, dpi=300)
-    # the shares the household chapter quotes, from the same run
-    with open(os.path.join(plot_path, "wealth_shares.json"), "w") as f:
-        json.dump(
-            {
-                "model": model.tolist(),
-                "target": target.tolist(),
-                "wid": wid.tolist(),
-            },
-            f,
-            indent=2,
-        )
     return fig
 
 
@@ -650,7 +598,7 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
     ax = axes[1]
     chi_n = labor.steady_state_chi_n(params)
     ax.semilogy(ages, chi_n, label="OG-ETH, calibrated to LFMS hours")
-    with urllib.request.urlopen(income.OGUSA_PARAMS_URL) as response:
+    with urllib.request.urlopen(OGUSA_PARAMS_URL) as response:
         chi_n_usa = np.asarray(json.load(response)["chi_n"], dtype=float)
     if chi_n_usa.ndim == 2:
         chi_n_usa = chi_n_usa[-1]
@@ -667,3 +615,7 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
     return fig
+
+
+if __name__ == "__main__":
+    main()

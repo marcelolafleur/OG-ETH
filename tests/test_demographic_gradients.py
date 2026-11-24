@@ -65,8 +65,6 @@ def test_calibration_passes_gradients_to_demographics():
     }
     with patch("ogeth.calibrate.macro_params") as mock_macro:
         mock_macro.EARNINGS_SCALE = 1.0
-        mock_macro.derive_remittance_params.return_value = {}
-        mock_macro.transfer_eta_path.return_value = np.zeros((1, 80, 7))
         with patch("ogeth.calibrate.demographic_rates") as mock_rates:
             mock_rates.return_value = _rates(0.05)
             with patch("ogcore.demographics.get_pop_objs") as mock_demog:

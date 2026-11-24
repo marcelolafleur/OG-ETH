@@ -297,8 +297,9 @@ class Calibration:
         self, p, demographic_data_path=None, output_path=None
     ):
         """
-        Rebuild the demographics (UN data, income gradients) and what
-        derives from them: e, remittance and transfer allocations.
+        Rebuild the demographics (UN data, income gradients) and the
+        earnings matrix e. The allocations and fiscal paths that depend on
+        them come from macro_params.baseline_params (update_baseline.py).
 
         Args:
             p (OG-Core Specifications object): model parameters
@@ -346,26 +347,6 @@ class Calibration:
             )
             * macro_params.EARNINGS_SCALE
         )
-
-        # remittance growth path and allocation, from these demographics
-        self.demographic_params.update(
-            macro_params.derive_remittance_params(
-                p.g_y,
-                self.demographic_params["g_n"],
-                self.demographic_params["omega_SS"],
-                p.lambdas,
-                omega=self.demographic_params["omega"],
-            )
-        )
-        # transfer allocation by year from that year's population (macro.md)
-        retire_idx = int(np.asarray(p.retirement_age).flatten()[0]) - int(p.E)
-        self.demographic_params["eta"] = macro_params.transfer_eta_path(
-            self.demographic_params["omega"],
-            self.demographic_params["omega_SS"],
-            p.lambdas,
-            retire_idx,
-            int(p.E),
-        ).tolist()
 
     # method to return all newly calibrated parameters in a dictionary
     def get_dict(self):

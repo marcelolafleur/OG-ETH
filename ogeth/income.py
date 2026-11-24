@@ -6,7 +6,6 @@ to WID pre-tax income shares (earnings.md).
 
 import json
 import os
-import urllib.request
 
 import numpy as np
 import pandas as pd
@@ -15,10 +14,10 @@ from ogcore import parameter_plots as pp
 
 CUR_PATH = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(CUR_PATH, "data")
-OGUSA_PARAMS_URL = (
-    "https://raw.githubusercontent.com/PSLmodels/OG-USA/master/"
-    "ogusa/ogusa_default_parameters.json"
-)
+# OG-USA's ability matrix and group shares, vendored from a fixed OG-USA
+# commit (see the file's "source" entry) so regeneration does not move with
+# OG-USA's master branch
+OGUSA_E_FILE = os.path.join(DATA_DIR, "ogusa_e_lambdas.json")
 # the OG-USA profiles cover ages 20 to 99 in one-year steps
 OGUSA_E = 20
 OGUSA_S = 80
@@ -26,7 +25,6 @@ OGUSA_S = 80
 # WID pre-tax national income (equal-split adults), latest Ethiopian year
 WID_YEAR = 2021
 WID_SHARE_VARIABLE = "sptincj992"
-WID_GINI_VARIABLE = "gptincj992"
 # WID net personal wealth shares (equal-split adults); floored because the
 # bottom quarter's share is negative and households cannot borrow
 WID_WEALTH_VARIABLE = "shwealj992"
@@ -55,18 +53,13 @@ OLDEST_MEASURED_AGE = 65
 
 def load_ogusa_e():
     """
-    Download the OG-USA ability matrix and group shares.
-
-    Returns:
-        e_usa (Numpy array): OG-USA ability matrix, size (80, 10)
-        lambdas_usa (Numpy array): OG-USA lifetime-income group shares
+    OG-USA ability matrix (80, 10) and lifetime-income group shares.
     """
-    with urllib.request.urlopen(OGUSA_PARAMS_URL) as response:
-        usa = json.load(response)
-    e_usa = np.asarray(usa["e"], dtype=float)
-    if e_usa.ndim == 3:
-        e_usa = e_usa[0]
-    return e_usa, np.asarray(usa["lambdas"], dtype=float)
+    with open(OGUSA_E_FILE, encoding="utf-8") as f:
+        usa = json.load(f)
+    return np.asarray(usa["e"], dtype=float), np.asarray(
+        usa["lambdas"], dtype=float
+    )
 
 
 def group_midpoints(lambdas):

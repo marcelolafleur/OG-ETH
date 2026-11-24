@@ -14,7 +14,6 @@ from ogeth import income
 CUR_PATH = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(CUR_PATH, "data")
 
-LFMS_YEAR = 2021
 # OG-USA's convention: labor supply is the share of a 16-hour waking day,
 # seven days a week
 WEEKLY_TIME_ENDOWMENT = (24 - 8) * 7

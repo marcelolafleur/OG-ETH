@@ -40,7 +40,7 @@ where $\omega_{s,j}$ is the steady-state population distribution over age and li
 
 This replaces the earlier calibration, shared with several sibling models, that tilted the US profiles with a single scalar so that the model reproduced the ratio of the two countries' Gini coefficients. That approach used one number, and in `OG-ETH` the number was a World Bank *consumption* Gini for Ethiopia (31.1) set against an *income* Gini for the United States (41.5), which understated Ethiopian inequality by a wide margin (issue #33). The reshaping uses seven income shares and eighty ages instead of one statistic.
 
-The code is in `ogeth/income.py`; `python -m ogeth.update_baseline --demographics-only` regenerates the packaged matrix with the demographics.
+The code is in `ogeth/income.py`; `python -m ogeth.update_baseline` regenerates the packaged matrix with the demographics.
 
 ### Age factor from National Transfer Accounts
 

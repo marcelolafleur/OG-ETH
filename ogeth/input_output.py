@@ -112,10 +112,6 @@ PROD_DICT = {
 }
 
 
-def norm(x):
-    return str(x).strip().casefold()
-
-
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 sam_path = os.path.join(CUR_DIR, "data", "IFPRI_SAM_ETH_2022_SAM.csv")
 

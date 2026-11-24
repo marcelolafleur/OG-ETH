@@ -89,7 +89,8 @@ def enable(path=SEED_PATH):
             )
             p_m_g = list(seed["p_m"])
         else:
-            # seeds saved before the full outer state was stored
+            # a run with another number of industries (the seed is
+            # single-industry): rebuild Y and w from TR and r
             TR_g = r_tr_scalars[1] * seed["TR"]
             Y_g = TR_g / p.alpha_T[-1]
             w_g = firm.get_w_from_r(r_g, p, "SS")

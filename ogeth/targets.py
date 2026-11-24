@@ -58,8 +58,9 @@ TRANSITION_TARGETS = {
     "K_f/K": (
         mp.FOREIGN_CAPITAL_SHARE,
         "zeta_K",
-        f"inward FDI stock {mp.FDI_STOCK_TO_GDP:.3f} of GDP (UNCTAD WIR "
-        f"2026) over private K/Y {mp.PRIVATE_CAPITAL_OUTPUT_RATIO:.2f} "
+        f"inward FDI stock {mp.FDI_STOCK_TO_GDP:.3f} of GDP (perpetual "
+        "inventory of IMF balance-of-payments equity inflows) over private "
+        f"K/Y {mp.PRIVATE_CAPITAL_OUTPUT_RATIO:.2f} "
         "(PWT 11.0 rebuilt on the rebased accounts, less IMF ICSD public "
         "capital)",
     ),
@@ -102,15 +103,17 @@ TRANSITION_TARGETS = {
         "net private transfers USD 7.04 bn (IMF CR 26/174)",
     ),
     "factor payments/Y": (
-        752.0 / 201420.0,
+        752.0 / (mp.REBASED_GDP_USD_BN * 1000),
         "check",
         "net primary income paid abroad USD 0.75 bn (IMF CR 26/174 Table 4a); "
         "the model counts payments on foreign-owned capital and market debt "
         "at r_p and interest on external debt at r_D_ext",
     ),
     "total tax/Y": (
-        (1172 + 39.4 + 32.8 + 20.0)
-        / mp.NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"]
+        mp.PIT_REVENUE_SHARE
+        + mp.CIT_REVENUE_SHARE
+        + mp.CONS_TAX_SHARE
+        + mp.WEALTH_TAX_SHARE
         + mp.PAYROLL_REVENUE_SHARE,
         "check",
         "sum of the mapped instruments",
@@ -182,8 +185,6 @@ def tpi_moments(tpi, t=0):
     """
 
     def at(key):
-        if key not in tpi:  # an ogcore without external debt at its own rate
-            return 0.0
         x = np.asarray(tpi[key])
         x = x.reshape(x.shape[0], -1).sum(axis=1) if x.ndim > 1 else x
         return float(x[t])
@@ -232,7 +233,7 @@ def ss_moments(ss):
     """
 
     def sc(key):
-        return float(np.sum(ss[key])) if key in ss else 0.0
+        return float(np.sum(ss[key]))
 
     Ym = float(np.squeeze(ss["Y"]))
     Y = _market_y(Ym, sc("cons_tax_revenue"))

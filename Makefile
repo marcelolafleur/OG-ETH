@@ -21,7 +21,7 @@ help:
 	@echo "coverage      : generate test coverage report"
 	@echo "pip-package   : build sdist + wheel via uv build"
 	@echo "documentation : build documentation using jupyter-book"
-	@echo "new-baseline  : update baseline parameters and save to json file"
+	@echo "new-baseline  : regenerate the demographics and the parameters derived from them"
 
 .PHONY=clean
 clean:
@@ -84,4 +84,4 @@ documentation:
 
 .PHONY=new-baseline
 new-baseline:
-	uv run python ogeth/update_baseline.py
+	uv run python -m ogeth.update_baseline
