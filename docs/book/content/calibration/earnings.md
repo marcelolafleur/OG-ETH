@@ -40,7 +40,7 @@ where $\omega_{s,j}$ is the steady-state population distribution over age and li
 
 This replaces the earlier calibration, shared with several sibling models, that tilted the US profiles with a single scalar so that the model reproduced the ratio of the two countries' Gini coefficients. That approach used one number, and in `OG-ETH` the number was a World Bank *consumption* Gini for Ethiopia (31.1) set against an *income* Gini for the United States (41.5), which understated Ethiopian inequality by a wide margin (issue #33). The reshaping uses seven income shares and eighty ages instead of one statistic.
 
-The code is in `ogeth/income.py`; `python -m ogeth.income` regenerates the packaged matrix from the packaged demographics and prints the comparison with the data.
+The code is in `ogeth/income.py`; `python -m ogeth.update_baseline --demographics-only` regenerates the packaged matrix with the demographics.
 
 ### Age factor from National Transfer Accounts
 
@@ -88,7 +88,7 @@ Exogenous life cycle income ability paths $\log(e_{j,s})$ with $S=80$ and $J=7$
 
 {numref}`Figure %s <FigLogAbil>` shows the resulting $J=7$ deterministic lifetime ability paths $e_{j,s}$, and {numref}`Figure %s <FigEarnVsData>` compares them with the data they are built from. The lifetime means of the seven groups run from 0.18 for the bottom quarter to 10.47 for the top percent, a ratio of 59 against 28 in the US profiles interpolated to the same groups and 8.8 in the previous Gini-tilted calibration. The Gini coefficient of $e$ over the model population is 0.526, against WID's 0.516 for Ethiopia's pre-tax income: the shares pin down inequality *between* the groups, and the variation of earnings over age *within* each group adds the small remainder.
 
-Two alternatives were considered and are available through the function's arguments. Tilting the groups to WID's Gini alone (`gini_to_match=0.516`) puts the top percent at 24 times the average and the bottom quarter at 0.36, because a single-parameter tilt can only stretch the distribution proportionally; the seven shares are a richer target. Scaling the groups by Ethiopia's shares *relative to the US shares* — a ratio approach in the spirit of the family's Gini-ratio method — gives a Gini of only 0.35 and a bottom quarter at 0.54, because it inherits the wedge between the OG-USA profiles (lifetime labor earnings of workers, with a bottom-quarter share of 10 percent) and WID's annual income per adult (3.4 percent in the United States). We impose Ethiopia's shares directly: the distribution of income across households is one of the model's focal outputs, and the data describe it without detour through the United States.
+Two alternatives were considered. Tilting the groups to WID's Gini alone (0.516) puts the top percent at 24 times the average and the bottom quarter at 0.36, because a single-parameter tilt can only stretch the distribution proportionally; the seven shares are a richer target. Scaling the groups by Ethiopia's shares *relative to the US shares* — a ratio approach in the spirit of the family's Gini-ratio method — gives a Gini of only 0.35 and a bottom quarter at 0.54, because it inherits the wedge between the OG-USA profiles (lifetime labor earnings of workers, with a bottom-quarter share of 10 percent) and WID's annual income per adult (3.4 percent in the United States). We impose Ethiopia's shares directly: the distribution of income across households is one of the model's focal outputs, and the data describe it without detour through the United States.
 
 ## Limits
 
