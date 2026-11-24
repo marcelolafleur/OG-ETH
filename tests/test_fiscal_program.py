@@ -381,13 +381,18 @@ def test_transfers_are_targeted_by_programme(packaged, params):
     assert np.array_equal(
         params.eta[n:], np.tile(eta, (params.T + params.S - n, 1, 1))
     )
-    # per person, transfers follow each year's population: the poorest
-    # group at 85 in the first year gets close to its steady-state amount
-    # (held at the steady-state matrix it got about 11 times as much)
-    i85 = 85 - int(params.E)
-    first = path[0, i85, 0] / omega[0, i85, 0]
-    ss = eta[i85, 0] / np.array(packaged["omega_SS"])[i85, 0]
-    assert first == pytest.approx(ss, rel=0.1)
+    # PSNP by its design, in every year: per person, the poorest group gets
+    # the fertilizer subsidy (as group 1 does) plus PSNP, and PSNP pays
+    # twice as much from PSNP_DIRECT_SUPPORT_AGE (12 months of direct
+    # support) as below it (6 months of public works)
+    age = np.arange(params.S) + int(params.E)
+    old = age >= mp.PSNP_DIRECT_SUPPORT_AGE
+    pops = list(omega[:n]) + [np.array(packaged["omega_SS"])]
+    for eta_t, om in zip(path, pops):
+        per_person = eta_t / om
+        psnp = per_person[:, 0] - per_person[:, 1]
+        assert np.allclose(psnp[old], 2 * psnp[~old].mean(), rtol=1e-9)
+        assert np.allclose(psnp[~old], psnp[~old].mean(), rtol=1e-9)
     # with the pension system on, old-age pensions are paid as benefits and
     # only survivor and invalidity benefits reach the covered groups as
     # transfers, at all ages
