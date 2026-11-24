@@ -117,14 +117,7 @@ K_{g,m,t+1} = (1 - \delta_g)\,K_{g,m,t} + (1 - \phi_g)\,I_{g,m,t}
 
 where $\delta_g$ is the depreciation rate of public capital (`delta_g_annual`, {glue:text}`delta_g`) and $\phi_g$ (`infra_investment_leakage_rate`) is the fraction of public investment that does not become productive capital.  We set $\phi_g =$ {glue:text}`leakage`, the hybrid efficiency gap the IMF-World Bank Public Investment Management Assessment for Ethiopia estimates (June 2025, section II: access and quality of infrastructure per head, against the efficiency frontier).  The same gap discounts the measured stock at the start (below); it does not scale $\gamma_g$, which multiplies the productive stock.
 
-Public investment flow is set as a share of GDP, $I_{g,t} = \alpha_{I,t}\,Y_t$.  `alpha_I` is general-government capital expenditure from the same fiscal accounts as the rest of the budget ({cite}`IMFCR26174:2026`, Table 2b), converted from old-base GDP to the model's output ({ref}`Sec_Rebasing`):
-
-| Fiscal year (model period) | 24/25 (0) | 25/26 (1) | 26/27 (2) | 27/28 (3) | 28/29 (4) | 29/30 (5) | 30/31 (6) | long run |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Baseline (packaged) | 0.032 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 | 0.036 |
-| Program scenario | 0.032 | 0.036 | 0.034 | 0.031 | 0.034 | 0.032 | 0.032 | 0.032 |
-
-The FY2024/25 value is the outturn (5.0 percent of old-base GDP) and FY2025/26 the enacted budget (5.8 percent); the baseline holds the budget value, and the program scenario follows the program's capital expenditure (5.5, 5.0, 5.4, 5.2 and 5.1 percent of old-base GDP) and holds its last value ({ref}`Sec_Scenarios`).  Much of Ethiopia's public investment runs off-budget through state-owned enterprises, so this on-budget general-government $\alpha_I$ understates total public-sector investment.
+Public investment flow is set as a share of GDP, $I_{g,t} = \alpha_{I,t}\,Y_t$.  `alpha_I` is general-government capital expenditure from the same fiscal accounts as the rest of the budget ({cite}`IMFCR26174:2026`, Table 2b), converted from old-base GDP to the model's output ({ref}`Sec_Rebasing`): 0.032 in FY2024/25, the outturn (5.0 percent of old-base GDP), and 0.036 from FY2025/26, the enacted budget (5.8 percent), held ({ref}`Sec_Scenarios`).  Much of Ethiopia's public investment runs off-budget through state-owned enterprises, so this on-budget general-government $\alpha_I$ understates total public-sector investment.
 
 ### Initial public capital to GDP ratio
 
