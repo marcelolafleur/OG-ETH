@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added `ogeth/targets.py`, `examples/tune.py`, a warm-start seed, `scripts/derive_sourced_values.py` (reproduces the values derived from the data files), `scripts/world_bank_values.py` (looks up the latest World Bank value when updating the calibration) and `scripts/ess_credit_saving.py` (the survey tabulations in the households chapter).
 * `macro_params.scenario_params(p, scenario)` is now `macro_params.baseline_params(p)`; `python -m ogeth.update_baseline` regenerates the packaged parameters. `Calibration(p, update_from_api=True)` rebuilds the demographics and the earnings matrix with everything `macro_params.baseline_params` derives from them (the path `update_baseline.py` writes), and the SAM inputs for a multi-industry model.
 * The tests are a short set, chiefly a check that the packaged parameters are what `update_baseline.py` derives.
-* Requires OG-Core with PSLmodels/OG-Core#1279, #1297 and #1298 (pinned to `int/eth-pin-eta-family` on `marcelolafleur/OG-Core` until they are released).
+* Requires OG-Core with PSLmodels/OG-Core#1279, #1297 and #1298 (pinned to `int/eth-pin-v2` on `marcelolafleur/OG-Core` until they are released).
 
 ### Removed
 * The IMF program scenario of 0.3.0 (`examples/run_og_eth.py --scenario program`): IMF reports are a source for the baseline's values, not a scenario. The official example runs the baseline and a corporate-tax reform.

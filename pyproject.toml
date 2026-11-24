@@ -103,16 +103,15 @@ members = [
 [tool.uv.sources]
 ogeth = { workspace = true, editable = true }
 # Three open pull requests on PSLmodels/OG-Core, on top of master at release
-# 0.24.6 (998032dc, which includes the speed fixes #1276 and #1277 and the
-# Anderson-accelerated initial wealth #1280): #1279 (government debt
-# contracted abroad at its own interest rate, alpha_D_ext and r_D_ext_annual,
-# for Issue #1125), #1297 (eta and eta_RM as paths over time) and #1298 (net
-# family transfers, phi_FT). Branch int/eth-pin-eta-family on
-# marcelolafleur/OG-Core, installed as ogcore 0.25.0. uv-only. The PyPI
+# 0.25.2 (aa6c0195): #1279 (government debt contracted abroad at its own
+# interest rate, alpha_D_ext and r_D_ext_annual, for Issue #1125), #1297 (eta
+# and eta_RM as paths over time) and #1298 (net family transfers, phi_FT).
+# Branch int/eth-pin-v2 on marcelolafleur/OG-Core, installed as ogcore
+# 0.25.5. uv-only. The PyPI
 # metadata above keeps ogcore>=0.24.5, but no release has these yet: before
 # publishing to PyPI, raise the floor to the release that includes all three
 # and check the packaged parameters load against it.
-ogcore = { git = "https://github.com/marcelolafleur/OG-Core", rev = "c50aced7a81411381d1f98dcd6b95e85e2e2facc" }
+ogcore = { git = "https://github.com/marcelolafleur/OG-Core", rev = "e0415472f93d6d4100deb6d67bd3eff0975cf6b5" }
 
 [dependency-groups]
 dev = [
