@@ -44,7 +44,6 @@ dependencies = [
     "requests",
     "xlwt",
     "openpyxl>=3.1.2",
-    "statsmodels",
     "linearmodels",
     "linecheck",
     "ogcore>=0.24.5",

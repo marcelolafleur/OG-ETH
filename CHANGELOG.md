@@ -12,14 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fiscal inputs are the FY2024/25 outturn and the FY2025/26 budget, held (IMF CR 26/174). Public debt is general-government debt, 27.2 percent of GDP, split into market (domestic) debt and debt contracted abroad at its own rate along the IMF DSA path (`alpha_D_ext`, `r_D_ext_annual`). The rate on market debt follows the DSA's real rate on domestic debt, -11.0 percent in FY2024/25 to 4.6 in 2036, then 4.7.
 * Each revenue instrument is tuned to its FY2024/25 collections (NBE Annual Report 2024/25): personal income tax 0.81 percent of GDP on the statutory schedules (Proclamations 979/2016 and 1395/2025) with compliance graded by lifetime income (ILOSTAT informality 77.65 percent), corporate and capital-income taxes 1.26, consumption taxes, fees and sales 3.01 (`tau_c` 0.040), land-use fees 0.18, pension contributions 0.29 and old-age pensions 0.08 (from the schemes' own accounts).
 * Capital stocks are rebuilt on the rebased investment (total 2.19 times GDP, private 1.66); `gamma` 0.176 from the firms' first-order condition at a 5 percent return; depreciation 0.0482; world rate 4 percent, the African peers' FDI return; `zeta_K` 0.185 for a foreign share of private capital of 10.2 percent.
-* Preferences: `sigma` 1.5 above a subsistence floor `c_min` 0.1088; Frisch elasticity 0.25 (was 0.4); one discount factor, 0.875, set so the long-run return equals the world rate.
+* Preferences: `sigma` 1.5 above a subsistence floor `c_min` 0.1088 (was none); Frisch elasticity 0.25 (was 0.4); one discount factor, 0.875, set so the long-run return equals the world rate (0.3.0 set one per lifetime-income group to the WID wealth shares, now a check).
 * `chi_n` is tuned to hours per person by age (LFMS 2021, with the decline from 65 fitted to the ESS 2021/22 panel); it reaches OG-Core's cap from age 69, and older households work more than the surveys show.
 * Transfers and remittances are allocated by programme and by survey, year by year from each year's population (OG-Core #1297): the safety net to the poorest quarter by its design (direct support twice public works per person), the fertilizer subsidy to the bottom 70 percent, survivor and invalidity benefits to the covered groups; remittances 3.5 percent of GDP.
 * Net family transfers (OG-Core `phi_FT`, #1298): working-age adults in each lifetime-income group support the group's elders, net of the government transfers they receive, 17 percent of output in the long run, sized to the NTA consumption of older people relative to prime-age adults.
 * The earnings matrix uses pay per hour; the demographics read the UN projection to 2098, with income gradients in fertility and mortality.
-* The official example runs the baseline and a corporate-tax reform only. Values are no longer refreshed from online sources when the model runs; `scripts/world_bank_values.py` looks up the latest World Bank value and `scripts/derive_sourced_values.py` reproduces the values derived from the data files.
-* Added `ogeth/targets.py`, `examples/tune.py` and a warm-start seed. Removed `constants.py`, the legacy `chi_n` estimation loop and the broken diesel-tax example; the tests are now a short set, chiefly a check that the packaged parameters are what `update_baseline.py` derives.
+* Added `ogeth/targets.py`, `examples/tune.py`, a warm-start seed, `scripts/derive_sourced_values.py` (reproduces the values derived from the data files) and `scripts/world_bank_values.py` (looks up the latest World Bank value when updating the calibration).
+* `macro_params.scenario_params(p, scenario)` is now `macro_params.baseline_params(p)`.
+* The tests are a short set, chiefly a check that the packaged parameters are what `update_baseline.py` derives.
 * Requires OG-Core with PSLmodels/OG-Core#1279, #1297 and #1298 (pinned to `int/eth-pin-eta-family` on `marcelolafleur/OG-Core` until they are released).
+
+### Removed
+* The IMF program scenario of 0.3.0 (`examples/run_og_eth.py --scenario program`): IMF reports are a source for the baseline's values, not a scenario. The official example runs the baseline and a corporate-tax reform.
+* The online refresh of `g_y_annual` from the World Bank in `Calibration(update_from_api=True)`, and the unused IMF fetch: every run uses the packaged values.
+* `constants.py` (unused labels; the SAM mappings moved to `input_output.py`), the legacy `chi_n` estimation loop (`python -m ogeth.labor`), `python -m ogeth.income` (it wrote the earnings matrix without its unit scaling) and `examples/eth_diesel_tax.py` (it imported a module not in the repository).
 
 ## [0.3.0] - 2026-09-10 20:00:00
 

@@ -36,7 +36,7 @@ Estimating lifetime productivity paths requires long panels of individual earnin
     e^{ETH}_{j,s} = e^{USA}_{j,s}\; A_s\; G_j, \qquad \sum_{s,j} e^{ETH}_{j,s}\,\omega_{s,j} = 1
 ```
 
-where $\omega_{s,j}$ is the steady-state population distribution over age and lifetime-income group. What carries over from the US estimates is the *shape of each profile over age*; the level of every age relative to other ages and of every group relative to other groups is set by Ethiopian data. `get_e_interp` also accepts a caller's own target shares (`group_shares`) or, as the sibling models do, a single Gini coefficient (`gini_to_match`), in which case the groups are tilted, $e \cdot \exp(a e)$, until the Gini of $e$ over the population equals the target.
+where $\omega_{s,j}$ is the steady-state population distribution over age and lifetime-income group. What carries over from the US estimates is the *shape of each profile over age*; the level of every age relative to other ages and of every group relative to other groups is set by Ethiopian data. `get_e_interp` also accepts a caller's own target shares (`group_shares`).
 
 This replaces the earlier calibration, shared with several sibling models, that tilted the US profiles with a single scalar so that the model reproduced the ratio of the two countries' Gini coefficients. That approach used one number, and in `OG-ETH` the number was a World Bank *consumption* Gini for Ethiopia (31.1) set against an *income* Gini for the United States (41.5), which understated Ethiopian inequality by a wide margin (issue #33). The reshaping uses seven income shares and eighty ages instead of one statistic.
 

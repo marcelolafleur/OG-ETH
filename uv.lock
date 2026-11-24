@@ -1660,7 +1660,6 @@ dependencies = [
     { name = "psutil" },
     { name = "requests" },
     { name = "scipy" },
-    { name = "statsmodels" },
     { name = "xlwt" },
 ]
 
@@ -1720,7 +1719,6 @@ requires-dist = [
     { name = "sphinx-exercise", marker = "extra == 'docs'" },
     { name = "sphinx-proof", marker = "extra == 'docs'" },
     { name = "sphinxcontrib-bibtex", marker = "extra == 'docs'", specifier = ">=2.0.0" },
-    { name = "statsmodels" },
     { name = "xlwt" },
 ]
 provides-extras = ["dev", "docs"]
