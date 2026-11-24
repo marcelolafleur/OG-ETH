@@ -12,6 +12,7 @@ parts:
     - file: content/api/income
     - file: content/api/input_output
     - file: content/api/macro_params
+    - file: content/api/utils
 - caption: Calibration
   chapters:
   - file: content/calibration/households
