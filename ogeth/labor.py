@@ -5,20 +5,17 @@ chi_n, the age profile of the disutility of labor, is calibrated so that
 the model's average labor supply by age matches hours worked per person
 in Ethiopia's 2021 Labour Force and Migration Survey (LFMS), with the
 shape within the survey's open 65+ band from the Ethiopia Socioeconomic
-Survey wave 5 (ESS, 2021/22). The
-calibration solves the steady state repeatedly, rescaling chi_n between
-solves by the ratio of marginal disutilities at the model's and the
-data's labor supply, which is the exact adjustment when consumption and
-prices are held fixed.
+Survey wave 5 (ESS, 2021/22). examples/tune.py rescales chi_n between
+steady-state solves by the ratio of marginal disutilities at the model's
+and the data's labor supply (chi_n_step), which is the exact adjustment
+when consumption and prices are held fixed.
 """
 
-import copy
-import json
 import os
 
 import numpy as np
 import pandas as pd
-from ogcore import SS, household
+from ogcore import household
 
 from ogeth import income
 
@@ -49,32 +46,10 @@ HOURS_BAND_MIDPOINTS = {
 OLDER_HOURS_START_AGE = 65
 # the target never falls below this share of the time endowment
 MIN_LABOR_SUPPLY = 0.02
-# ages over which the fit is judged; older households supply little labor
-# and their targets rest on small samples
+# ages over which examples/tune.py judges the fit of chi_n
 FIT_AGES = (20, 80)
-DEFAULT_MAX_ITER = 10
-DEFAULT_TOL = 0.02
-# the steady-state solver needs its interest-rate guess above the solution
-R_GUESS_MARGIN = 1.3
-# OG-Core caps the factor guess at this value; the solver's own sweep over
-# the guess covers the rest
-MAX_FACTOR_GUESS = 500000.0
 # OG-Core's upper bound on chi_n
 MAX_CHI_N = 10000.0
-
-
-def factor_guess(factor):
-    """
-    A factor guess OG-Core accepts, from a solved factor.
-
-    Args:
-        factor (float): solved steady-state factor
-
-    Returns:
-        guess (float): the factor, capped at MAX_FACTOR_GUESS
-
-    """
-    return float(min(factor, MAX_FACTOR_GUESS))
 
 
 def hours_per_person():
@@ -248,145 +223,3 @@ def steady_state_chi_n(p):
     if chi_n.ndim == 2:
         chi_n = chi_n[-1]
     return chi_n.copy()
-
-
-def estimate_chi_n(
-    p,
-    client=None,
-    max_iter=DEFAULT_MAX_ITER,
-    tol=DEFAULT_TOL,
-    verbose=True,
-):
-    """
-    Calibrate chi_n to the LFMS labor supply profile by repeated
-    steady-state solves.
-
-    Args:
-        p (OG-Core Specifications object): model parameters
-        client (Dask client object): client for parallel computation
-        max_iter (int): maximum number of steady-state solves
-        tol (float): largest acceptable relative gap between model and
-            target labor supply over FIT_AGES
-        verbose (bool): print the gap after each solve
-
-    Returns:
-        chi_n (Numpy array): calibrated disutility weights, length S
-        target (Numpy array): target labor supply by age, length S
-        history (list): one dict per solve with the chi_n used, the model
-            labor supply, the largest gap and the solved r, TR and factor
-
-    """
-    p = copy.deepcopy(p)
-    target = labor_supply_target(p.E, p.S, p.ltilde)
-    ages = income.model_ages(p.E, p.S)
-    fit = (ages >= FIT_AGES[0]) & (ages < FIT_AGES[1])
-    chi_n = steady_state_chi_n(p)
-    history = []
-    for iteration in range(max_iter):
-        ss = SS.run_SS(p, client=client)
-        n_model = average_labor_supply(ss["n"], p.omega_SS)
-        # ages where chi_n sits at OG-Core's cap cannot be fitted
-        gap = np.abs(n_model / target - 1)[fit & (chi_n < MAX_CHI_N)].max()
-        history.append(
-            {
-                "iteration": iteration,
-                "chi_n": chi_n.copy(),
-                "n_model": n_model,
-                "max_gap": gap,
-                "r": float(ss["r"]),
-                "TR": float(ss["TR"]),
-                "factor": float(ss["factor"]),
-            }
-        )
-        if verbose:
-            print(
-                f"chi_n iteration {iteration}: largest relative gap "
-                f"{gap:.3f}, r {ss['r']:.4f}, factor {ss['factor']:.0f}"
-            )
-        if gap < tol:
-            break
-        chi_n = chi_n_step(chi_n, n_model, target, p)
-        p.update_specifications(
-            {
-                "chi_n": chi_n.tolist(),
-                "initial_guess_r_SS": R_GUESS_MARGIN * float(ss["r"]),
-                "initial_guess_TR_SS": float(ss["TR"]),
-                "initial_guess_factor_SS": factor_guess(ss["factor"]),
-            }
-        )
-    else:
-        print(
-            f"chi_n did not converge in {max_iter} solves; keeping the "
-            "last solved profile"
-        )
-        chi_n = history[-1]["chi_n"]
-    return chi_n, target, history
-
-
-def fit_table(target, n_model, E, S):
-    """
-    Model and target labor supply averaged over the LFMS age bands.
-
-    Args:
-        target (Numpy array): target labor supply by age, length S
-        n_model (Numpy array): model labor supply by age, length S
-        E (int): age at which agents become economically active
-        S (int): number of model periods in a lifetime
-
-    Returns:
-        df (Pandas DataFrame): age_band, target, model, both as weekly
-            hours per person and as shares of the time endowment
-
-    """
-    ages = income.model_ages(E, S)
-    rows = []
-    bands = [(20, 25), (25, 30), (30, 35), (35, 40), (40, 45), (45, 50)]
-    bands += [(50, 55), (55, 60), (60, 65), (65, 70), (70, 80), (80, 100)]
-    for lo, hi in bands:
-        sel = (ages >= lo) & (ages < hi)
-        rows.append(
-            {
-                "age_band": f"{lo}-{hi - 1}",
-                "target": target[sel].mean(),
-                "model": n_model[sel].mean(),
-                "target_hours": target[sel].mean() * WEEKLY_TIME_ENDOWMENT,
-                "model_hours": n_model[sel].mean() * WEEKLY_TIME_ENDOWMENT,
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def main():
-    """
-    Calibrate chi_n on the packaged parameters and write it, with the
-    steady-state guesses of the last solve, back into the packaged JSON.
-    """
-    import multiprocessing
-
-    from distributed import Client
-    from ogcore.parameters import Specifications
-
-    json_path = os.path.join(CUR_PATH, "ogeth_default_parameters.json")
-    num_workers = min(multiprocessing.cpu_count(), 7)
-    client = Client(n_workers=num_workers, threads_per_worker=1)
-    p = Specifications(baseline=True, num_workers=num_workers)
-    with open(json_path, encoding="utf-8") as f:
-        p.update_specifications(json.load(f))
-    chi_n, target, history = estimate_chi_n(p, client=client)
-    client.close()
-    last = history[-1]
-    print(fit_table(target, last["n_model"], p.E, p.S).round(3).to_string())
-    income.write_json_parameters(
-        json_path,
-        {
-            "chi_n": chi_n.tolist(),
-            "initial_guess_r_SS": round(R_GUESS_MARGIN * last["r"], 4),
-            "initial_guess_TR_SS": round(last["TR"], 5),
-            "initial_guess_factor_SS": round(factor_guess(last["factor"]), 0),
-        },
-    )
-    print(f"wrote chi_n to {json_path}")
-
-
-if __name__ == "__main__":
-    main()

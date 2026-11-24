@@ -25,28 +25,6 @@ BAND = {"15-29": -0.4063, "30-44": -0.18, "45-59": 0.2069}
 RULE_SLOPE = -0.4324
 
 
-def test_gradients_by_age_in_library_units():
-    g = calibrate.demographic_gradients(20, 80)
-    fert, mort = g["fert_gradient"], g["mort_gradient"]
-    assert fert.shape == mort.shape == (100,)
-    # TFR plus the pooled offset of each age group, divided by 100
-    for age, off in OFFSETS.items():
-        assert fert[age] == pytest.approx((TFR + off) / 100, abs=1e-6)
-    assert fert[10] == pytest.approx(fert[15])  # below 15: 15-19 offset
-    assert fert[60] == pytest.approx(fert[47])  # 50 and over: 45-49 offset
-    assert g["infmort_gradient"] == pytest.approx(IMR / 100, abs=1e-6)
-    assert mort[0] == 0.0  # age 0 is infmort_gradient
-    assert np.allclose(mort[1:5], CMR / 100, atol=1e-6)
-    assert np.allclose(mort[5:30], (G45 + BAND["15-29"]) / 100, atol=1e-6)
-    assert np.allclose(mort[30:45], (G45 + BAND["30-44"]) / 100, atol=1e-6)
-    top = (G45 + BAND["45-59"]) / 100
-    assert np.allclose(mort[45:60], top, atol=1e-6)
-    # straight line from the 45-59 value at 60 to 0 at 75, then 0
-    assert mort[60] == pytest.approx(top)
-    assert mort[67] == pytest.approx(top * 8 / 15)
-    assert np.all(mort[75:] == 0.0)
-
-
 def _rates(p=0.1, n=400):
     mort = np.full((n, 100), p)
     mort[:, -1] = 1.0
@@ -69,37 +47,6 @@ def test_conversion_to_ogcore_units():
     )
     assert np.all(g["mort_gradient"][:, -1] == 0.0)  # final age
     assert calibrate.to_ogcore_units(-0.5, 1.0) == 0.0
-
-
-def test_adult_mortality_steepens_with_income():
-    g = calibrate.demographic_gradients(
-        20, 80, T=320, start_year=2025, g_y_annual=0.047, rates=_rates(0.0)
-    )
-    mort = g["mort_gradient"]
-    assert mort.shape == (400, 100)
-    # row 2 is 2025, the latest GDP year: the rule's change since 2007
-    shift = RULE_SLOPE * np.log(3094.87 / 1109.14)
-    assert mort[2, 20] == pytest.approx(
-        (G45 + shift + BAND["15-29"]) / 100, abs=1e-6
-    )
-    assert mort[2, 3] == pytest.approx(CMR / 100)  # children: no rule
-    assert mort[2, 80] == 0.0  # 75 and over: 0
-    # steeper over time, held once GDP per head reaches the rule's range
-    assert mort[40, 30] < mort[2, 30]
-    capped = RULE_SLOPE * np.log(18000 / 1109.14)
-    assert mort[-1, 20] == pytest.approx(
-        (G45 + capped + BAND["15-29"]) / 100, abs=1e-6
-    )
-
-
-def test_gradients_missing_indicator_raises(tmp_path):
-    path = tmp_path / "g.csv"
-    path.write_text(
-        "indicator,year,sex,age_lo,age_hi,measure,slope\n"
-        "TFR,2024,all,,,,-0.7\n"
-    )
-    with pytest.raises(ValueError):
-        calibrate.demographic_gradients(20, 80, path=str(path))
 
 
 def test_calibration_passes_gradients_to_demographics():

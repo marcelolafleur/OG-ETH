@@ -337,29 +337,6 @@ def test_get_imf_macro_params_overwrites_saved_file(monkeypatch, tmp_path):
     assert saved_2024.loc["G271_T", "value"] == pytest.approx(0.1)
 
 
-def test_estimate_r_gov_reproduces_frozen_values():
-    """
-    estimate_r_gov reproduces the committed r_gov_* defaults and the
-    debt-elastic premium is exactly zero at debt_ratio_ss (so the steady
-    state is unchanged).
-    """
-    d = macro_params.estimate_r_gov(debt_ratio_ss=0.30, r_gov_DY2=0.04)
-
-    assert d["r_gov_scale"][0] == pytest.approx(0.24484763593657788)
-    assert d["r_gov_shift"][0] == pytest.approx(-0.03736625043803518)
-    assert d["r_gov_DY"] == pytest.approx(-0.024)
-    assert d["r_gov_DY2"] == pytest.approx(0.04)
-
-    # Premium contribution net of the shift offset, evaluated at the target
-    # debt ratio, must equal the base (un-centered) Li-Magud-Werner level of
-    # +0.03376625 — i.e. the premium adds nothing at the steady state.
-    dbar = 0.30
-    net_constant = (
-        -d["r_gov_shift"][0] + d["r_gov_DY"] * dbar + d["r_gov_DY2"] * dbar**2
-    )
-    assert net_constant == pytest.approx(0.03376625043803518)
-
-
 def test_get_imf_macro_params_falls_back_to_last_available_year(monkeypatch):
     _mock_requests_get(
         monkeypatch,

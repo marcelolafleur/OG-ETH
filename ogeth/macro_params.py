@@ -401,7 +401,7 @@ def get_macro_params(
     # r_gov_DY, r_gov_DY2) are NOT returned from the live path. r_gov_scale
     # and the base r_gov_shift come from inverting the Li, Magud, Werner,
     # Witte (2021) sovereign-vs-corporate yield relationship (a deterministic
-    # calculation reproduced by estimate_r_gov below), but the committed
+    # calculation, scripts/derive_sourced_values.py), but the committed
     # r_gov_shift is then re-centered for the debt-elastic premium
     # (r_gov_DY, r_gov_DY2) so the premium is exactly zero at debt_ratio_ss
     # (see macro.md). Returning the raw LMW shift here would un-center that
@@ -410,59 +410,12 @@ def get_macro_params(
     if update_from_api:
         print(
             "Not updating r_gov_* (frozen, debt-elastic premium re-centered; "
-            "see macro.md and estimate_r_gov)"
+            "see macro.md)"
         )
     else:
         print("Not computing r_gov_shift, r_gov_scale")
 
     return macro_parameters
-
-
-def estimate_r_gov(debt_ratio_ss=0.30, r_gov_DY2=0.04):
-    """
-    Reproduce the frozen government-debt interest-rate parameters.
-
-    The base level shift and scale invert the sovereign-vs-corporate yield
-    relationship estimated by Li, Magud, Werner, Witte (2021),
-    https://www.imf.org/en/Publications/WP/Issues/2021/06/04/The-Long-Run-Impact-of-Sovereign-Yields-on-Corporate-Yields-in-Emerging-Markets-50224
-    (discussion at https://github.com/EAPD-DRB/OG-ZAF/issues/22): generate
-    modelled corporate yields for sovereign yields of 2-12% using Table 8
-    column 2, then OLS-regress the sovereign yield on the fitted corporate
-    yield.
-
-    A convex debt-elastic premium ``r_gov_DY2 * (D/Y - debt_ratio_ss)**2`` is
-    then added and re-centered on ``debt_ratio_ss`` so it is exactly zero at
-    the steady-state debt ratio (leaving the steady state unchanged) and only
-    prices the transition-path debt overshoot. Expanding the square gives
-    ``r_gov_DY = -2 * r_gov_DY2 * debt_ratio_ss`` and shifts the level term by
-    ``r_gov_DY2 * debt_ratio_ss**2`` (OG-Core subtracts ``r_gov_shift``, so the
-    constant is folded into the shift). See macro.md for the full derivation.
-
-    Args:
-        debt_ratio_ss (float): steady-state debt-to-GDP ratio the premium is
-            centered on
-        r_gov_DY2 (float): curvature of the debt-elastic premium
-
-    Returns:
-        dict: {r_gov_scale, r_gov_shift, r_gov_DY, r_gov_DY2}
-    """
-    import statsmodels.api as sm
-
-    sov_y = np.arange(20, 120) / 10
-    corp_yhat = 8.199 - (2.975 * sov_y) + (0.478 * sov_y**2)
-    corp_yhat = sm.add_constant(corp_yhat)
-    res = sm.OLS(sov_y, corp_yhat).fit()
-    # First term is the constant (÷100 for the correct unit); second is slope.
-    r_gov_scale = res.params[1]
-    r_gov_shift_base = -res.params[0] / 100
-    r_gov_shift = r_gov_shift_base - r_gov_DY2 * debt_ratio_ss**2
-    r_gov_DY = -2 * r_gov_DY2 * debt_ratio_ss
-    return {
-        "r_gov_scale": [r_gov_scale],
-        "r_gov_shift": [r_gov_shift],
-        "r_gov_DY": r_gov_DY,
-        "r_gov_DY2": r_gov_DY2,
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -959,37 +912,9 @@ CASH_TRANSFERS = rebased(
 # (ogeth/data/imf_fdi_income_africa_peers.csv). The pooled nominal dollar
 # return is 6.1 percent, between 4.0 and 8.8 in every year (Kenya 7.1,
 # Tanzania 5.5, Uganda 3.9, Rwanda 4.6); less US inflation, as for the
-# external-debt rate, that is 4 percent real. The previous 6.3 percent was
-# UNCTAD's nominal 2017 figure for Africa used as a real rate.
-PEER_FDI_YEARS = (2015, 2024)
-
-
-def peer_fdi_return(years=PEER_FDI_YEARS):
-    """
-    Pooled nominal return on inward FDI in Ethiopia's African peers: total
-    direct-investment income paid abroad over the average of the opening and
-    closing direct-investment liabilities, summed over countries and years.
-
-    Args:
-        years (tuple): first and last year of the window
-
-    Returns:
-        float: pooled nominal return
-    """
-    df = pd.read_csv(
-        Path(__file__).parent / "data" / "imf_fdi_income_africa_peers.csv"
-    )
-    df = df.sort_values(["country", "year"])
-    df["avg_liabilities"] = df.groupby("country")[
-        "di_liabilities_usd_m"
-    ].transform(lambda s: (s + s.shift(1)) / 2)
-    used = df[(df.year >= years[0]) & (df.year <= years[1])].dropna(
-        subset=["di_income_debit_usd_m", "avg_liabilities"]
-    )
-    return float(used.di_income_debit_usd_m.sum() / used.avg_liabilities.sum())
-
-
-WORLD_INT_RATE_ANNUAL = round(peer_fdi_return() - US_INFLATION, 2)
+# external-debt rate, that is 4 percent real
+# (scripts/derive_sourced_values.py).
+WORLD_INT_RATE_ANNUAL = 0.04
 
 # Long-run real interest rate on market debt (r_gov in the steady state).
 # Concessional debt is modelled at its own rate, so r_gov prices market debt
@@ -1966,132 +1891,22 @@ def zeta_D_path():
 # running through the whole history.
 #
 # We therefore rebuild the stock by perpetual inventory from PWT's investment
-# and GDP at constant national prices (ogeth/data/pwt110_eth_capital.csv,
-# Ethiopia rows of PWT 11.0, PWT year t = FY t-1/t), extended to FY2024/25
-# with the old-base investment share (20.1, and 21.15 for FY2023/24,
-# interpolated from PWT's 22.2 in FY2022/23) and real growth (8.1 and 9.2),
+# and GDP at constant national prices (ogeth/data/pwt110_eth_capital.csv),
+# extended to FY2024/25 with the old-base investment share and real growth,
 # and add the investment the old accounts missed, phased in linearly from
-# zero in FY2015/16, the old base year. The whole calculation runs in units
-# of old-base GDP, so the missed investment is measured there too: rebased
-# investment, 35.3 percent of rebased GDP, is 56.2 percent of old-base GDP
-# (8,483 against 3,034 billion birr), so the gap is 36.1 points of old-base
-# GDP in FY2024/25, not the 15.2-point difference between the two published
-# shares (rebasing_investment_gap). The ratio of the revised to the
-# unrevised stock-output ratio scales PWT's 2023 level, and the result is
-# converted from old-base to rebased GDP like every other ratio
-# (rebase_factors). The result, 2.00, sits in a range of 1.27 (no revision
-# before FY2024/25: the old-base stock rolled forward, over the larger
-# rebased GDP) to 2.70 (the gap in every year since 1970); phasing in from
-# 2019 or 2011 gives 1.84 or 2.22. It should be replaced by the Ministry's
-# capital stocks or back series when they are published.
-#
-# The level is PWT's net capital stock at current national prices over GDP at
-# current national prices (PWT 11.0 capital detail, the four asset types in
-# ogeth/data/pwt110_eth_capital_detail.csv, million birr), 2.37 in 2023: the
-# ratio at domestic prices, which is what a one-good model whose investment
-# share is a share of nominal GDP needs. PWT's cn / cgdpo (2.17 in 2023)
-# values both at international (PPP) prices instead; capital goods are
-# relatively dearer in Ethiopia, so the domestic-price ratio is higher.
-OLD_BASE_GCF_SHARE = 0.201
-CAPITAL_REVISION_START_YEAR = 2016
-# old-base investment share and real growth for the years after PWT's last
-OLD_BASE_EXTENSION = {2024: (0.2115, 0.081), 2025: (OLD_BASE_GCF_SHARE, 0.092)}
-
-
-def pwt_domestic_capital_output_ratio(year=2023):
-    """
-    PWT 11.0 net capital stock over GDP, both at current national prices.
-
-    Args:
-        year (int): PWT year
-
-    Returns:
-        float: capital-output ratio at domestic prices, old-base GDP
-    """
-    data = Path(__file__).parent / "data"
-    detail = pd.read_csv(
-        data / "pwt110_eth_capital_detail.csv", index_col="year"
-    )
-    na = pd.read_csv(data / "pwt110_eth_capital.csv", index_col="year")
-    return float(detail.net_capital_stock[year] / na.v_gdp[year])
-
-
-PWT_CAPITAL_OUTPUT_RATIO = round(pwt_domestic_capital_output_ratio(), 4)
-
-
-def rebasing_investment_gap():
-    """
-    Investment the old accounts missed in FY2024/25, as a share of old-base
-    GDP: rebased investment (a share of rebased GDP) restated over old-base
-    GDP, less the old-base investment share.
-
-    Returns:
-        gap (float): missed investment over old-base GDP in FY2024/25
-    """
-    return (
-        GROSS_CAPITAL_FORMATION_REBASED / 100 / rebase_factors()[0]
-        - OLD_BASE_GCF_SHARE
-    )
-
-
-def rebased_capital_output_ratio(revision_start=CAPITAL_REVISION_START_YEAR):
-    """
-    Total capital-output ratio in FY2024/25 on the rebased accounts, by
-    perpetual inventory on PWT 11.0 investment with the rebasing's investment
-    gap phased in linearly from ``revision_start`` (None for no revision).
-    The inventory runs in units of old-base GDP; the result is converted to
-    rebased GDP.
-
-    Args:
-        revision_start (int or None): PWT year in which the gap starts from
-            zero, reaching its FY2024/25 size in 2025
-
-    Returns:
-        ky (float): total capital over GDP in FY2024/25
-    """
-    pwt = pd.read_csv(
-        Path(__file__).parent / "data" / "pwt110_eth_capital.csv",
-        index_col="year",
-    )
-    share = pwt.v_gfcf / pwt.v_gdp
-    # real investment share per point of nominal share
-    real_per_nominal = (pwt.q_gfcf / pwt.q_gdp) / share
-    years = list(pwt.index) + list(OLD_BASE_EXTENSION)
-    q_gdp = list(pwt.q_gdp)
-    shares = list(share)
-    for s_old, growth in OLD_BASE_EXTENSION.values():
-        q_gdp.append(q_gdp[-1] * (1 + growth))
-        shares.append(s_old)
-    rpn = list(real_per_nominal) + [real_per_nominal.iloc[-1]] * len(
-        OLD_BASE_EXTENSION
-    )
-    delta = float(pwt.delta.iloc[-1])
-    gap = rebasing_investment_gap()
-    last = years[-1]
-
-    def stock_output(with_gap):
-        ky = {}
-        k = None
-        for y, qy, s, r in zip(years, q_gdp, shares, rpn):
-            extra = 0.0
-            if with_gap and revision_start is not None:
-                extra = gap * min(
-                    max((y - revision_start) / (last - revision_start), 0.0),
-                    1.0,
-                )
-            inv = (s + extra) * r * qy
-            # first year: the stock in steady state at the decade's growth
-            k = inv / (delta + 0.03) if k is None else k * (1 - delta) + inv
-            ky[y] = k / qy
-        return ky
-
-    unrevised = stock_output(False)
-    revised = stock_output(True)
-    old_base = PWT_CAPITAL_OUTPUT_RATIO * revised[last] / unrevised[2023]
-    return old_base * rebase_factors()[0]
-
-
-TOTAL_CAPITAL_OUTPUT_RATIO = round(rebased_capital_output_ratio(), 3)
+# zero in FY2015/16, the old base year. The calculation runs in units of
+# old-base GDP: rebased investment, 35.3 percent of rebased GDP, is 56.2
+# percent of old-base GDP, so the gap is 36.1 points of old-base GDP in
+# FY2024/25. The ratio of the revised to the unrevised stock-output ratio
+# scales PWT's 2023 net capital stock over GDP at current national prices
+# (2.37, ogeth/data/pwt110_eth_capital_detail.csv), and the result is
+# converted to rebased GDP: 2.19, in a range of 1.39 (no revision) to 2.94
+# (the gap in every year since 1970). scripts/derive_sourced_values.py
+# reproduces these numbers. They should be replaced by the Ministry's capital
+# stocks or back series when published.
+PWT_CAPITAL_OUTPUT_RATIO = 2.3655
+REBASING_INVESTMENT_GAP = 0.361
+TOTAL_CAPITAL_OUTPUT_RATIO = 2.186
 # Public capital: IMF Investment and Capital Stock Dataset (api.imf.org,
 # IMF.FAD ICSD), general-government capital stock at current prices over GDP
 # at current prices, CAPSTCK_S13_V_XDC / B1GQ_V_XDC = 2,265.27 / 2,696.22
@@ -2135,41 +1950,13 @@ DELTA_ANNUAL = round(
 # a net stock at replacement cost like its K, so we accumulate the same
 # inflows by perpetual inventory at the private depreciation rate, revalued
 # by 2.5 percent a year for the dollar price of capital goods
-# (ogeth/data/imf_fdi_inflows_eth.csv): USD 34.0 billion in mid-FY2024/25,
-# 0.169 of rebased GDP of USD 201.4 billion. Unrecorded reinvested earnings
-# (Ethiopia reports none) bias both measures down.
-FDI_PRICE_GROWTH = 0.025
-FDI_MISSING_YEARS_FLOW = 250.0  # USD million a year, 1995-2002
+# (ogeth/data/imf_fdi_inflows_eth.csv; scripts/derive_sourced_values.py):
+# USD 34.0 billion in mid-FY2024/25, 0.169 of rebased GDP of USD 201.4
+# billion. Unrecorded reinvested earnings (Ethiopia reports none) bias both
+# measures down.
+FDI_STOCK_USD_BN = 33.98
 REBASED_GDP_USD_BN = 201.42
-
-
-def fdi_stock_usd_bn(delta=None, price_growth=FDI_PRICE_GROWTH):
-    """
-    Net replacement-cost stock of foreign direct investment in mid-FY2024/25,
-    by perpetual inventory on IMF balance-of-payments equity inflows.
-
-    Args:
-        delta (float): depreciation rate; defaults to DELTA_ANNUAL
-        price_growth (float): annual growth of the dollar price of capital
-
-    Returns:
-        float: USD billion
-    """
-    if delta is None:
-        delta = DELTA_ANNUAL
-    flows = pd.read_csv(
-        Path(__file__).parent / "data" / "imf_fdi_inflows_eth.csv",
-        index_col="year",
-    ).fdi_equity_inflows_usd_m
-    k = 0.0
-    for year in range(int(flows.index.min()), int(flows.index.max()) + 1):
-        flow = flows.get(year, FDI_MISSING_YEARS_FLOW)
-        k = k * (1 - delta) * (1 + price_growth) + flow
-    # half a year more to the middle of FY2024/25
-    return k * (1 - delta) * (1 + price_growth) ** 0.5 / 1e3
-
-
-FDI_STOCK_TO_GDP = round(fdi_stock_usd_bn() / REBASED_GDP_USD_BN, 4)
+FDI_STOCK_TO_GDP = round(FDI_STOCK_USD_BN / REBASED_GDP_USD_BN, 4)
 # foreign-owned share of private capital in FY2024/25, the zeta_K target
 FOREIGN_CAPITAL_SHARE = round(
     FDI_STOCK_TO_GDP / PRIVATE_CAPITAL_OUTPUT_RATIO, 4
