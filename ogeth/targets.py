@@ -105,22 +105,23 @@ TRANSITION_TARGETS = {
     "C/Y purch.": (
         mp.PRIVATE_CONSUMPTION_REBASED / 100,
         "check",
-        "private consumption 64.4 percent of rebased GDP",
+        "private consumption 64.4 percent of rebased GDP (MoNS rebasing "
+        "report, Table 4), of which non-profit institutions serving "
+        "households 2.8",
     ),
     "G/Y": (
         mp.GOVERNMENT_CONSUMPTION_SHARE,
         "check",
-        "government final consumption 881.4 bn birr (NBE Q4 Report "
-        "2024/25, Table 20) over rebased GDP; model G plus depreciation of "
-        "recorded public capital, as in the national accounts. The "
-        "derived 4.7 also holds non-profit institutions and the "
-        "statistical discrepancy",
+        "government final consumption 1,136.8 bn birr over rebased GDP "
+        "(MoNS rebasing report, Table 4); model G plus depreciation of "
+        "recorded public capital, as in the national accounts",
     ),
     "NX/Y": (
-        mp.IMF_TRADE_BALANCE[0] / 100,
+        mp.NET_EXPORTS_SHARE,
         "check",
-        "goods and services balance USD -8.9 bn (IMF CR 26/174 Table 4a) "
-        "over rebased GDP",
+        "resource balance -1,065.6 bn birr over rebased GDP (MoNS rebasing "
+        "report, Table 4); the IMF goods and services balance (CR 26/174 "
+        "Table 4a) gives -4.5",
     ),
     "RM/Y": (
         mp.IMF_PRIVATE_TRANSFERS[0] / 100,
@@ -135,7 +136,9 @@ TRANSITION_TARGETS = {
         "at r_p and interest on external debt at r_D_ext",
     ),
     "total tax/Y": (
-        (1172 + 39.4 + 32.8 + 20.0) / 24030 + mp.PAYROLL_REVENUE_SHARE,
+        (1172 + 39.4 + 32.8 + 20.0)
+        / mp.NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"]
+        + mp.PAYROLL_REVENUE_SHARE,
         "check",
         "sum of the mapped instruments",
     ),

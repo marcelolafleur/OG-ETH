@@ -27,15 +27,17 @@ def packaged():
 
 
 def test_rebase_factors_are_old_over_new_gdp():
-    """FY2024/25: 15,094 (IMF CR 26/174, old base) over 24,030 billion birr
-    (Ministry of National Strategy, rebased); FY2025/26: 19,268 over 31,860;
+    """FY2024/25: 15,094 (IMF CR 26/174, old base) over 24,031 billion birr
+    (Ministry of National Strategy, rebased); FY2025/26: 19,268 over 31,934;
     later years hold the FY2025/26 factor."""
     f = mp.rebase_factors(7)
-    assert f[0] == pytest.approx(15094 / 24030)
-    assert f[1] == pytest.approx(19268 / 31860)
+    assert f[0] == pytest.approx(15094 / 24031.07)
+    assert f[1] == pytest.approx(19268 / 31934)
     assert np.allclose(f[2:], f[1])
     # a published series keeps its numerator: debt in birr is unchanged
-    assert mp.rebased([50.0])[0] == pytest.approx(50.0 * 15094 / 24030, 1e-4)
+    assert mp.rebased([50.0])[0] == pytest.approx(
+        50.0 * 15094 / 24031.07, 1e-4
+    )
 
 
 def test_debt_is_general_government_on_the_rebased_basis():
@@ -59,13 +61,13 @@ def test_revenue_mapping_adds_up_to_the_outturn():
         + mp.CIT_REVENUE_SHARE
         + mp.CONS_TAX_SHARE
         + mp.WEALTH_TAX_SHARE
-    ) * 24030
+    ) * 24031.07
     unmapped = (
         r["reimbursements and property sales"]
         + r["other non-tax incl. pension contributions"]
     )
     assert mapped + unmapped == pytest.approx(domestic, abs=0.5)
-    assert mp.PIT_REVENUE_SHARE == pytest.approx(194.3 / 24030, abs=1e-5)
+    assert mp.PIT_REVENUE_SHARE == pytest.approx(194.3 / 24031.07, abs=1e-5)
 
 
 def test_price_basis_conversion():
@@ -103,10 +105,9 @@ def test_targets_carry_sources_and_dials():
     for k, (target, dial, source) in targets.TRANSITION_TARGETS.items():
         assert np.isfinite(target) and dial and source, k
     assert targets.TRANSITION_TARGETS["(I+I_g)/Y"][0] == pytest.approx(0.353)
-    # government consumption is the NBE's measured series, not the
-    # expenditure-side residual
+    # government consumption is the rebased series (MoNS report, Table 4)
     assert targets.TRANSITION_TARGETS["G/Y"][0] == pytest.approx(
-        881.4 / 24030.0, abs=1e-5
+        1136.844 / 24031.07, abs=1e-5
     )
     # first-year investment is scored; patience answers to the long run
     assert targets.TRANSITION_TARGETS["(I+I_g)/Y"][1] == "check"
@@ -127,7 +128,7 @@ def test_capital_stocks_are_rebased():
     # public capital: ICSD general-government stock at current prices over
     # GDP at current prices, 2019, converted like other fiscal stocks
     assert mp.PUBLIC_CAPITAL_OUTPUT_RATIO == pytest.approx(
-        2265.27 / 2696.22 * 15094 / 24030, abs=1e-3
+        2265.27 / 2696.22 * 15094 / 24031.07, abs=1e-3
     )
     # no revision rolls the old-base stock forward; the full-history gap is
     # the upper bound; the central case sits between
@@ -136,7 +137,7 @@ def test_capital_stocks_are_rebased():
     assert low < mp.TOTAL_CAPITAL_OUTPUT_RATIO < high
     # without revision, the old-base stock over old-base GDP stays near
     # PWT's level; over rebased GDP it is smaller by the rebasing factor
-    assert 2.0 < low * 24030 / 15094 < 2.5
+    assert 2.0 < low * 24031.07 / 15094 < 2.5
 
 
 def test_capital_anchor_is_the_domestic_price_stock():
@@ -186,7 +187,7 @@ def test_gamma_from_the_firm_first_order_condition():
         files("ogeth").joinpath("ogeth_default_parameters.json").read_text()
     )
     assert packaged["adjustment_factor_for_cit_receipts"][0] == pytest.approx(
-        mp.CIT_COLLECTIONS_FACTOR, abs=5e-3
+        mp.CIT_COLLECTIONS_FACTOR, abs=1e-4
     )
 
 
@@ -208,19 +209,19 @@ def test_pension_benefits_from_the_schemes():
     assert mp.PENSION_BENEFITS_BIRR_BN == pytest.approx(23.48, abs=0.01)
     assert mp.PENSION_BENEFITS_PUBLISHED == pytest.approx(0.200, abs=1e-3)
     assert mp.PENSIONS_SHARE_OF_GDP == pytest.approx(
-        0.200 * 0.6 * 15094 / 24030, abs=1e-3
+        0.200 * 0.6 * 15094 / 24031.07, abs=1e-3
     )
     assert mp.SURVIVOR_INVALIDITY_SHARE_OF_GDP == pytest.approx(
-        0.200 * 0.4 * 15094 / 24030, abs=1e-3
+        0.200 * 0.4 * 15094 / 24031.07, abs=1e-3
     )
 
 
 def test_investment_gap_is_measured_in_old_base_gdp():
     """The perpetual inventory runs in old-base GDP, so the investment the
     old accounts missed is restated there: rebased investment (35.3 percent
-    of 24,030 billion birr) less old-base investment (20.1 percent of
+    of 24,031 billion birr) less old-base investment (20.1 percent of
     15,094), over 15,094."""
-    missed_birr = 0.353 * 24030 - 0.201 * 15094
+    missed_birr = 0.353 * 24031.07 - 0.201 * 15094
     assert mp.rebasing_investment_gap() * 15094 == pytest.approx(
         missed_birr, rel=1e-6
     )

@@ -713,14 +713,17 @@ def derived_remittance_params(p, scenario=None):
 # ---------------------------------------------------------------------------
 # GDP basis: the rebased national accounts
 #
-# Ethiopia rebased its national accounts on 4 November 2026 (Ministry of
-# National Strategy, with IMF technical assistance; announced by the Finance
-# Minister, ENA): base year FY2024/25, 2008 SNA, wider coverage of informal
-# mining and manufacturing, transport and digital services and regional
-# state-owned enterprises. FY2024/25 nominal GDP went from 15,094 to 24,030
-# billion birr (USD 126.5 to 201.4 billion at the NBE average rate of 119.3)
-# and FY2025/26 (preliminary) is 31,860 billion birr. Every ratio to GDP in
-# this calibration is to the rebased series.
+# Ethiopia rebased its national accounts in November 2026 (Ministry of
+# National Strategy, "High Level Report: 2017 EFY GDP Rebasing", with IMF
+# technical assistance; figures in ogeth/data/mons_rebased_gdp_fy2024_25.csv):
+# base year FY2024/25, 2008 SNA, wider coverage of informal mining and
+# manufacturing, transport and digital services and regional state-owned
+# enterprises. FY2024/25 nominal GDP went from 15,094 to 24,031 billion birr
+# (USD 126.5 to 201.4 billion at the NBE average rate of 119.3; report
+# Table 2) and FY2025/26 (preliminary) is 31,934 billion birr (Table 5; the
+# report's text also gives 31.86 and 31.97 trillion, but Table 5's figure is
+# the sum of its components and the denominator of its sector shares).
+# Every ratio to GDP in this calibration is to the rebased series.
 #
 # The IMF tables below are kept exactly as published, on the 2015/16 base
 # (IMF CR 26/174, June 2026, Table 1: FY2024/25 actual 15,094 billion birr;
@@ -741,7 +744,7 @@ NOMINAL_GDP_OLD_BASE_BIRR_BN = {
     "FY2025/26": 19268.0,
     "FY2026/27": 23851.0,
 }
-NOMINAL_GDP_REBASED_BIRR_BN = {"FY2024/25": 24030.0, "FY2025/26": 31860.0}
+NOMINAL_GDP_REBASED_BIRR_BN = {"FY2024/25": 24031.07, "FY2025/26": 31934.0}
 
 # Fiscal program path (IMF Country Report 26/174, fifth ECF review, Tables 1,
 # 2b and 4b). Ethiopian fiscal years FY2024/25 (model period 0, start year
@@ -892,31 +895,26 @@ DSA_DOMESTIC_REAL_RATE = [-11.0, -9.8, -5.1, -0.6, 1.0, 2.6, 3.3, 4.6, 6.6]
 DSA_MARGINAL_DOMESTIC_REAL_RATES = (4.9, 4.5)
 
 # Rebased expenditure-side national accounts, FY2024/25 (Ministry of National
-# Strategy rebasing report, as reported by Birr Metrics, BusinessDay and
-# Wazema and checked against the old-base NBE tables): private consumption
-# 15.47 trillion birr (64.4 percent), gross capital formation 8.49 trillion
-# (35.3 percent, fixed capital plus inventories; old base 20.1), gross
-# domestic saving 30.9 percent. Government consumption (about 4.7) and net
-# exports (about -4.5, matching the balance-of-payments goods and services
-# balance of USD -8.9 billion over USD 201.4 billion) are derived.
+# Strategy rebasing report, Table 4, billions of birr): private consumption
+# 15,473.1 (64.4 percent of GDP; households 14,807.3 or 61.6 percent and
+# non-profit institutions serving households 665.8 or 2.8 percent), gross
+# capital formation 8,486.8 (35.3 percent, fixed capital plus inventories;
+# old base 20.1), government consumption 1,136.8 (4.7 percent) and the
+# resource balance -1,065.6 (-4.4 percent; the IMF's goods and services
+# balance over rebased GDP gives -4.5). National-accounts government
+# consumption includes the consumption of fixed capital on public capital,
+# an imputed cost the model does not count in G, so the model moment adds
+# delta_g times K_g (ogeth/targets.py).
 PRIVATE_CONSUMPTION_REBASED = 64.4
 GROSS_CAPITAL_FORMATION_REBASED = 35.3
-GOVERNMENT_CONSUMPTION_REBASED = 4.7
-# The 4.7 above is a residual (GDP less private consumption, capital
-# formation and net exports), so it also holds the non-profit institutions
-# serving households and any statistical discrepancy; the rebasing has not
-# published government consumption itself. The measured series is the
-# NBE's government final consumption expenditure, FY2024/25, 881.4 billion
-# birr at current prices (NBE Fourth Quarter Report 2024/25, Table 20; the
-# rebasing note names capital formation, private consumption and
-# non-profit coverage as the revised components). National-accounts
-# government consumption includes the consumption of fixed capital on
-# public capital, an imputed cost the model does not count in G, so the
-# model moment adds delta_g times K_g (ogeth/targets.py).
-GOVERNMENT_CONSUMPTION_BIRR_BN = 881.4
+GOVERNMENT_CONSUMPTION_BIRR_BN = 1136.844
 GOVERNMENT_CONSUMPTION_SHARE = round(
     GOVERNMENT_CONSUMPTION_BIRR_BN / NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"],
     5,
+)
+RESOURCE_BALANCE_BIRR_BN = -1065.627
+NET_EXPORTS_SHARE = round(
+    RESOURCE_BALANCE_BIRR_BN / NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"], 5
 )
 
 # Price basis. OG-Core's output Y is GDP at producer prices: the consumption
@@ -1235,7 +1233,9 @@ PENSION_COVERAGE_SCALE = 0.097098
 # below the pension coverage scale. Contribution data are the least certain
 # fiscal anchor here (no official FY2024/25 scheme accounts were found).
 PAYROLL_STATUTORY_RATE = 0.18
-PAYROLL_REVENUE_SHARE = round(69.0 / 24030.0, 5)
+PAYROLL_REVENUE_SHARE = round(
+    69.0 / NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"], 5
+)
 PAYROLL_COVERAGE_SCALE = 0.097527
 
 # Personal income tax: the statutory employment-income schedule (Schedule A)
@@ -1264,14 +1264,14 @@ PIT_SCHEDULE_2025 = [
 CAPITAL_INCOME_TAX_RATE = 0.10
 # The model's birr are FY2024/25 birr, the start year and the rebased base
 # year: mean_income_data is household factor income per adult of that year,
-# rebased GDP per adult (24,030 billion birr over the adult population in
+# rebased GDP per adult (24,031 billion birr over the adult population in
 # the middle of the fiscal year, World Bank population and age structure,
 # 2024, grown half a year) times the model's household income share of GDP
 # (MODEL_INCOME_SHARE_OF_GDP).
 # Proclamation 979/2016 applies as written in FY2024/25; the thresholds of
 # Proclamation 1395/2025, written in FY2025/26 birr, are deflated by the
 # rebased growth of nominal GDP per head between the two years
-# (31,860 / 24,030, less population growth) so that they bite at the same
+# (31,934 / 24,031, less population growth) so that they bite at the same
 # real incomes. The population is the UN figure the model's demographics use
 # (the Ministry of Finance uses 110.6 million).
 POPULATION_2024 = 132.06e6
@@ -2437,7 +2437,7 @@ FIRM_RETURN_TARGET = 0.05
 # factor is folded here after each retune; tests check the two agree.
 CIT_RATE = 0.30
 C_CORP_SHARE_OF_ASSETS = 0.55
-CIT_COLLECTIONS_FACTOR = 0.3749
+CIT_COLLECTIONS_FACTOR = 0.3755
 BUSINESS_TAX_WEDGE = round(
     CIT_RATE * C_CORP_SHARE_OF_ASSETS * CIT_COLLECTIONS_FACTOR, 4
 )

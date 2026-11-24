@@ -62,8 +62,8 @@ def test_program_paths_start_at_fy2024_25_values(packaged):
     """Period 0 is FY2024/25: general-government debt 43.3, capital spending
     5.0, grants 1.7 and recurrent spending net of interest and transfers 4.3
     percent of old-base GDP (IMF WEO Oct 2026; CR 26/174 Tables 1 and 2b),
-    times old over rebased GDP (15,094 / 24,030), in model units."""
-    f = 15094.0 / 24030.0
+    times old over rebased GDP (15,094 / 24,031), in model units."""
+    f = 15094.0 / 24031.07
     assert mp.rebase_factors()[0] == pytest.approx(f)
     # general-government debt, split into external debt (alpha_D_ext) and
     # market debt (initial_debt_ratio), which is domestic: non-residents

@@ -1,0 +1,19 @@
+# Ministry of National Strategy, "High Level Report: 2017 EFY GDP Rebasing", Addis Ababa, November 2026.
+# Billions of birr at current prices. 2017 EFY = FY2024/25, 2018 EFY = FY2025/26 (preliminary).
+# old_base: 2015/16-base series; rebased: 2017 EFY-base series. Sources: Tables 2, 4 and 5.
+# FY2025/26 GDP: the report gives 31.97 trillion (executive summary), 31.86 (section 10) and 31,934
+# (Table 5); Table 5's figure is used, the sum of its components and the denominator of its shares.
+table,item,fy2024_25_old_base,fy2024_25_rebased,fy2025_26_rebased
+expenditure,Gross capital formation,3036.993,8486.756,
+expenditure,Private final consumption expenditure,12216.351,15473.100,
+expenditure,Household final consumption expenditure,,14807.330,
+expenditure,NPISH final consumption expenditure,,665.770,
+expenditure,Government final consumption expenditure,881.424,1136.844,
+expenditure,Resource balance,-1040.349,-1065.627,
+expenditure,Gross domestic saving,1996.644,7421.129,
+activity,Agriculture,4953.78,7585.86,10011
+activity,Industry,4190.77,7257.06,10149
+activity,Services,5520.73,8628.58,10808
+activity,GVA at basic prices,14518.62,23471.51,30968.0
+activity,Taxes less subsidies on products,575.80,559.57,965.69
+total,GDP at current market prices,15094.42,24031.07,31934

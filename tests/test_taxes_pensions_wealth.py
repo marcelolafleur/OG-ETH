@@ -56,7 +56,7 @@ def test_statutory_tax_params_shape_and_anchor():
     assert t["mtrx_params"] == t["etr_params"]
     assert t["mtry_params"][0][0][0] == pytest.approx(0.10)
     # household factor income per adult in FY2024/25 birr: rebased GDP per
-    # adult (24,030 billion over about 66.7 million adults) times the
+    # adult (24,031 billion over about 66.7 million adults) times the
     # model's household income share of GDP
     assert mp.mean_income_per_adult() == pytest.approx(360_000, rel=0.01)
     assert t["mean_income_data"] == pytest.approx(

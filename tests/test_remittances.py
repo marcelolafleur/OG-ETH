@@ -34,7 +34,7 @@ from ogeth import macro_params as remittances
 # the model's Y (GDP at producer prices), so the market-price share is
 # converted.
 IMF_PRIVATE_TRANSFERS_USD_MN = 7037
-IMF_PRIVATE_TRANSFERS_SHARE_OF_GDP = 0.056 * 15094.0 / 24030.0
+IMF_PRIVATE_TRANSFERS_SHARE_OF_GDP = 0.056 * 15094.0 / 24031.07
 EXPECTED_ALPHA_RM = round(
     remittances.to_model(IMF_PRIVATE_TRANSFERS_SHARE_OF_GDP), 6
 )

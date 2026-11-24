@@ -100,7 +100,7 @@ def test_statutory_tax_functions(p):
     # FY2024/25 birr) it is near zero
     top = mp.gs_rates(55_000 * 12, etr[-1, 0], "etr")
     assert 0.28 < top < 0.35
-    growth = (31860 / 24030) / (1 + mp.POPULATION_GROWTH)
+    growth = (31934 / 24031.07) / (1 + mp.POPULATION_GROWTH)
     assert mp.gs_rates(12 * 2000 / growth, etr[-1, 0], "etr") < 0.04
 
 
@@ -127,7 +127,7 @@ def test_cit_collections_factor(p):
     from ogeth import macro_params as mp
 
     assert float(factor[0]) == pytest.approx(
-        mp.CIT_COLLECTIONS_FACTOR, abs=5e-3
+        mp.CIT_COLLECTIONS_FACTOR, abs=1e-4
     )
     assert np.allclose(factor, factor[0])
     prog = mp.program_revenue_paths(0.06, float(factor[0]))
