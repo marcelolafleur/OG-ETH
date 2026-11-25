@@ -55,6 +55,36 @@ def burn_in_dist(
     # keep their total share, so the oldest ages' shares are unchanged
     life = young.ravel()
     dist[life] *= start[life].sum() / dist[life].sum()
+    return join_oldest(dist / dist.sum(), omega0, life)
+
+
+def join_oldest(dist, omega0, life):
+    """
+    Rescale each group's oldest ages (not moved by the burn-in) so that
+    their wealth per person continues from the last life-cycle age, keeping
+    their shape. Without this the poorest group's wealth per person jumped
+    at the cutoff age, and the household solver's starting guess for
+    cohorts crossing it failed.
+
+    Args:
+        dist (array_like): (S, J) shares of wealth
+        omega0 (array_like): first-period population, (S, J)
+        life (array_like): (S,) booleans, True for life-cycle ages
+
+    Returns:
+        Numpy array: (S, J) shares summing to one
+    """
+    dist = np.asarray(dist, dtype=float).copy()
+    omega0 = np.asarray(omega0, dtype=float)
+    life = np.asarray(life, dtype=bool)
+    if life.all() or not life.any():
+        return dist
+    last, first_old = np.flatnonzero(life)[-1], np.flatnonzero(~life)[0]
+    pp = dist / omega0
+    scale = np.ones(dist.shape[1])
+    held = pp[first_old] > 0
+    scale[held] = pp[last, held] / pp[first_old, held]
+    dist[~life] *= scale
     return dist / dist.sum()
 
 
