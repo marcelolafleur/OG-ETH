@@ -4,7 +4,6 @@ This script creates tables and figures from the OG-ETH documentation.
 
 # import
 import os
-import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
 from importlib.resources import files
@@ -19,12 +18,6 @@ CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 plot_path = os.path.join(CUR_DIR, "book", "content", "calibration", "images")
 EXAMPLE_OUTPUT = os.path.join(
     CUR_DIR, "..", "examples", "OG-ETH-Example", "OUTPUT_BASELINE"
-)
-# OG-USA's chi_n for comparison, at a fixed OG-USA commit
-OGUSA_PARAMS_URL = (
-    "https://raw.githubusercontent.com/PSLmodels/OG-USA/"
-    "c225f85ecca0c5d4244bb97ab9e30aded09794ab/ogusa/"
-    "ogusa_default_parameters.json"
 )
 
 
@@ -185,6 +178,9 @@ def main():
         ss_path
     ) > os.path.getmtime(json_path):
         labor_supply_vs_data()
+        results_tables()
+        fiscal_path_panel()
+        consumption_vs_target()
 
 
 def earnings_vs_data(save_path=None):
@@ -600,16 +596,9 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
 
     ax = axes[1]
     chi_n = labor.steady_state_chi_n(params)
-    ax.semilogy(ages, chi_n, label="OG-ETH, calibrated to LFMS hours")
-    with urllib.request.urlopen(OGUSA_PARAMS_URL) as response:
-        chi_n_usa = np.asarray(json.load(response)["chi_n"], dtype=float)
-    if chi_n_usa.ndim == 2:
-        chi_n_usa = chi_n_usa[-1]
-    ax.semilogy(
-        income.model_ages(income.OGUSA_E, income.OGUSA_S),
-        chi_n_usa,
-        "--",
-        label="OG-USA (shipped before)",
+    ax.semilogy(ages, chi_n, label="OG-ETH, calibrated to hours by age")
+    ax.axhline(
+        labor.MAX_CHI_N, color="0.5", ls=":", label="OG-Core's upper bound"
     )
     ax.set_xlabel("Age")
     ax.set_ylabel(r"$\chi^n_s$ (log scale)")
@@ -617,6 +606,363 @@ def labor_supply_vs_data(output_dir=None, save_path=None):
     ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
+    return fig
+
+
+# Rows of the FY2024/25 validation table: label, moment, how it is used
+VALIDATION_ROWS = [
+    ("Personal income tax", "PIT/Y", "tuned (compliance scale)", "NBE"),
+    (
+        "Corporate and capital-income taxes",
+        "CIT/Y",
+        "tuned (CIT collections factor)",
+        "NBE",
+    ),
+    (
+        "Consumption taxes, fees and sales",
+        "cons tax/Y",
+        "tuned (`tau_c`)",
+        "NBE",
+    ),
+    ("Land-use fees", "wealth tax/Y", "tuned (`p_wealth`)", "NBE"),
+    (
+        "Pension contributions",
+        "payroll/Y",
+        "tuned (payroll coverage scale)",
+        "pension schemes",
+    ),
+    (
+        "Old-age pensions",
+        "pensions/Y",
+        "tuned (pension coverage scale)",
+        "ILO",
+    ),
+    (
+        "Foreign-owned share of private capital",
+        "K_f/K",
+        "tuned (`zeta_K`)",
+        "IMF BoP; PWT",
+    ),
+    ("Household wealth", "B/Y", "imposed", "PWT; IMF"),
+    ("General-government debt", "D/Y", "imposed", "IMF"),
+    ("Remittances", "RM/Y", "imposed", "IMF"),
+    (
+        "Gross capital formation (private and public)",
+        "(I+I_g)/Y",
+        "check",
+        "MoNS",
+    ),
+    ("Private consumption", "C/Y purch.", "check", "MoNS"),
+    ("Government consumption", "G/Y", "check", "MoNS"),
+    ("Net exports", "NX/Y", "check", "MoNS"),
+    (
+        "Payments abroad on capital and debt",
+        "factor payments/Y",
+        "check",
+        "IMF",
+    ),
+]
+HOURS_BANDS = [
+    (20, 25),
+    (25, 30),
+    (30, 35),
+    (35, 40),
+    (40, 45),
+    (45, 50),
+    (50, 55),
+    (55, 60),
+    (60, 65),
+    (65, 70),
+    (70, 80),
+    (80, 90),
+    (90, 100),
+]
+CONSUMPTION_BANDS = [
+    (20, 25),
+    (25, 30),
+    (30, 40),
+    (40, 50),
+    (50, 60),
+    (60, 65),
+    (65, 70),
+    (70, 80),
+    (80, 86),
+]
+
+
+def _band(lo, hi):
+    return f"{lo}\u2013{hi - 1}"
+
+
+def _num(x, digits, sign=False):
+    """A number for a table, with a typographic minus sign."""
+    text = f"{x:+.{digits}f}" if sign else f"{x:.{digits}f}"
+    return text.replace("-", "\u2212")
+
+
+def _write(path, lines):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def results_tables(output_dir=None, path=None):
+    """
+    Write the results tables of the calibration chapters from an example
+    run and the packaged parameters: the FY2024/25 and long-run validation
+    tables (macro.md), hours by age (households.md) and consumption and net
+    family transfers by age (households.md).
+
+    Args:
+        output_dir (str): OUTPUT_BASELINE directory of an example run;
+            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE
+        path (str): folder for the tables; defaults to the docs images
+            folder
+
+    Returns:
+        None
+    """
+    from ogcore.utils import safe_read_pickle
+    from ogeth import income, labor, targets
+    from ogeth import macro_params as mp
+
+    output_dir = EXAMPLE_OUTPUT if output_dir is None else output_dir
+    path = plot_path if path is None else path
+    params = safe_read_pickle(os.path.join(output_dir, "model_params.pkl"))
+    ss = safe_read_pickle(os.path.join(output_dir, "SS", "SS_vars.pkl"))
+    tpi = safe_read_pickle(os.path.join(output_dir, "TPI", "TPI_vars.pkl"))
+
+    # validation: first model year and steady state
+    m0 = targets.tpi_moments(tpi, 0)
+    mss = targets.ss_moments(ss)
+    lines = [
+        "| Ratio to GDP, FY2024/25 (percent) | Model | Data "
+        "| How it is used | Source |",
+        "|:---|:---:|:---:|:---|:---|",
+    ]
+    for label, key, use, source in VALIDATION_ROWS:
+        model, data = 100 * m0[key], 100 * targets.TRANSITION_TARGETS[key][0]
+        digits = 2 if abs(data) < 5 else 1
+        lines.append(
+            f"| {label} | {_num(model, digits)} | {_num(data, digits)} "
+            f"| {use} | {source} |"
+        )
+    lines += [
+        "",
+        "| Long run (steady state) | Model | Target |",
+        "|:---|:---:|:---:|",
+        f"| Owners' return on capital (real, percent a year) | "
+        f"{100 * mss['r_K']:.2f} | at least "
+        f"{100 * mp.OWNERS_RETURN_FLOOR:.2f} |",
+        f"| Firms' return on capital (real, percent a year) | "
+        f"{100 * mss['r']:.2f} | outcome |",
+        f"| Rate on market debt (real, percent a year) | "
+        f"{100 * mss['r_gov']:.2f} | {100 * mp.LONG_RUN_R_GOV:.2f} |",
+        f"| Private capital / GDP | {mss['K/Y']:.2f} | outcome "
+        f"({m0['K/Y']:.2f} in FY2024/25) |",
+        f"| Foreign-owned share of capital | {100 * mss['K_f/K']:.1f} "
+        "| outcome |",
+        f"| Private consumption / GDP | {100 * mss['C/Y purch.']:.1f} "
+        "| outcome |",
+    ]
+    _write(os.path.join(path, "validation_table.md"), lines)
+
+    # first-tier moments over the early transition
+    rows = [
+        ("Gross capital formation", "(I+I_g)/Y"),
+        ("Private consumption", "C/Y purch."),
+        ("Net exports", "NX/Y"),
+        ("General-government debt", "D/Y"),
+        ("Total tax", "total tax/Y"),
+        ("Foreign-owned share of private capital", "K_f/K"),
+        ("Firms' return on capital", "r"),
+    ]
+    years = [0, 2, 5, 10]
+    m_t = [targets.tpi_moments(tpi, t) for t in years]
+    lines = [
+        "| Percent of GDP (return: percent a year) | "
+        + " | ".join(str(int(params.start_year) + t) for t in years)
+        + " |",
+        "|:---|" + ":---:|" * len(years),
+    ]
+    for label, key in rows:
+        lines.append(
+            f"| {label} | "
+            + " | ".join(_num(100 * m[key], 1) for m in m_t)
+            + " |"
+        )
+    _write(os.path.join(path, "early_transition_table.md"), lines)
+
+    # hours by age, steady state
+    ages = income.model_ages(params.E, params.S)
+    scale = labor.WEEKLY_TIME_ENDOWMENT / params.ltilde
+    n_model = scale * labor.average_labor_supply(
+        np.asarray(ss["n"]), params.omega_SS
+    )
+    n_target = scale * labor.labor_supply_target(
+        params.E, params.S, params.ltilde
+    )
+    capped = labor.steady_state_chi_n(params) >= labor.MAX_CHI_N
+    lines = [
+        "| Age | Target: hours per person per week (LFMS 2021; ESS 2021/22 "
+        "shape from 65) | Model steady state |",
+        "|---|---|---|",
+    ]
+    for lo, hi in HOURS_BANDS:
+        k = (ages >= lo) & (ages < hi)
+        note = " ($\\chi^n$ at its cap)" if capped[k].all() else ""
+        lines.append(
+            f"| {_band(lo, hi)}{note} | {n_target[k].mean():.1f} "
+            f"| {n_model[k].mean():.1f} |"
+        )
+    _write(os.path.join(path, "hours_by_age_table.md"), lines)
+
+    # consumption per adult and net family transfers by age, steady state
+    a, model, data, gap = targets.consumption_profile(ss, params)
+    phi = mp.family_transfers_ss()
+    a_phi = np.arange(phi.shape[0]) + int(params.E)
+    lines = [
+        "| Age | Consumption per adult, model | Target | Net family "
+        "transfers received, percent of output |",
+        "|---|---|---|---|",
+    ]
+    for lo, hi in CONSUMPTION_BANDS:
+        k = (a >= lo) & (a < hi)
+        top = 101 if hi == 86 else hi
+        kp = (a_phi >= lo) & (a_phi < top)
+        label = f"{lo}+ (consumption to 85)" if hi == 86 else _band(lo, hi)
+        lines.append(
+            f"| {label} | {model[k].mean():.2f} | {data[k].mean():.2f} "
+            f"| {_num(100 * phi[kp].sum(), 1, sign=True)} |"
+        )
+    lines.append(
+        f"| Mean absolute gap, ages 20\u201385 | {gap:.3f} | | "
+        f"total received {100 * phi[phi > 0].sum():.1f} |"
+    )
+    _write(os.path.join(path, "consumption_by_age_table.md"), lines)
+
+
+def fiscal_path_panel(output_dir=None, save_path=None, years=36):
+    """
+    The near-term fiscal path: general-government debt, primary balance,
+    tax revenue and public investment as percent of GDP at market prices,
+    model path against the FY2024/25 outturn and the FY2025/26 budget
+    (IMF CR 26/174, NBE Annual Report 2024/25, rebased).
+
+    Args:
+        output_dir (str): OUTPUT_BASELINE directory of an example run;
+            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE
+        save_path (str): where to save the figure; defaults to the docs
+            images folder
+        years (int): number of transition years to plot
+
+    Returns:
+        matplotlib Figure
+    """
+    from ogcore.utils import safe_read_pickle
+    from ogeth import macro_params as mp
+    from ogeth import targets
+
+    output_dir = EXAMPLE_OUTPUT if output_dir is None else output_dir
+    if save_path is None:
+        save_path = os.path.join(plot_path, "fiscal_path_panel.png")
+    tpi = safe_read_pickle(os.path.join(output_dir, "TPI", "TPI_vars.pkl"))
+    params = safe_read_pickle(os.path.join(output_dir, "model_params.pkl"))
+    t = np.arange(years)
+    yr = int(params.start_year) + t
+
+    def ratio(key):
+        y = (
+            np.asarray(tpi["Y"])[:years]
+            + np.asarray(tpi["cons_tax_revenue"])[:years]
+        )
+        return 100 * np.asarray(tpi[key])[:years] / y
+
+    revenue = ratio("total_tax_revenue")
+    primary = revenue - ratio("total_primary_government_outlays")
+    if "foreign_aid" in tpi:
+        primary = primary + ratio("foreign_aid")
+    # actuals: cash accounts, rebased; primary balance = all revenue and
+    # grants less recurrent spending net of interest and capital spending
+    rev_all = (
+        100
+        * sum(mp.REVENUE_FY2425_BIRR_BN.values())
+        / (mp.NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"])
+    )
+    pb_actual = rev_all - (
+        mp.IMF_RECURRENT[0] - mp.IMF_INTEREST[0] + mp.IMF_CAPITAL[0]
+    )
+    tax_actual = 100 * targets.TRANSITION_TARGETS["total tax/Y"][0]
+    panels = [
+        (
+            "General-government debt",
+            ratio("D") + ratio("D_ext"),
+            mp.IMF_PUBLIC_DEBT,
+        ),
+        ("Primary balance (incl. grants)", primary, [pb_actual, None]),
+        ("Tax revenue (mapped instruments)", revenue, [tax_actual, None]),
+        ("Public investment", ratio("I_g"), mp.IMF_CAPITAL),
+    ]
+    fig, axes = plt.subplots(2, 2, figsize=(11, 7))
+    for ax, (title, path, data) in zip(axes.ravel(), panels):
+        ax.plot(yr, path, color="C0", label="OG-ETH baseline")
+        for i, (v, lab) in enumerate(
+            zip(data, ["FY2024/25 outturn", "FY2025/26 budget"])
+        ):
+            if v is not None:
+                ax.plot(
+                    yr[i], v, "o" if i == 0 else "D", color="C3", label=lab
+                )
+        lo, hi = (
+            min(path.min(), *[v for v in data if v is not None]),
+            max(path.max(), *[v for v in data if v is not None]),
+        )
+        pad = 0.15 * max(hi - lo, 1.0)
+        ax.set_ylim(lo - pad, hi + pad)
+        ax.set_title(title, fontsize=10)
+        ax.set_ylabel("Percent of GDP")
+        ax.grid(alpha=0.3)
+    axes[0, 0].legend(fontsize=8)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    return fig
+
+
+def consumption_vs_target(output_dir=None, save_path=None):
+    """
+    Plot steady-state consumption per adult by age against the consumption
+    target (targets.consumption_target), relative to ages 30-49.
+
+    Args:
+        output_dir (str): OUTPUT_BASELINE directory of an example run;
+            defaults to examples/OG-ETH-Example/OUTPUT_BASELINE
+        save_path (str): where to save the figure; defaults to the docs
+            images folder
+
+    Returns:
+        matplotlib Figure
+    """
+    from ogcore.utils import safe_read_pickle
+    from ogeth import targets
+
+    output_dir = EXAMPLE_OUTPUT if output_dir is None else output_dir
+    if save_path is None:
+        save_path = os.path.join(plot_path, "consumption_vs_target.png")
+    ss = safe_read_pickle(os.path.join(output_dir, "SS", "SS_vars.pkl"))
+    params = safe_read_pickle(os.path.join(output_dir, "model_params.pkl"))
+    ages, model, data, gap = targets.consumption_profile(ss, params)
+    k = ages <= 85
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    ax.plot(ages[k], model[k], label="OG-ETH steady state")
+    ax.plot(ages[k], data[k], "--", color="C3", label="Target")
+    ax.set_xlabel("Age")
+    ax.set_ylabel("Consumption per adult, relative to ages 30-49")
+    ax.set_title(f"Consumption by age: model vs. target (mean gap {gap:.3f})")
+    ax.legend(loc="lower center", fontsize=8)
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
     return fig
 
 

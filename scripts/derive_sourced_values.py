@@ -130,8 +130,8 @@ def sovereign_rate_scale():
 
 def nta_old_age_consumption():
     """NTA 2005 private consumption per person at 65-69, 70-79 and 80-85
-    relative to ages 30-49 (simple means over single ages): the target that
-    sizes net family transfers (households.md)."""
+    relative to ages 30-49 (simple means over single ages): a check on the
+    fitted net family transfers (households.md)."""
     c = pd.read_csv(
         DATA / "nta_consumption_by_age.csv", comment="#"
     ).set_index("age")["private_consumption"]
