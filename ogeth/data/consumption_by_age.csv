@@ -1,0 +1,73 @@
+# Consumption per adult by age, Ethiopia 2024, relative to ages 30-49; ages in completed years from
+# OG-Core's first model age (20); 85 is the open 85+ group. Default consumption-by-age target
+# for OG-Core countries: private consumption per person by age from the cross-country model of 70 NTA
+# profiles, with the consumption of people under 20 carried by the adults who support them (UN WPP
+# fertility, population and mortality; DHS cross-country medians for husband-wife age gaps and for
+# children not living with a parent). Inputs: ETH 2024: GDP per capita PPP 2892 (2024), old-age dependency 5.60 (2024)
+age,target
+20,0.5169
+21,0.5421
+22,0.5674
+23,0.5929
+24,0.6182
+25,0.6436
+26,0.6690
+27,0.6946
+28,0.7208
+29,0.7480
+30,0.7764
+31,0.8067
+32,0.8395
+33,0.8747
+34,0.9122
+35,0.9490
+36,0.9835
+37,1.0163
+38,1.0469
+39,1.0729
+40,1.0925
+41,1.1013
+42,1.0998
+43,1.0937
+44,1.0858
+45,1.0763
+46,1.0646
+47,1.0509
+48,1.0361
+49,1.0211
+50,1.0042
+51,0.9837
+52,0.9611
+53,0.9382
+54,0.9164
+55,0.8956
+56,0.8757
+57,0.8587
+58,0.8444
+59,0.8307
+60,0.8191
+61,0.8103
+62,0.8044
+63,0.8011
+64,0.7996
+65,0.8036
+66,0.8138
+67,0.8206
+68,0.8201
+69,0.8190
+70,0.8214
+71,0.8264
+72,0.8322
+73,0.8389
+74,0.8263
+75,0.8098
+76,0.8038
+77,0.7991
+78,0.8024
+79,0.8082
+80,0.8160
+81,0.8255
+82,0.8364
+83,0.8592
+84,0.8599
+85,0.8599

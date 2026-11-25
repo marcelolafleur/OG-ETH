@@ -6,6 +6,8 @@ scripts/world_bank_values.py.
 """
 
 # imports
+from importlib.resources import files
+
 import numpy as np
 
 # Solver settings written into the packaged parameters: outer-loop damping
@@ -355,6 +357,14 @@ CASH_TRANSFERS = rebased(
 # percent nominal USD, less US inflation (IMF BOP and IIP;
 # ogeth/data/imf_fdi_income_africa_peers.csv; macro.md, World interest rate).
 WORLD_INT_RATE_ANNUAL = 0.04
+# Discount factor, one for every group (households.md). Patience sets
+# household saving; the national accounts call for more saving than the
+# model produces, so patience is as high as the return evidence allows: the
+# owners' long-run return on capital (public-capital rent included,
+# government debt excluded) stays at or above the bottom of the 6-10 percent
+# evidence range (firms.md); at 0.94 it is 6.1 percent.
+BETA_ANNUAL = 0.94
+OWNERS_RETURN_FLOOR = 0.06
 
 # Long-run real rate on market debt: mean of the DSA's rates on new
 # domestic borrowing, 4.7 percent (macro.md, Interest rates).
@@ -363,7 +373,7 @@ LONG_RUN_R_GOV = round(sum(DSA_MARGINAL_DOMESTIC_REAL_RATES) / 200, 4)
 R_GOV_FLOOR = -0.12
 # Steady-state return at which r_gov_shift is evaluated: the solved
 # baseline of examples/run_og_eth.py.
-R_SS_FOR_R_GOV = 0.039962
+R_SS_FOR_R_GOV = 0.027362
 
 # Informal share of employment (ILOSTAT SDG 8.3.1, LFMS 2021). The formal
 # share is the richest lifetime-income groups (taxes.md, Informality).
@@ -396,7 +406,7 @@ NONCOMPLIANCE = [
 ]
 # Scale on compliance so PIT collects PIT_REVENUE_SHARE of GDP in
 # FY2024/25 (examples/tune.py; taxes.md).
-COMPLIANCE_SCALE = 0.056434
+COMPLIANCE_SCALE = 0.056221
 
 # Pension coverage by group: PSSSA and POESSA cover formal employment only.
 PENSION_COVERAGE = [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0]
@@ -415,7 +425,7 @@ PENSION_AVERAGING_YEARS = 3
 PENSION_CAREER_YEARS = 40
 # Scale on coverage so pension outlays match PENSIONS_SHARE_OF_GDP
 # (examples/tune.py).
-PENSION_COVERAGE_SCALE = 0.097098
+PENSION_COVERAGE_SCALE = 0.093803
 # Contributions: 7 percent employee plus 11 employer (Proclamations
 # 1267/1268 of 2022), on the covered groups times a scale tuned to about
 # 69 billion birr in FY2024/25 (POESSA ~29, Reporter 2025; PSSSA ~40,
@@ -424,7 +434,7 @@ PAYROLL_STATUTORY_RATE = 0.18
 PAYROLL_REVENUE_SHARE = round(
     69.0 / NOMINAL_GDP_REBASED_BIRR_BN["FY2024/25"], 5
 )
-PAYROLL_COVERAGE_SCALE = 0.097527
+PAYROLL_COVERAGE_SCALE = 0.099215
 
 # PIT Schedule A, birr per month, (upper bound, marginal rate): Proclamation
 # 979/2016 in FY2024/25, Proclamation 1395/2025 from FY2025/26.
@@ -658,7 +668,7 @@ def mean_income_per_adult():
 # Model household income (r_p b + w e n) over market-price GDP in the
 # solved steady state (examples/tune.py); scales GDP per adult into
 # mean_income_data.
-MODEL_INCOME_SHARE_OF_GDP = 0.861073
+MODEL_INCOME_SHARE_OF_GDP = 0.85403
 
 
 def model_income_share(ss, p):
@@ -870,103 +880,59 @@ def transfer_eta_path(p):
     )
 
 
-# Net family transfers (phi_FT): working-age members of each group support
-# its elders, net of government transfers to them; size set so old-age
-# consumption matches NTA 2005 (data/nta_consumption_by_age.csv). Steady-
-# state size is a share of the model's Y, not market-price GDP
-# (households.md, Net family transfers).
-FAMILY_GIVER_AGES = (25, 65)
-FAMILY_RECEIVER_AGE = 65
-FAMILY_TRANSFER_SHARE_SS = 0.17
+# Net family transfers (phi_FT): shares of the model's output Y received
+# (positive) or given (negative) by each age and lifetime-income group,
+# summing to zero within each group. The steady-state matrix
+# (data/family_transfers_ss.csv) is fitted so that each group's consumption
+# by age follows the consumption target (targets.consumption_target)
+# (examples/fit_family_transfers.py; households.md, Net family transfers).
+FAMILY_TRANSFERS_FILE = "family_transfers_ss.csv"
 
 
-def family_transfers(omega, e, eta, alpha_T, total_share, first_age=20):
+def family_transfers_ss():
     """
-    Net family transfer shares of GDP for one period.
-
-    Args:
-        omega (array_like): population distribution, (S, J)
-        e (array_like): earnings matrix, (S, J)
-        eta (array_like): transfer allocation matrix, (S, J)
-        alpha_T (scalar): government transfers, share of GDP
-        total_share (scalar): family transfers before netting, share of GDP
-        first_age (int): age of the first model age (OG-Core's E)
+    Steady-state net family transfers, shares of the model's output Y.
 
     Returns:
-        Numpy array: (S, J), positive for receivers, summing to zero
+        Numpy array: (S, J), each column summing to zero
     """
-    omega = np.asarray(omega, dtype=float)
-    e = np.asarray(e, dtype=float)
-    S, J = omega.shape
-    age = np.arange(S) + first_age
-    give = (age >= FAMILY_GIVER_AGES[0]) & (age < FAMILY_GIVER_AGES[1])
-    recv = age >= FAMILY_RECEIVER_AGE
-    capacity = omega * e * give[:, np.newaxis]
-    group_share = capacity.sum(axis=0) / capacity.sum()
-    public = alpha_T * np.asarray(eta, dtype=float)[recv].sum(axis=0)
-    pot = np.maximum(total_share * group_share - public, 0.0)
-    phi = np.zeros((S, J))
-    for j in range(J):
-        if pot[j] == 0.0:
-            continue
-        phi[give, j] = -pot[j] * capacity[give, j] / capacity[give, j].sum()
-        phi[recv, j] = pot[j] * omega[recv, j] / omega[recv, j].sum()
-    return phi
+    text = (
+        files("ogeth")
+        .joinpath("data", FAMILY_TRANSFERS_FILE)
+        .read_text(encoding="utf-8")
+    )
+    rows = [r for r in text.splitlines() if r and not r.startswith("#")]
+    return np.loadtxt(rows[1:], delimiter=",")[:, 1:]
 
 
-def family_transfer_path(p, eta, alpha_T, tol=1e-12):
+def family_transfer_path(p, phi_ss=None, tol=1e-12):
     """
-    Net family transfer shares for each transition year of the demographics
-    and earnings in ``p`` (allocation_path).
+    Net family transfer shares for each transition year of the population
+    in ``p``: each receiving cell keeps its transfer per person relative to
+    output per person, and the givers of each group pay the group's total
+    in their steady-state proportions per person, so every year sums to
+    zero within each group.
 
     Args:
         p (Specifications): model parameters
-        eta (array_like): transfer matrices by year, (n, S, J)
-        alpha_T (array_like): government transfers, share of GDP, by year
+        phi_ss (array_like): steady-state matrix, (S, J); default
+            family_transfers_ss()
         tol (scalar): trailing years within tol of steady state are dropped
 
     Returns:
         Numpy array: (n + 1, S, J)
     """
-    TS = int(p.T) + int(p.S)
-    first_age = int(p.E)
-    e = np.asarray(p.e, dtype=float)
-    e = e[-1] if e.ndim == 3 else e
-
-    def held(value):
-        value = np.asarray(value, dtype=float)
-        if value.shape[0] >= TS:
-            return value[:TS]
-        pad = np.repeat(value[-1:], TS - value.shape[0], axis=0)
-        return np.concatenate([value, pad])
-
+    phi_SS = family_transfers_ss() if phi_ss is None else np.asarray(phi_ss)
     omega = np.asarray(p.omega, dtype=float)
-    omega_SS = np.asarray(p.omega_SS, dtype=float)
-    eta = held(eta)
-    alpha_T = held(np.asarray(alpha_T, dtype=float).flatten())
-    S = omega_SS.shape[0]
-    recv = np.arange(S) + first_age >= FAMILY_RECEIVER_AGE
-
-    def elder_share(om):
-        return om[recv].sum() / om.sum()
-
-    share_SS = elder_share(omega_SS)
-    phi_SS = family_transfers(
-        omega_SS, e, eta[-1], alpha_T[-1], FAMILY_TRANSFER_SHARE_SS, first_age
-    )
-    path = np.array(
-        [
-            family_transfers(
-                omega[t],
-                e,
-                eta[t],
-                alpha_T[t],
-                FAMILY_TRANSFER_SHARE_SS * elder_share(omega[t]) / share_SS,
-                first_age,
-            )
-            for t in range(omega.shape[0])
-        ]
-    )
+    per_person = phi_SS / np.asarray(p.omega_SS, dtype=float)
+    path = np.zeros(omega.shape)
+    for t in range(omega.shape[0]):
+        x = per_person * omega[t]
+        for j in range(x.shape[1]):
+            give, recv = x[:, j] < 0, x[:, j] > 0
+            if give.any():
+                x[give, j] *= x[recv, j].sum() / -x[give, j].sum()
+        path[t] = x
     n = path.shape[0]
     while n > 0 and np.abs(path[n - 1] - phi_SS).max() < tol:
         n -= 1
@@ -1162,7 +1128,7 @@ FIRM_RETURN_TARGET = 0.05
 # factor here after each retune (tests check it matches the JSON).
 CIT_RATE = 0.30
 C_CORP_SHARE_OF_ASSETS = 0.55
-CIT_COLLECTIONS_FACTOR = 0.3755
+CIT_COLLECTIONS_FACTOR = 0.3749
 BUSINESS_TAX_WEDGE = round(
     CIT_RATE * C_CORP_SHARE_OF_ASSETS * CIT_COLLECTIONS_FACTOR, 4
 )
@@ -1198,9 +1164,8 @@ def baseline_params(p):
     out.update(compliance_paths())
     out["zeta_D"] = zeta_D_path()
     out["eta"] = transfer_eta_path(p).tolist()
-    out["phi_FT"] = family_transfer_path(
-        p, out["eta"], out["alpha_T"]
-    ).tolist()
+    out["phi_FT"] = family_transfer_path(p).tolist()
+    out["beta_annual"] = [BETA_ANNUAL] * len(LAMBDAS)
     out.update(remittance_params(p))
     out.update(remittance_level_params())
     out.update(

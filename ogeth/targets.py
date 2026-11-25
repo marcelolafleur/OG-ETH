@@ -124,7 +124,10 @@ SS_TARGETS = {
         "debt_ratio_ss (all market debt by then)",
     ),
     "r_gov": (mp.LONG_RUN_R_GOV, "r_gov_shift (long run)"),
-    "r": (mp.WORLD_INT_RATE_ANNUAL, "discount factor level"),
+    "r_K": (
+        mp.OWNERS_RETURN_FLOOR,
+        "lower bound on owners' return (discount factor)",
+    ),
     "K/Y": (mp.PRIVATE_CAPITAL_OUTPUT_RATIO, "outcome (provisional anchor)"),
 }
 
@@ -160,7 +163,9 @@ def tpi_moments(tpi, t=0):
     Ym = at("Y")
     Y = _market_y(Ym, at("cons_tax_revenue"))
     r_p = at("r_p")
-    nx = Ym - at("C") - at("I_total") - at("I_g") - at("G")
+    # C_i is spending on goods, the subsistence floor included (the
+    # resource constraint's consumption); C excludes the floor
+    nx = Ym - at("C_i") - at("I_total") - at("I_g") - at("G")
     return {
         "PIT/Y": at("iit_revenue") / Y,
         "CIT/Y": at("business_tax_revenue") / Y,
@@ -172,7 +177,7 @@ def tpi_moments(tpi, t=0):
         "K_f/K": at("K_f") / at("K"),
         "B/Y": at("B") / Y,
         "D/Y": (at("D") + at("D_ext")) / Y,
-        "C/Y purch.": (at("C") + at("cons_tax_revenue")) / Y,
+        "C/Y purch.": (at("C_i") + at("cons_tax_revenue")) / Y,
         "G/Y": (at("G") + _cfc_g(at("K_g"))) / Y,
         "NX/Y": nx / Y,
         "RM/Y": at("RM") / Y,
@@ -205,7 +210,7 @@ def ss_moments(ss):
 
     Ym = float(np.squeeze(ss["Y"]))
     Y = _market_y(Ym, sc("cons_tax_revenue"))
-    nx = Ym - sc("C") - sc("I_total") - sc("I_g") - sc("G")
+    nx = Ym - sc("C_i") - sc("I_total") - sc("I_g") - sc("G")
     return {
         "PIT/Y": sc("iit_revenue") / Y,
         "CIT/Y": sc("business_tax_revenue") / Y,
@@ -224,10 +229,75 @@ def ss_moments(ss):
         "K/Y": sc("K") / Y,
         "K_f/K": sc("K_f") / sc("K"),
         "B/Y": sc("B") / Y,
-        "C/Y purch.": (sc("C") + sc("cons_tax_revenue")) / Y,
+        "C/Y purch.": (sc("C_i") + sc("cons_tax_revenue")) / Y,
         "NX/Y": nx / Y,
         "RM/Y": sc("RM") / Y,
         "r": sc("r"),
+        # owners' return on capital: the firms' return plus the rent on
+        # public capital passed to them (aggregates.get_r_p), government
+        # debt excluded
+        "r_K": sc("r")
+        + (1 - mp.BUSINESS_TAX_WEDGE) * mp.GAMMA_G * Ym / sc("K"),
         "r_gov": sc("r_gov"),
         "factor": sc("factor"),
     }
+
+
+# Consumption by age: consumption per adult aged 20+ (OG-Core's first model
+# age, E), each adult also carrying the consumption of the people under 20
+# they support, relative to ages 30-49;
+# ages above 85 take the open 85+ value. The default target for OG-Core
+# countries (ogeth/data/consumption_by_age.csv; households.md, Net family
+# transfers).
+CONSUMPTION_TARGET_FILE = "consumption_by_age.csv"
+PROFILE_BASE_AGES = (30, 50)
+PROFILE_FIT_AGES = (20, 86)
+
+
+def consumption_target(ages):
+    """
+    Target consumption per adult at the given ages, relative to the mean at
+    ages 30-49.
+
+    Args:
+        ages (array_like): ages in completed years (20 and over)
+
+    Returns:
+        Numpy array: the target at ``ages``
+    """
+    from importlib.resources import files
+
+    text = (
+        files("ogeth")
+        .joinpath("data", CONSUMPTION_TARGET_FILE)
+        .read_text(encoding="utf-8")
+    )
+    rows = [r.split(",") for r in text.splitlines() if r and r[0] != "#"]
+    a = np.array([float(r[0]) for r in rows[1:]])
+    v = np.array([float(r[1]) for r in rows[1:]])
+    x = np.clip(np.asarray(ages, float), a.min(), a.max())
+    return np.interp(x, a, v)
+
+
+def consumption_profile(ss, p):
+    """
+    Steady-state consumption per person by age (the floor included),
+    averaged over groups with the population weights, relative to ages
+    30-49, with the target and the mean absolute gap at ages 20-85.
+
+    Args:
+        ss (dict): a solved ``SS_vars.pkl``
+        p (Specifications): its parameters
+
+    Returns:
+        tuple: (ages, model profile, data profile, mean absolute gap)
+    """
+    omega = np.asarray(p.omega_SS, dtype=float)
+    c = np.asarray(ss["c"]) + float(np.asarray(p.c_min).ravel()[0])
+    ages = np.arange(omega.shape[0]) + int(p.E)
+    model = (c * omega).sum(axis=1) / omega.sum(axis=1)
+    base = (ages >= PROFILE_BASE_AGES[0]) & (ages < PROFILE_BASE_AGES[1])
+    model = model / model[base].mean()
+    data = consumption_target(ages)
+    fit = (ages >= PROFILE_FIT_AGES[0]) & (ages < PROFILE_FIT_AGES[1])
+    return ages, model, data, float(np.abs(model - data)[fit].mean())

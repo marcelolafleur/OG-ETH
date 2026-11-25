@@ -10,7 +10,6 @@ its own target:
 
     dial                               moment (ogeth/targets.py)
     chi_n by age                       hours per person by age (LFMS 2021), SS
-    beta_annual (one value, all groups) SS r at the world rate
     initial_hhwealth_dist              burn-in: the shape chosen in period 0
     zeta_K                             K_f/K in FY2024/25
     compliance scale                   PIT/Y in FY2024/25
@@ -56,18 +55,9 @@ from ogeth.targets import SS_TARGETS, TRANSITION_TARGETS, ss_moments
 from ogeth.targets import tpi_moments
 from ogeth.warm_start import enable, solve_ss_from
 
-# Bounds on the discount factor (households.md)
-BETA_BOUNDS = (0.5, 0.995)
-
 # Revenue is close to proportional to its rate or scale, so those dials
-# take the full step. The level of the discount factors moves the
-# steady-state return: scaling all of them by 0.98, 0.96 and 0.94 gave
-# returns of 3.1, 3.9 and 4.6 percent (tuning runs of 16 November 2026), a
-# log-patience change of about -2.8 per unit of return. The level step is
-# that slope times the return gap, damped and bounded.
-R_LEVEL_SLOPE = 2.8
-LEVEL_DAMPING = 0.8
-LEVEL_STEP = 1.04
+# take the full step. The discount factor is not tuned: it is a constant
+# (macro_params.BETA_ANNUAL; households.md).
 DIAL_BOUNDS = (0.5, 2.0)
 
 
@@ -123,25 +113,6 @@ def next_overrides(p, ss, tm, tpi=None):
     n_model = labor.average_labor_supply(np.asarray(ss["n"]), p.omega_SS)
     chi_n = labor.steady_state_chi_n(p)
     out["chi_n"] = labor.chi_n_step(chi_n, n_model, n_target, p).tolist()
-    # One discount factor for every group. The WID wealth shares for
-    # Ethiopia are imputed (from income inequality and similar countries,
-    # WID technical notes 2023/2025), not measured; matching them forced
-    # patience above one for the richest group and to 0.5 for the poorest.
-    # Wealth inequality is an outcome of measured earnings dispersion and
-    # bequests, reported against WID as a check. chi_b keeps its values.
-    lambdas = np.asarray(p.lambdas).flatten()
-    beta = np.asarray(p.beta_annual, dtype=float).flatten()
-    beta = np.full_like(beta, np.exp(np.dot(lambdas, np.log(beta))))
-    # level of patience: the steady-state return at the world rate (lower
-    # patience, less saving, a higher return)
-    r_gap = SS_TARGETS["r"][0] - float(np.squeeze(ss["r"]))
-    beta = beta * float(
-        np.clip(
-            np.exp(-LEVEL_DAMPING * R_LEVEL_SLOPE * r_gap),
-            1 / LEVEL_STEP,
-            LEVEL_STEP,
-        )
-    )
     sc = scales_from(p)
     if tm is not None:
         t = {k: v[0] for k, v in TRANSITION_TARGETS.items()}
@@ -175,7 +146,6 @@ def next_overrides(p, ss, tm, tpi=None):
                 * _ratio(t["wealth tax/Y"], tm["wealth tax/Y"])
             )
         ]
-    out["beta_annual"] = np.clip(beta, *BETA_BOUNDS).tolist()
     # the sovereign-rate shift path is evaluated at the solved return
     out["r_gov_shift"] = mp.market_r_gov_shift_path(
         float(np.asarray(p.r_gov_scale).flatten()[0]),
